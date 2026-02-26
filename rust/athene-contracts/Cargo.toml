@@ -1,0 +1,17 @@
+[package]
+name = "athene-contracts"
+version = "0.1.0"
+edition = "2021"
+description = "Shared DTOs and API contracts for Athene services"
+license = "MIT OR Apache-2.0"
+authors = ["Athene Team"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.11", features = ["serde", "v4"] }
+validator = { version = "0.18", features = ["derive"] }
+utoipa = { version = "5.2", default-features = false, features = ["macros", "axum_extras", "chrono"] }
+
+[features]
+default = []

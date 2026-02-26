@@ -1,0 +1,3 @@
+[workspace]
+members = ["rust/athene-contracts"]
+resolver = "2"

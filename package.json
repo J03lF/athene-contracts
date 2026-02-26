@@ -1,0 +1,14 @@
+{
+  "name": "@athene/contracts",
+  "version": "0.1.0",
+  "description": "Shared API contracts for Athene frontend clients",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "echo \"@athene/contracts uses source files directly\""
+  }
+}
