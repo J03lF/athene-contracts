@@ -5,4 +5,6 @@
 pub mod common;
 pub mod auth;
 
-pub use common::{ApiError, ApiResponse, ListMeta, ListResponse};
+pub use common::{
+    ApiError, ApiErrorCode, ApiErrorEnvelope, ApiResponse, ListMeta, ListResponse,
+};

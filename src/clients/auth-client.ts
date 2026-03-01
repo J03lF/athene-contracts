@@ -48,6 +48,10 @@ export class AuthApiClient {
     return this.http.post('/auth/logout', {});
   }
 
+  refresh(): Promise<AuthSessionResponse> {
+    return this.http.post('/auth/refresh', {});
+  }
+
   passwordReset(request: PasswordResetRequest): Promise<PasswordResetResponse> {
     return this.http.post('/auth/password/reset', request);
   }
