@@ -2,9 +2,9 @@
 //!
 //! Shared DTOs that backend services and clients agree on.
 
-pub mod common;
+pub mod admin;
 pub mod auth;
+pub mod common;
+pub mod user;
 
-pub use common::{
-    ApiError, ApiErrorCode, ApiErrorEnvelope, ApiResponse, ListMeta, ListResponse,
-};
+pub use common::{ApiError, ApiErrorCode, ApiErrorEnvelope, ApiResponse, ListMeta, ListResponse};
