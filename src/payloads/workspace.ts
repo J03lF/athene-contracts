@@ -4,6 +4,8 @@ export interface WorkspaceResponse {
   slug: string;
   logo_url?: string | null;
   owner_id: string;
+  role: string;
+  joined_at: string;
   created_at: string;
 }
 
