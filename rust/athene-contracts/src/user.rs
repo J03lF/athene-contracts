@@ -6,6 +6,7 @@ pub struct UserSettingsResponse {
     pub theme: String,
     pub language: String,
     pub shortcuts: serde_json::Value,
+    pub dashboard_layout: Option<serde_json::Value>,
     pub notifications_enabled: bool,
     pub email_notifications: bool,
 }
@@ -15,6 +16,7 @@ pub struct UpdateUserSettingsRequest {
     pub theme: Option<String>,
     pub language: Option<String>,
     pub shortcuts: Option<serde_json::Value>,
+    pub dashboard_layout: Option<serde_json::Value>,
     pub notifications_enabled: Option<bool>,
     pub email_notifications: Option<bool>,
 }

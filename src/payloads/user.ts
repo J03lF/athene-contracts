@@ -2,6 +2,7 @@ export interface UserSettingsResponse {
   theme: string;
   language: string;
   shortcuts: unknown;
+  dashboard_layout?: unknown;
   notifications_enabled: boolean;
   email_notifications: boolean;
 }
@@ -10,6 +11,7 @@ export interface UpdateUserSettingsRequest {
   theme?: string | null;
   language?: string | null;
   shortcuts?: unknown;
+  dashboard_layout?: unknown;
   notifications_enabled?: boolean | null;
   email_notifications?: boolean | null;
 }
