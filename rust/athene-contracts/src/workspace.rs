@@ -26,4 +26,9 @@ pub struct JoinInviteResponse {
     pub already_member: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct CreateWorkspaceRequest {
+    pub name: String,
+}
+
 pub type WorkspaceListResponse = crate::ListResponse<WorkspaceResponse>;

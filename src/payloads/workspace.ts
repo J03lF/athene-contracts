@@ -19,3 +19,7 @@ export interface JoinInviteResponse {
   workspace_slug: string;
   already_member: boolean;
 }
+
+export interface CreateWorkspaceRequest {
+  name: string;
+}
