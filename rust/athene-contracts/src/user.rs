@@ -4,6 +4,7 @@ use utoipa::ToSchema;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct UserSettingsResponse {
     pub theme: String,
+    pub palette: String,
     pub language: String,
     pub shortcuts: serde_json::Value,
     pub dashboard_layout: Option<serde_json::Value>,
@@ -14,6 +15,7 @@ pub struct UserSettingsResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct UpdateUserSettingsRequest {
     pub theme: Option<String>,
+    pub palette: Option<String>,
     pub language: Option<String>,
     pub shortcuts: Option<serde_json::Value>,
     pub dashboard_layout: Option<serde_json::Value>,

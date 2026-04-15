@@ -5,6 +5,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::common::{ApiResponse, ListResponse};
+use crate::persistence::DbEnum;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Validate, ToSchema)]
 pub struct LoginRequest {
@@ -100,6 +101,27 @@ impl Default for UserRole {
     }
 }
 
+impl DbEnum for UserRole {
+    fn from_db(value: Option<&str>) -> Result<Self, String> {
+        match value.unwrap_or("user") {
+            "admin" => Ok(UserRole::Admin),
+            "operator" => Ok(UserRole::Operator),
+            "user" => Ok(UserRole::User),
+            "guest" => Ok(UserRole::Guest),
+            other => Err(format!("invalid user role '{}'", other)),
+        }
+    }
+
+    fn to_db(&self) -> &'static str {
+        match self {
+            UserRole::Admin => "admin",
+            UserRole::Operator => "operator",
+            UserRole::User => "user",
+            UserRole::Guest => "guest",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub enum UserStatus {
     #[serde(rename = "active")]
@@ -115,6 +137,27 @@ pub enum UserStatus {
 impl Default for UserStatus {
     fn default() -> Self {
         Self::PendingVerification
+    }
+}
+
+impl DbEnum for UserStatus {
+    fn from_db(value: Option<&str>) -> Result<Self, String> {
+        match value.unwrap_or("pending_verification") {
+            "active" => Ok(UserStatus::Active),
+            "inactive" => Ok(UserStatus::Inactive),
+            "locked" => Ok(UserStatus::Locked),
+            "pending_verification" => Ok(UserStatus::PendingVerification),
+            other => Err(format!("invalid user status '{}'", other)),
+        }
+    }
+
+    fn to_db(&self) -> &'static str {
+        match self {
+            UserStatus::Active => "active",
+            UserStatus::Inactive => "inactive",
+            UserStatus::Locked => "locked",
+            UserStatus::PendingVerification => "pending_verification",
+        }
     }
 }
 
@@ -140,6 +183,25 @@ pub enum RegistrationMode {
     ApiKeyRequired,
     #[serde(rename = "open")]
     Open,
+}
+
+impl DbEnum for RegistrationMode {
+    fn from_db(value: Option<&str>) -> Result<Self, String> {
+        match value.unwrap_or("disabled") {
+            "disabled" => Ok(RegistrationMode::Disabled),
+            "api_key_required" => Ok(RegistrationMode::ApiKeyRequired),
+            "open" => Ok(RegistrationMode::Open),
+            other => Err(format!("invalid registration mode '{}'", other)),
+        }
+    }
+
+    fn to_db(&self) -> &'static str {
+        match self {
+            RegistrationMode::Disabled => "disabled",
+            RegistrationMode::ApiKeyRequired => "api_key_required",
+            RegistrationMode::Open => "open",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]

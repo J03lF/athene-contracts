@@ -1,5 +1,6 @@
 export interface UserSettingsResponse {
   theme: string;
+  palette: string;
   language: string;
   shortcuts: unknown;
   dashboard_layout?: unknown;
@@ -9,6 +10,7 @@ export interface UserSettingsResponse {
 
 export interface UpdateUserSettingsRequest {
   theme?: string | null;
+  palette?: string | null;
   language?: string | null;
   shortcuts?: unknown;
   dashboard_layout?: unknown;
