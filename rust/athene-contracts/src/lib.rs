@@ -7,6 +7,7 @@ pub mod admin;
 pub mod auth;
 pub mod common;
 pub mod dashboard;
+pub mod field_definitions;
 pub mod persistence;
 pub mod user;
 pub mod work;

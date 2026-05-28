@@ -70,6 +70,12 @@ export interface TicketResponse {
   resolved_at: string | null;
   due_date: string | null;
   sla_breached: boolean;
+  /**
+   * Custom field values keyed by `FieldDefinition.key`. Server-validated
+   * against the workspace's definitions before persistence; unknown keys
+   * are dropped server-side. Always a plain object — `{}` when empty.
+   */
+  custom_values: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -87,10 +93,22 @@ export interface CreateTicketRequest {
   sla_policy_id?: string | null;
   /** RFC3339 timestamp. */
   due_date?: string | null;
+  /**
+   * Custom field values keyed by `FieldDefinition.key`. Optional — defaults
+   * to `{}`. Server validates against the project's workspace definitions
+   * and returns 400 for type mismatches or missing required fields.
+   */
+  custom_values?: Record<string, unknown>;
 }
 
 export interface UpdateTicketStatusRequest {
   status: string;
+}
+
+export interface UpdateTicketCustomValuesRequest {
+  /** Replace the ticket's custom_values bucket wholesale. Server validates
+   *  the shape against the workspace's field definitions before saving. */
+  custom_values: Record<string, unknown>;
 }
 
 export interface AssignTicketRequest {

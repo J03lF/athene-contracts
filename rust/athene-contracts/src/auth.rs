@@ -83,22 +83,17 @@ pub struct AuthUser {
     pub last_login_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub enum UserRole {
     #[serde(rename = "admin")]
     Admin,
     #[serde(rename = "operator")]
     Operator,
     #[serde(rename = "user")]
+    #[default]
     User,
     #[serde(rename = "guest")]
     Guest,
-}
-
-impl Default for UserRole {
-    fn default() -> Self {
-        Self::User
-    }
 }
 
 impl DbEnum for UserRole {
@@ -122,7 +117,7 @@ impl DbEnum for UserRole {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub enum UserStatus {
     #[serde(rename = "active")]
     Active,
@@ -131,13 +126,8 @@ pub enum UserStatus {
     #[serde(rename = "locked")]
     Locked,
     #[serde(rename = "pending_verification")]
+    #[default]
     PendingVerification,
-}
-
-impl Default for UserStatus {
-    fn default() -> Self {
-        Self::PendingVerification
-    }
 }
 
 impl DbEnum for UserStatus {

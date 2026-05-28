@@ -16,6 +16,7 @@ import type {
   SprintResponse,
   TicketLinkResponse,
   TicketResponse,
+  UpdateTicketCustomValuesRequest,
   UpdateTicketStatusRequest,
   WatcherResponse,
 } from '../payloads/work';
@@ -72,6 +73,17 @@ export class WorkApiClient {
   ): Promise<TicketResponse> {
     return this.http
       .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}/assign`, body)
+      .then(unwrap);
+  }
+  updateTicketCustomValues(
+    id: string,
+    body: UpdateTicketCustomValuesRequest,
+  ): Promise<TicketResponse> {
+    return this.http
+      .patch<ApiEnvelope<TicketResponse>>(
+        `/work/tickets/${id}/custom-values`,
+        body,
+      )
       .then(unwrap);
   }
 
