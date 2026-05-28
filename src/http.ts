@@ -1,21 +1,41 @@
 export interface AtheneHttpClient {
   get<T>(path: string, config?: RequestInit): Promise<T>;
   post<T>(path: string, body?: unknown, config?: RequestInit): Promise<T>;
+  patch<T>(path: string, body?: unknown, config?: RequestInit): Promise<T>;
+  put<T>(path: string, body?: unknown, config?: RequestInit): Promise<T>;
+  delete<T>(path: string, config?: RequestInit): Promise<T>;
 }
 
 export class FetchAtheneClient implements AtheneHttpClient {
   constructor(private readonly baseUrl: string, private readonly defaultHeaders: HeadersInit = {}) {}
 
-  async get<T>(path: string, config: RequestInit = {}): Promise<T> {
+  get<T>(path: string, config: RequestInit = {}): Promise<T> {
     return this.request<T>('GET', path, undefined, config);
   }
-
-  async post<T>(path: string, body?: unknown, config: RequestInit = {}): Promise<T> {
+  post<T>(path: string, body?: unknown, config: RequestInit = {}): Promise<T> {
     return this.request<T>('POST', path, body, config);
   }
+  patch<T>(path: string, body?: unknown, config: RequestInit = {}): Promise<T> {
+    return this.request<T>('PATCH', path, body, config);
+  }
+  put<T>(path: string, body?: unknown, config: RequestInit = {}): Promise<T> {
+    return this.request<T>('PUT', path, body, config);
+  }
+  delete<T>(path: string, config: RequestInit = {}): Promise<T> {
+    return this.request<T>('DELETE', path, undefined, config);
+  }
 
-  private async request<T>(method: string, path: string, body?: unknown, config: RequestInit = {}): Promise<T> {
-    const headers = new Headers({ 'content-type': 'application/json', ...this.defaultHeaders, ...config.headers });
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    config: RequestInit = {},
+  ): Promise<T> {
+    const headers = new Headers({
+      'content-type': 'application/json',
+      ...this.defaultHeaders,
+      ...config.headers,
+    });
     const response = await fetch(`${this.baseUrl}${path}`, {
       method,
       headers,

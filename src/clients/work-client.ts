@@ -1,21 +1,79 @@
 import type {
   AddWatcherRequest,
+  AssignTicketRequest,
   AssignTicketsRequest,
   CreateLabelRequest,
+  CreateProjectRequest,
   CreateSprintRequest,
   CreateTicketLinkRequest,
+  CreateTicketRequest,
   LabelResponse,
   LinkRelation,
+  ListTicketsQuery,
+  ProjectResponse,
   SetLabelsRequest,
   SprintBurnDownResponse,
   SprintResponse,
   TicketLinkResponse,
+  TicketResponse,
+  UpdateTicketStatusRequest,
   WatcherResponse,
 } from '../payloads/work';
 import type { AtheneHttpClient } from '../http';
 
+interface ApiEnvelope<T> {
+  data: T;
+}
+
+function unwrap<T>(envelope: ApiEnvelope<T>): T {
+  return envelope.data;
+}
+
 export class WorkApiClient {
   constructor(private readonly http: AtheneHttpClient) {}
+
+  // ---------- Projects ----------
+  listProjects(): Promise<ProjectResponse[]> {
+    return this.http
+      .get<ApiEnvelope<ProjectResponse[]>>('/work/projects')
+      .then(unwrap);
+  }
+  createProject(body: CreateProjectRequest): Promise<ProjectResponse> {
+    return this.http
+      .post<ApiEnvelope<ProjectResponse>>('/work/projects', body)
+      .then(unwrap);
+  }
+
+  // ---------- Tickets ----------
+  listTickets(query: ListTicketsQuery = {}): Promise<TicketResponse[]> {
+    const qs = query.project_id
+      ? `?project_id=${encodeURIComponent(query.project_id)}`
+      : '';
+    return this.http
+      .get<ApiEnvelope<TicketResponse[]>>(`/work/tickets${qs}`)
+      .then(unwrap);
+  }
+  createTicket(body: CreateTicketRequest): Promise<TicketResponse> {
+    return this.http
+      .post<ApiEnvelope<TicketResponse>>('/work/tickets', body)
+      .then(unwrap);
+  }
+  updateTicketStatus(
+    id: string,
+    body: UpdateTicketStatusRequest,
+  ): Promise<TicketResponse> {
+    return this.http
+      .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}/status`, body)
+      .then(unwrap);
+  }
+  assignTicket(
+    id: string,
+    body: AssignTicketRequest,
+  ): Promise<TicketResponse> {
+    return this.http
+      .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}/assign`, body)
+      .then(unwrap);
+  }
 
   // ---------- Sprints ----------
   listSprintsForProject(projectId: string): Promise<SprintResponse[]> {

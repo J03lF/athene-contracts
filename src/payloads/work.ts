@@ -35,6 +35,94 @@ export interface MyTicketEntry {
   updated_at: string;
 }
 
+// Full ticket response shape returned by `GET /work/tickets`, `POST /work/tickets`,
+// and the status/assign mutations. Mirrors `athene::transport::http::handlers::work::TicketDto`.
+export type TicketStatus =
+  | 'open'
+  | 'in_progress'
+  | 'in_review'
+  | 'blocked'
+  | 'done'
+  | 'closed';
+
+export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
+
+export interface TicketResponse {
+  id: string;
+  project_id: string;
+  /**
+   * Per-project monotonic counter. Combined with the project's `key` it
+   * produces the human-readable ticket key (e.g. `WEB-128`). Backfilled
+   * for legacy tickets by migration 0007.
+   */
+  sequence: number;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  assignee_id: string | null;
+  reporter_id: string;
+  sla_policy_id: string | null;
+  triage_category: string | null;
+  triage_reason: string | null;
+  triaged_at: string | null;
+  first_response_at: string | null;
+  resolved_at: string | null;
+  due_date: string | null;
+  sla_breached: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ListTicketsQuery {
+  project_id?: string;
+}
+
+export interface CreateTicketRequest {
+  project_id: string;
+  title: string;
+  description: string;
+  priority: string;
+  assignee_id?: string | null;
+  sla_policy_id?: string | null;
+  /** RFC3339 timestamp. */
+  due_date?: string | null;
+}
+
+export interface UpdateTicketStatusRequest {
+  status: string;
+}
+
+export interface AssignTicketRequest {
+  assignee_id: string | null;
+}
+
+export type ProjectHealth = 'on_track' | 'at_risk' | 'blocked';
+
+export interface ProjectResponse {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  /** Hex color `#RRGGBB`. When null the frontend derives a stable colour from the key. */
+  color: string | null;
+  health: string;
+  /** 0..1 — completion ratio, manually set or derived from tickets. */
+  progress: number;
+  lead_id: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateProjectRequest {
+  key: string;
+  name: string;
+  description?: string | null;
+  /** Optional hex color `#RRGGBB` — overrides the deterministic palette. */
+  color?: string | null;
+}
+
 export interface UpcomingEntry {
   type: 'ticket' | 'milestone';
   id: string;
