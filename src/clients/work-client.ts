@@ -17,6 +17,7 @@ import type {
   TicketLinkResponse,
   TicketResponse,
   UpdateTicketCustomValuesRequest,
+  MoveTicketRequest,
   UpdateTicketStatusRequest,
   WatcherResponse,
 } from '../payloads/work';
@@ -65,6 +66,12 @@ export class WorkApiClient {
   ): Promise<TicketResponse> {
     return this.http
       .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}/status`, body)
+      .then(unwrap);
+  }
+  /** Board drag: target column and position in one request. */
+  moveTicket(id: string, body: MoveTicketRequest): Promise<TicketResponse> {
+    return this.http
+      .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}/move`, body)
       .then(unwrap);
   }
   assignTicket(

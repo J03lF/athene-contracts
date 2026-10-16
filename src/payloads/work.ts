@@ -76,6 +76,12 @@ export interface TicketResponse {
    * are dropped server-side. Always a plain object — `{}` when empty.
    */
   custom_values: Record<string, unknown>;
+  /**
+   * Position within the board column, ordered inside (project, status).
+   * `null` for tickets written before ranking existed — sort a column by
+   * this value and place the nulls last, newest first.
+   */
+  board_rank: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -103,6 +109,17 @@ export interface CreateTicketRequest {
 
 export interface UpdateTicketStatusRequest {
   status: string;
+}
+
+export interface MoveTicketRequest {
+  /** Target column. Same vocabulary as `UpdateTicketStatusRequest.status`. */
+  status: string;
+  /**
+   * Zero-based position within the target column, counted after the ticket
+   * has been removed from wherever it was. Clamped server-side, so a stale
+   * view lands the card at an end instead of failing.
+   */
+  index: number;
 }
 
 export interface UpdateTicketCustomValuesRequest {
