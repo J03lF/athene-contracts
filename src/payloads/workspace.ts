@@ -25,3 +25,19 @@ export interface JoinInviteResponse {
 export interface CreateWorkspaceRequest {
   name: string;
 }
+
+/** Role a member holds in a workspace. */
+export type WorkspaceMemberRole = 'owner' | 'admin' | 'member' | 'guest';
+
+export interface WorkspaceMemberResponse {
+  user_id: string;
+  role: WorkspaceMemberRole;
+  /** RFC3339 timestamp. */
+  joined_at: string;
+  /**
+   * `null` when the membership outlived the user record. The row is still
+   * returned so an orphaned membership stays visible instead of vanishing.
+   */
+  display_name: string | null;
+  email: string | null;
+}

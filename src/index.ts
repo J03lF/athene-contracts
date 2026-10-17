@@ -10,6 +10,7 @@ export * from './payloads/field-definitions';
 export * from './http';
 export * from './clients/auth-client';
 export * from './clients/work-client';
+export * from './clients/workspace-client';
 export * from './clients/dashboard-client';
 export * from './clients/activity-client';
 export * from './clients/field-definitions-client';
