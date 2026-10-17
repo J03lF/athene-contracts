@@ -6,6 +6,9 @@ pub struct UserSettingsResponse {
     pub theme: String,
     pub palette: String,
     pub language: String,
+    /// `cozy` | `compact`.
+    #[serde(default)]
+    pub density: String,
     pub shortcuts: serde_json::Value,
     pub dashboard_layout: Option<serde_json::Value>,
     /// Named filter sets the user has kept. Always a JSON array; the element
@@ -31,6 +34,7 @@ pub struct UpdateUserSettingsRequest {
     pub theme: Option<String>,
     pub palette: Option<String>,
     pub language: Option<String>,
+    pub density: Option<String>,
     pub shortcuts: Option<serde_json::Value>,
     pub dashboard_layout: Option<serde_json::Value>,
     pub saved_views: Option<serde_json::Value>,

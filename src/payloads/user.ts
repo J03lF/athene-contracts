@@ -34,6 +34,8 @@ export interface UserSettingsResponse {
   theme: string;
   palette: string;
   language: string;
+  /** `cozy` | `compact`. */
+  density: string;
   shortcuts: unknown;
   dashboard_layout?: unknown;
   /** Always an array; `[]` when the user has saved none. */
@@ -47,6 +49,7 @@ export interface UpdateUserSettingsRequest {
   theme?: string | null;
   palette?: string | null;
   language?: string | null;
+  density?: string | null;
   shortcuts?: unknown;
   dashboard_layout?: unknown;
   /**
