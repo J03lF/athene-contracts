@@ -1,5 +1,4 @@
 import type {
-  AddWatcherRequest,
   AssignTicketRequest,
   AssignTicketsRequest,
   CreateLabelRequest,
@@ -16,12 +15,14 @@ import type {
   SprintResponse,
   TicketLinkResponse,
   TicketResponse,
+  TicketWatcherListResponse,
   UpdateTicketCustomValuesRequest,
+  UpdateTicketRequest,
   AddTicketCommentRequest,
   MoveTicketRequest,
   TicketCommentResponse,
   UpdateTicketStatusRequest,
-  WatcherResponse,
+  WatchStateResponse,
 } from '../payloads/work';
 import type { AtheneHttpClient } from '../http';
 
@@ -60,6 +61,21 @@ export class WorkApiClient {
   createTicket(body: CreateTicketRequest): Promise<TicketResponse> {
     return this.http
       .post<ApiEnvelope<TicketResponse>>('/work/tickets', body)
+      .then(unwrap);
+  }
+  /** One ticket by id — for deep links that open before the list loads. */
+  getTicket(id: string): Promise<TicketResponse> {
+    return this.http
+      .get<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}`)
+      .then(unwrap);
+  }
+  /**
+   * Content patch. Omitted keys are left alone; an explicit `null` clears a
+   * nullable field. See `UpdateTicketRequest`.
+   */
+  updateTicket(id: string, body: UpdateTicketRequest): Promise<TicketResponse> {
+    return this.http
+      .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}`, body)
       .then(unwrap);
   }
   updateTicketStatus(
@@ -158,27 +174,52 @@ export class WorkApiClient {
     return this.http.post(`/work/labels/${id}/delete`);
   }
 
-  // ---------- Ticket links (V1 client surface; endpoint comes in 3.6) ----------
+  // ---------- Ticket links ----------
+  /** Links on a ticket, each carrying the ticket on the other end. */
   listTicketLinks(ticketId: string): Promise<TicketLinkResponse[]> {
-    return this.http.get(`/work/tickets/${ticketId}/links`);
+    return this.http
+      .get<ApiEnvelope<TicketLinkResponse[]>>(`/work/tickets/${ticketId}/links`)
+      .then(unwrap);
   }
-  createTicketLink(ticketId: string, body: CreateTicketLinkRequest): Promise<void> {
-    return this.http.post(`/work/tickets/${ticketId}/links`, body);
+  createTicketLink(
+    ticketId: string,
+    body: CreateTicketLinkRequest,
+  ): Promise<TicketLinkResponse> {
+    return this.http
+      .post<ApiEnvelope<TicketLinkResponse>>(`/work/tickets/${ticketId}/links`, body)
+      .then(unwrap);
   }
-  deleteTicketLink(ticketId: string, toTicketId: string, relation: LinkRelation): Promise<void> {
-    return this.http.post(
-      `/work/tickets/${ticketId}/links/delete?to=${encodeURIComponent(toTicketId)}&relation=${encodeURIComponent(relation)}`,
-    );
+  deleteTicketLink(
+    ticketId: string,
+    toTicketId: string,
+    relation: LinkRelation,
+  ): Promise<void> {
+    return this.http
+      .delete<ApiEnvelope<{ deleted: boolean }>>(
+        `/work/tickets/${ticketId}/links/${encodeURIComponent(relation)}/${encodeURIComponent(toTicketId)}`,
+      )
+      .then(() => undefined);
   }
 
   // ---------- Watchers ----------
-  listWatchers(ticketId: string): Promise<WatcherResponse[]> {
-    return this.http.get(`/work/tickets/${ticketId}/watchers`);
+  /** The watcher list plus whether the caller is on it. */
+  listWatchers(ticketId: string): Promise<TicketWatcherListResponse> {
+    return this.http
+      .get<ApiEnvelope<TicketWatcherListResponse>>(`/work/tickets/${ticketId}/watchers`)
+      .then(unwrap);
   }
-  addWatcher(ticketId: string, body: AddWatcherRequest): Promise<WatcherResponse> {
-    return this.http.post(`/work/tickets/${ticketId}/watchers`, body);
+  /**
+   * Start watching, as the caller. Watching is self-service — there is no
+   * endpoint for subscribing somebody else, by design.
+   */
+  watchTicket(ticketId: string): Promise<WatchStateResponse> {
+    return this.http
+      .put<ApiEnvelope<WatchStateResponse>>(`/work/tickets/${ticketId}/watchers/me`)
+      .then(unwrap);
   }
-  removeWatcher(ticketId: string, userId: string): Promise<void> {
-    return this.http.post(`/work/tickets/${ticketId}/watchers/${userId}/remove`);
+  unwatchTicket(ticketId: string): Promise<WatchStateResponse> {
+    return this.http
+      .delete<ApiEnvelope<WatchStateResponse>>(`/work/tickets/${ticketId}/watchers/me`)
+      .then(unwrap);
   }
 }

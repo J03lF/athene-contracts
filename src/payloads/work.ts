@@ -47,6 +47,8 @@ export type TicketStatus =
 
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
 
+export type TicketType = 'task' | 'bug' | 'feature' | 'support' | 'epic';
+
 export interface TicketResponse {
   id: string;
   project_id: string;
@@ -58,11 +60,22 @@ export interface TicketResponse {
   sequence: number;
   title: string;
   description: string;
-  status: string;
-  priority: string;
+  ticket_type: TicketType;
+  status: TicketStatus;
+  priority: TicketPriority;
   assignee_id: string | null;
   reporter_id: string;
   sla_policy_id: string | null;
+  /**
+   * Set when this ticket is a subtask. The subtask tree is built from this
+   * field, not from the link table, so a subtask has exactly one parent by
+   * construction and the server rejects cycles.
+   */
+  parent_ticket_id: string | null;
+  sprint_id: string | null;
+  milestone_id: string | null;
+  /** Planning estimate, 0..1000. */
+  story_points: number | null;
   triage_category: string | null;
   triage_reason: string | null;
   triaged_at: string | null;
@@ -113,6 +126,11 @@ export interface CreateTicketRequest {
   /** RFC3339 timestamp. */
   due_date?: string | null;
   /**
+   * Makes the new ticket a subtask of this one, in the same request — so a
+   * subtask is never briefly a top-level ticket. The parent must exist.
+   */
+  parent_ticket_id?: string | null;
+  /**
    * Custom field values keyed by `FieldDefinition.key`. Optional — defaults
    * to `{}`. Server validates against the project's workspace definitions
    * and returns 400 for type mismatches or missing required fields.
@@ -122,6 +140,29 @@ export interface CreateTicketRequest {
 
 export interface UpdateTicketStatusRequest {
   status: string;
+}
+
+/**
+ * Content patch for a ticket: `PATCH /work/tickets/:id`.
+ *
+ * Only the keys present in the request are touched. For the nullable fields
+ * that matters twice over: **omit** a key to leave it alone, send `null` to
+ * clear it. Sending `{ title }` alone will not wipe the due date; sending
+ * `{ due_date: null }` will.
+ *
+ * Status and assignee are deliberately absent — they have their own
+ * endpoints because they carry workflow side effects (SLA stamps,
+ * notifications) that a content edit should not trigger.
+ */
+export interface UpdateTicketRequest {
+  title?: string;
+  description?: string;
+  ticket_type?: TicketType;
+  priority?: TicketPriority;
+  /** RFC3339 timestamp, or `null` to clear. */
+  due_date?: string | null;
+  story_points?: number | null;
+  parent_ticket_id?: string | null;
 }
 
 export interface MoveTicketRequest {
@@ -149,6 +190,12 @@ export type ProjectHealth = 'on_track' | 'at_risk' | 'blocked';
 
 export interface ProjectResponse {
   id: string;
+  /**
+   * The workspace the project belongs to. `null` for projects created before
+   * projects carried a workspace — those are invisible to workspace-scoped
+   * features (the activity feed, custom field definitions).
+   */
+  workspace_id: string | null;
   key: string;
   name: string;
   description: string | null;
@@ -166,6 +213,12 @@ export interface ProjectResponse {
 export interface CreateProjectRequest {
   key: string;
   name: string;
+  /**
+   * Always send this. A project without a workspace records no activity and
+   * gets none of the workspace's custom fields; the field is optional only so
+   * older clients keep compiling.
+   */
+  workspace_id?: string | null;
   description?: string | null;
   /** Optional hex color `#RRGGBB` — overrides the deterministic palette. */
   color?: string | null;
@@ -267,10 +320,20 @@ export type LinkRelation =
   | 'child_of'
   | 'parent_of';
 
+/**
+ * One link on a ticket, with the ticket on the other end already resolved.
+ *
+ * `relation` reads from the perspective of the ticket that was asked about:
+ * `blocks` means *this* ticket blocks `ticket`. The server writes the
+ * symmetric counterpart too, so the other ticket shows the inverse without a
+ * second request.
+ *
+ * Parent/child hierarchy does **not** come through here — it lives on
+ * `TicketResponse.parent_ticket_id`.
+ */
 export interface TicketLinkResponse {
-  from_ticket_id: string;
-  to_ticket_id: string;
   relation: LinkRelation;
+  ticket: TicketResponse;
   created_at: string;
   created_by: string | null;
 }
@@ -280,12 +343,24 @@ export interface CreateTicketLinkRequest {
   relation: LinkRelation;
 }
 
-export interface WatcherResponse {
-  ticket_id: string;
+export interface TicketWatcherResponse {
   user_id: string;
+  /** `null` when the user record is gone; fall back to the id. */
+  display_name: string | null;
+  email: string | null;
   added_at: string;
 }
 
-export interface AddWatcherRequest {
-  user_id: string;
+/**
+ * The watcher list plus whether the caller is on it, so the list and the
+ * watch toggle come from one request instead of two.
+ */
+export interface TicketWatcherListResponse {
+  watchers: TicketWatcherResponse[];
+  watching: boolean;
+}
+
+/** Response of the watch / unwatch toggle. */
+export interface WatchStateResponse {
+  watching: boolean;
 }
