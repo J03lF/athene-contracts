@@ -86,6 +86,19 @@ export interface TicketResponse {
   updated_at: string;
 }
 
+export interface TicketCommentResponse {
+  id: string;
+  ticket_id: string;
+  author_id: string;
+  body: string;
+  /** RFC3339 timestamp. */
+  created_at: string;
+}
+
+export interface AddTicketCommentRequest {
+  body: string;
+}
+
 export interface ListTicketsQuery {
   project_id?: string;
 }

@@ -17,7 +17,9 @@ import type {
   TicketLinkResponse,
   TicketResponse,
   UpdateTicketCustomValuesRequest,
+  AddTicketCommentRequest,
   MoveTicketRequest,
+  TicketCommentResponse,
   UpdateTicketStatusRequest,
   WatcherResponse,
 } from '../payloads/work';
@@ -68,6 +70,22 @@ export class WorkApiClient {
       .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}/status`, body)
       .then(unwrap);
   }
+  /** Comments on a ticket, oldest first. */
+  listTicketComments(id: string): Promise<TicketCommentResponse[]> {
+    return this.http
+      .get<ApiEnvelope<TicketCommentResponse[]>>(`/work/tickets/${id}/comments`)
+      .then(unwrap);
+  }
+
+  addTicketComment(
+    id: string,
+    body: AddTicketCommentRequest,
+  ): Promise<TicketCommentResponse> {
+    return this.http
+      .post<ApiEnvelope<TicketCommentResponse>>(`/work/tickets/${id}/comments`, body)
+      .then(unwrap);
+  }
+
   /** Board drag: target column and position in one request. */
   moveTicket(id: string, body: MoveTicketRequest): Promise<TicketResponse> {
     return this.http
