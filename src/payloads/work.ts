@@ -262,6 +262,7 @@ export interface AssignTicketRequest {
 }
 
 export type ProjectHealth = 'on_track' | 'at_risk' | 'blocked';
+export type ProjectStatus = 'active' | 'archived';
 
 export interface ProjectResponse {
   id: string;
@@ -303,6 +304,26 @@ export interface CreateProjectRequest {
   description?: string | null;
   /** Optional hex color `#RRGGBB` — overrides the deterministic palette. */
   color?: string | null;
+}
+
+/**
+ * A patch for a project.
+ *
+ * Every field is optional and only the ones present are applied, so a patch
+ * that mentions nothing is rejected rather than treated as "clear
+ * everything". `key` is not editable: it prefixes every ticket ever raised
+ * in the project.
+ */
+export interface UpdateProjectRequest {
+  name?: string;
+  /** `null` clears the description. */
+  description?: string | null;
+  /** `#RRGGBB`, or `null` to fall back to the derived palette colour. */
+  color?: string | null;
+  health?: ProjectHealth;
+  status?: ProjectStatus;
+  /** `null` leaves the project without a lead. */
+  lead_id?: string | null;
 }
 
 export interface UpcomingEntry {
