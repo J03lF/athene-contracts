@@ -12,6 +12,9 @@ pub struct UserSettingsResponse {
     /// shape is the client's own filter model, stored without interpretation.
     #[serde(default)]
     pub saved_views: serde_json::Value,
+    /// `{ seen_at, archived }` — which inbox entries the user has dealt with.
+    #[serde(default)]
+    pub inbox_state: serde_json::Value,
     pub notifications_enabled: bool,
     pub email_notifications: bool,
 }
@@ -31,6 +34,7 @@ pub struct UpdateUserSettingsRequest {
     pub shortcuts: Option<serde_json::Value>,
     pub dashboard_layout: Option<serde_json::Value>,
     pub saved_views: Option<serde_json::Value>,
+    pub inbox_state: Option<serde_json::Value>,
     pub notifications_enabled: Option<bool>,
     pub email_notifications: Option<bool>,
 }

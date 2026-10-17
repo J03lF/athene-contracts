@@ -1,3 +1,5 @@
+import type { ActivityAction } from './activity';
+
 export interface WorkspaceStats {
   open_tickets: number;
   in_progress_tickets: number;
@@ -97,6 +99,37 @@ export interface TicketResponse {
   board_rank: number | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Why an inbox entry reached the reader.
+ *
+ * Ordered by how directly it concerns them: when several apply the strongest
+ * wins, because "assigned to you" explains an entry better than "you watch
+ * this" even when both are true.
+ */
+export type InboxReason = 'assigned' | 'reported' | 'watching';
+
+/**
+ * One inbox entry: something that happened, on a ticket the reader is
+ * involved in.
+ *
+ * Shaped like an activity event with the ticket attached, so the same
+ * renderer serves both surfaces. The reader's own actions are never
+ * included — an inbox full of what you just did buries what somebody else
+ * did.
+ */
+export interface InboxEntryResponse {
+  /** The activity event's id. */
+  id: string;
+  actor_id: string | null;
+  action: ActivityAction;
+  detail: string | null;
+  metadata: Record<string, unknown> | null;
+  /** RFC3339. */
+  created_at: string;
+  reason: InboxReason;
+  ticket: TicketResponse;
 }
 
 export interface TicketCommentResponse {

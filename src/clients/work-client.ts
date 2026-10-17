@@ -6,6 +6,7 @@ import type {
   CreateSprintRequest,
   CreateTicketLinkRequest,
   CreateTicketRequest,
+  InboxEntryResponse,
   LabelResponse,
   LinkRelation,
   ListTicketsQuery,
@@ -46,6 +47,19 @@ export class WorkApiClient {
   createProject(body: CreateProjectRequest): Promise<ProjectResponse> {
     return this.http
       .post<ApiEnvelope<ProjectResponse>>('/work/projects', body)
+      .then(unwrap);
+  }
+
+  // ---------- Inbox ----------
+  /**
+   * What has happened on the tickets the caller is involved in, newest
+   * first. Relevance is decided by the server: it needs the watcher table
+   * and ticket ownership, neither of which the client has.
+   */
+  inbox(limit?: number): Promise<InboxEntryResponse[]> {
+    const qs = limit != null ? `?limit=${limit}` : '';
+    return this.http
+      .get<ApiEnvelope<InboxEntryResponse[]>>(`/work/inbox${qs}`)
       .then(unwrap);
   }
 

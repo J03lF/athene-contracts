@@ -41,3 +41,38 @@ export interface WorkspaceMemberResponse {
   display_name: string | null;
   email: string | null;
 }
+
+export type InvitationStatus = 'active' | 'used' | 'expired' | 'revoked';
+
+/**
+ * An invitation to a workspace.
+ *
+ * Carries the `token` because the point of creating one is a link to send.
+ * Only members may read the list — every live token in it is a way in.
+ */
+export interface InvitationResponse {
+  id: string;
+  workspace_id: string;
+  token: string;
+  /** Addressed to one person, or `null` for a link anybody may use. */
+  email: string | null;
+  role: WorkspaceMemberRole;
+  invited_by: string;
+  status: InvitationStatus;
+  /** Only meaningful for a link invite; `null` means unlimited. */
+  max_uses: number | null;
+  use_count: number;
+  /** RFC3339, or `null` when it does not expire on its own. */
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface CreateInviteRequest {
+  /** `member` when omitted. Never more than the inviter holds. */
+  role?: WorkspaceMemberRole;
+  /** Omit or send `null` for a link anybody may use. */
+  email?: string | null;
+  max_uses?: number | null;
+  /** RFC3339. */
+  expires_at?: string | null;
+}

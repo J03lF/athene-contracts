@@ -17,6 +17,19 @@ export interface SavedView {
   created_at: string;
 }
 
+/**
+ * What the user has dealt with in their inbox.
+ *
+ * `seen_at` is a watermark — everything older counts as read — rather than a
+ * list of ids, so "mark all read" does not grow without bound on a feed that
+ * never stops. `archived` needs per-entry granularity and stays a list.
+ */
+export interface InboxState {
+  /** RFC3339. Absent means nothing has been marked read yet. */
+  seen_at?: string | null;
+  archived?: string[];
+}
+
 export interface UserSettingsResponse {
   theme: string;
   palette: string;
@@ -25,6 +38,7 @@ export interface UserSettingsResponse {
   dashboard_layout?: unknown;
   /** Always an array; `[]` when the user has saved none. */
   saved_views: SavedView[];
+  inbox_state: InboxState;
   notifications_enabled: boolean;
   email_notifications: boolean;
 }
@@ -40,6 +54,8 @@ export interface UpdateUserSettingsRequest {
    * is no per-view endpoint to keep in sync.
    */
   saved_views?: SavedView[];
+  /** Replaces the whole object, for the same reason as `saved_views`. */
+  inbox_state?: InboxState;
   notifications_enabled?: boolean | null;
   email_notifications?: boolean | null;
 }

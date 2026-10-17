@@ -1,5 +1,7 @@
 import type { AtheneHttpClient } from '../http';
 import type {
+  CreateInviteRequest,
+  InvitationResponse,
   WorkspaceMemberResponse,
   WorkspaceResponse,
 } from '../payloads/workspace';
@@ -24,6 +26,23 @@ export class WorkspaceApiClient {
   listMembers(workspaceId: string): Promise<WorkspaceMemberResponse[]> {
     return this.http
       .get<ApiEnvelope<WorkspaceMemberResponse[]>>(`/workspaces/${workspaceId}/members`)
+      .then(unwrap);
+  }
+
+  /** Invitations issued for a workspace, newest first. Members only. */
+  listInvites(workspaceId: string): Promise<InvitationResponse[]> {
+    return this.http
+      .get<ApiEnvelope<InvitationResponse[]>>(`/workspaces/${workspaceId}/invites`)
+      .then(unwrap);
+  }
+
+  /** Mint an invitation. Owners and admins only. */
+  createInvite(
+    workspaceId: string,
+    body: CreateInviteRequest = {},
+  ): Promise<InvitationResponse> {
+    return this.http
+      .post<ApiEnvelope<InvitationResponse>>(`/workspaces/${workspaceId}/invites`, body)
       .then(unwrap);
   }
 }
