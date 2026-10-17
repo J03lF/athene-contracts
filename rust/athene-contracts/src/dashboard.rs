@@ -38,7 +38,7 @@ pub struct DashboardOverviewResponse {
     pub kpis: KpisResponse,
     pub focus: Vec<FocusTicket>,
     pub recent_activity: Vec<ActivityEventResponse>,
-    pub on_track_text: String,
+    pub on_track: OnTrackResponse,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
@@ -47,4 +47,16 @@ pub enum FocusTab {
     Today,
     Assigned,
     Review,
+}
+
+/// How the week is going, as a state plus a number.
+///
+/// Not a sentence: a sentence composed here could only ever be in one
+/// language, and the client knows the reader's.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct OnTrackResponse {
+    /// `overdue` | `busy_week` | `on_track`.
+    pub state: String,
+    /// Overdue items, or items due this week; `0` when on track.
+    pub count: i64,
 }

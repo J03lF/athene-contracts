@@ -26,11 +26,32 @@ export interface FocusTicket {
   due_date: string | null;
 }
 
+/**
+ * How the week is going, as a state plus a number.
+ *
+ * Not a sentence: the server used to compose "You have 2 overdue items"
+ * and the client printed it, which is one language on every build. The
+ * three states and the count are everything the sentence carried, so
+ * the sentence is written where the reader's language is known.
+ */
+export type OnTrackState =
+  /** At least one overdue item in the focus list. `count` is how many. */
+  | 'overdue'
+  /** A heavy week — `count` items due. */
+  | 'busy_week'
+  /** Nothing pressing. `count` is 0. */
+  | 'on_track';
+
+export interface OnTrackResponse {
+  state: OnTrackState;
+  count: number;
+}
+
 export interface DashboardOverviewResponse {
   kpis: KpisResponse;
   focus: FocusTicket[];
   recent_activity: ActivityEventResponse[];
-  on_track_text: string;
+  on_track: OnTrackResponse;
 }
 
 export type FocusTab = 'today' | 'assigned' | 'review';
