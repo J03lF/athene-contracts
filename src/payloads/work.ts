@@ -251,6 +251,12 @@ export interface UpdateTicketCustomValuesRequest {
   custom_values: Record<string, unknown>;
 }
 
+export interface UpdateProjectCustomValuesRequest {
+  /** Replace the project's custom_values bucket wholesale. Validated
+   *  against the workspace's `applies_to = project` definitions. */
+  custom_values: Record<string, unknown>;
+}
+
 export interface AssignTicketRequest {
   assignee_id: string | null;
 }
@@ -275,6 +281,12 @@ export interface ProjectResponse {
   progress: number;
   lead_id: string | null;
   status: string;
+  /**
+   * Values for the workspace's `applies_to = project` field definitions,
+   * keyed by each definition's stable `key`. Always an object; `{}` when
+   * the workspace defines no project fields.
+   */
+  custom_values: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }

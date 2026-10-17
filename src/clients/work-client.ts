@@ -20,6 +20,7 @@ import type {
   TicketResponse,
   TicketWatcherListResponse,
   UpdateTicketCustomValuesRequest,
+  UpdateProjectCustomValuesRequest,
   UpdateTicketRequest,
   AddTicketCommentRequest,
   MoveTicketRequest,
@@ -149,6 +150,17 @@ export class WorkApiClient {
     return this.http
       .patch<ApiEnvelope<TicketResponse>>(
         `/work/tickets/${id}/custom-values`,
+        body,
+      )
+      .then(unwrap);
+  }
+  updateProjectCustomValues(
+    id: string,
+    body: UpdateProjectCustomValuesRequest,
+  ): Promise<ProjectResponse> {
+    return this.http
+      .patch<ApiEnvelope<ProjectResponse>>(
+        `/work/projects/${id}/custom-values`,
         body,
       )
       .then(unwrap);
