@@ -1,5 +1,7 @@
 import type {
   AssignTicketRequest,
+  BulkUpdateTicketsRequest,
+  BulkUpdateTicketsResponse,
   AssignTicketsRequest,
   CreateLabelRequest,
   CreateProjectRequest,
@@ -90,6 +92,16 @@ export class WorkApiClient {
   updateTicket(id: string, body: UpdateTicketRequest): Promise<TicketResponse> {
     return this.http
       .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}`, body)
+      .then(unwrap);
+  }
+  /**
+   * Apply one patch to many tickets. Answers per ticket — check `failed`.
+   */
+  updateTickets(
+    body: BulkUpdateTicketsRequest,
+  ): Promise<BulkUpdateTicketsResponse> {
+    return this.http
+      .post<ApiEnvelope<BulkUpdateTicketsResponse>>('/work/tickets/bulk', body)
       .then(unwrap);
   }
   updateTicketStatus(

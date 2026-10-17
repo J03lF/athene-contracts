@@ -198,6 +198,42 @@ export interface UpdateTicketRequest {
   parent_ticket_id?: string | null;
 }
 
+/**
+ * One patch applied to a selection of tickets.
+ *
+ * The same patch shape as a single edit, so a field the one accepts cannot
+ * quietly be ignored by the other.
+ */
+export interface BulkUpdateTicketsRequest {
+  ticket_ids: string[];
+  patch: UpdateTicketRequest;
+  /**
+   * Taken apart from the patch, and applied through the status endpoint's
+   * own path: a status change stamps SLA timers and clears a resolution
+   * date, and writing it as a plain field would skip all of that.
+   */
+  status?: TicketStatus;
+}
+
+/** Why one ticket in a bulk edit did not move. */
+export interface BulkUpdateFailure {
+  ticket_id: string;
+  message: string;
+}
+
+/**
+ * What a bulk edit did, per ticket.
+ *
+ * Deliberately not all-or-nothing: a selection of fifty where one has been
+ * deleted under the user moves the other forty-nine and names the one that
+ * did not. Both halves matter — `updated` replaces what the client holds,
+ * `failed` is what to tell the user about.
+ */
+export interface BulkUpdateTicketsResponse {
+  updated: TicketResponse[];
+  failed: BulkUpdateFailure[];
+}
+
 export interface MoveTicketRequest {
   /** Target column. Same vocabulary as `UpdateTicketStatusRequest.status`. */
   status: string;
