@@ -144,31 +144,44 @@ export class WorkApiClient {
 
   // ---------- Sprints ----------
   listSprintsForProject(projectId: string): Promise<SprintResponse[]> {
-    return this.http.get(`/work/projects/${projectId}/sprints`);
+    return this.http
+      .get<ApiEnvelope<SprintResponse[]>>(`/work/projects/${projectId}/sprints`)
+      .then(unwrap);
   }
+  /** The sprint running today, or `null` when none is. */
   currentSprint(projectId: string): Promise<SprintResponse | null> {
-    return this.http.get(`/work/projects/${projectId}/sprints/current`);
+    return this.http
+      .get<ApiEnvelope<SprintResponse | null>>(`/work/projects/${projectId}/sprints/current`)
+      .then(unwrap);
   }
   createSprint(projectId: string, body: CreateSprintRequest): Promise<SprintResponse> {
-    return this.http.post(`/work/projects/${projectId}/sprints`, body);
+    return this.http
+      .post<ApiEnvelope<SprintResponse>>(`/work/projects/${projectId}/sprints`, body)
+      .then(unwrap);
   }
   getSprint(id: string): Promise<SprintResponse> {
-    return this.http.get(`/work/sprints/${id}`);
+    return this.http.get<ApiEnvelope<SprintResponse>>(`/work/sprints/${id}`).then(unwrap);
   }
   startSprint(id: string): Promise<SprintResponse> {
-    return this.http.post(`/work/sprints/${id}/start`);
+    return this.http
+      .post<ApiEnvelope<SprintResponse>>(`/work/sprints/${id}/start`)
+      .then(unwrap);
   }
   completeSprint(id: string): Promise<SprintResponse> {
-    return this.http.post(`/work/sprints/${id}/complete`);
+    return this.http
+      .post<ApiEnvelope<SprintResponse>>(`/work/sprints/${id}/complete`)
+      .then(unwrap);
   }
   deleteSprint(id: string): Promise<void> {
-    return this.http.post(`/work/sprints/${id}/delete`);
+    return this.http.post(`/work/sprints/${id}/delete`).then(() => undefined);
   }
   assignTicketsToSprint(id: string, body: AssignTicketsRequest): Promise<void> {
-    return this.http.post(`/work/sprints/${id}/assign`, body);
+    return this.http.post(`/work/sprints/${id}/assign`, body).then(() => undefined);
   }
   sprintBurnDown(id: string): Promise<SprintBurnDownResponse> {
-    return this.http.get(`/work/sprints/${id}/burndown`);
+    return this.http
+      .get<ApiEnvelope<SprintBurnDownResponse>>(`/work/sprints/${id}/burndown`)
+      .then(unwrap);
   }
 
   // ---------- Labels ----------
