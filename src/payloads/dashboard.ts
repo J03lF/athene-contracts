@@ -17,7 +17,12 @@ export interface KpisResponse {
 
 export interface FocusTicket {
   id: string;
-  key: string;
+  /**
+   * The ticket's per-project number. The key — "ATH-3" — is this plus the
+   * project's prefix, composed on the client, which holds every project
+   * and one definition of what a ticket key looks like.
+   */
+  sequence: number;
   title: string;
   status: string;
   priority: string;
