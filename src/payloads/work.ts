@@ -499,3 +499,54 @@ export interface TicketWatcherListResponse {
 export interface WatchStateResponse {
   watching: boolean;
 }
+
+// ---------- Reports ----------
+
+/** One day of a sprint's burndown. */
+export interface BurndownPointResponse {
+  /** `YYYY-MM-DD` */
+  date: string;
+  /** Points still open at the end of the day; `null` for days still ahead. */
+  remaining: number | null;
+  /** The straight line from the sprint's scope to zero. */
+  ideal: number;
+}
+
+/** One completed sprint, for velocity. */
+export interface VelocityEntryResponse {
+  sprint_id: string;
+  name: string;
+  /** Points in the sprint when it closed; `null` if that was never recorded. */
+  committed: number | null;
+  completed: number;
+}
+
+/** One day of the project's flow. */
+export interface FlowPointResponse {
+  /** `YYYY-MM-DD` */
+  date: string;
+  created: number;
+  resolved: number;
+}
+
+export interface StatusShareResponse {
+  status: TicketStatus;
+  count: number;
+  points: number;
+}
+
+export interface ProjectReportResponse {
+  /** The sprint the burndown is drawn for, or `null` when there is none. */
+  sprint: {
+    id: string;
+    name: string;
+    start_date: string;
+    end_date: string;
+    status: SprintStatus;
+  } | null;
+  burndown: BurndownPointResponse[];
+  velocity: VelocityEntryResponse[];
+  /** The last 28 days, oldest first. */
+  flow: FlowPointResponse[];
+  statuses: StatusShareResponse[];
+}

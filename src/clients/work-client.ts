@@ -4,6 +4,7 @@ import type {
   BulkUpdateTicketsResponse,
   AssignTicketsRequest,
   CompleteSprintRequest,
+  ProjectReportResponse,
   DeletedTicketResponse,
   CreateLabelRequest,
   LabelAssignmentResponse,
@@ -244,6 +245,17 @@ export class WorkApiClient {
   /** Take tickets back out of a sprint, into the backlog. */
   unassignTicketsFromSprint(id: string, body: AssignTicketsRequest): Promise<void> {
     return this.http.post(`/work/sprints/${id}/unassign`, body).then(() => undefined);
+  }
+  /**
+   * Burndown, velocity and flow for a project. `sprintId` picks the sprint
+   * whose burndown is drawn; by default the running one, else the last
+   * completed.
+   */
+  projectReport(projectId: string, sprintId?: string): Promise<ProjectReportResponse> {
+    const query = sprintId ? `?sprint_id=${encodeURIComponent(sprintId)}` : '';
+    return this.http
+      .get<ApiEnvelope<ProjectReportResponse>>(`/work/projects/${projectId}/reports${query}`)
+      .then(unwrap);
   }
   sprintBurnDown(id: string): Promise<SprintBurnDownResponse> {
     return this.http
