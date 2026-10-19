@@ -416,6 +416,22 @@ export interface CreateLabelRequest {
   color?: string | null;
 }
 
+/**
+ * Rename and/or recolour a label. An absent key leaves that part as it is;
+ * `color: null` clears the colour back to the theme's default.
+ */
+export interface UpdateLabelRequest {
+  name?: string;
+  /** `#RRGGBB`, or `null` to clear. */
+  color?: string | null;
+}
+
+/** One label on one ticket. */
+export interface LabelAssignmentResponse {
+  ticket_id: string;
+  label_id: string;
+}
+
 export interface SetLabelsRequest {
   label_ids: string[];
   workspace_id?: string | null;

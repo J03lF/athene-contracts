@@ -5,6 +5,7 @@ import type {
   AssignTicketsRequest,
   CompleteSprintRequest,
   CreateLabelRequest,
+  LabelAssignmentResponse,
   CreateProjectRequest,
   CreateSprintRequest,
   CreateTicketLinkRequest,
@@ -15,6 +16,7 @@ import type {
   ListTicketsQuery,
   ProjectResponse,
   SetLabelsRequest,
+  UpdateLabelRequest,
   SprintBurnDownResponse,
   SprintResponse,
   TicketLinkResponse,
@@ -233,8 +235,18 @@ export class WorkApiClient {
   setLabelsForTicket(ticketId: string, body: SetLabelsRequest): Promise<void> {
     return this.http.post(`/work/tickets/${ticketId}/labels/set`, body);
   }
+  updateLabel(id: string, body: UpdateLabelRequest): Promise<LabelResponse> {
+    return this.http.patch(`/work/labels/${id}`, body);
+  }
   deleteLabel(id: string): Promise<void> {
     return this.http.post(`/work/labels/${id}/delete`);
+  }
+  /**
+   * Every (ticket, label) pair in a workspace — one read for the chips and
+   * the filter of a whole list or board.
+   */
+  listLabelAssignments(workspaceId: string): Promise<LabelAssignmentResponse[]> {
+    return this.http.get(`/work/workspaces/${workspaceId}/labels/assignments`);
   }
 
   // ---------- Ticket links ----------
