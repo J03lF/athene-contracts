@@ -76,3 +76,7 @@ export interface CreateInviteRequest {
   /** RFC3339. */
   expires_at?: string | null;
 }
+
+export interface RenameWorkspaceRequest {
+  name: string;
+}

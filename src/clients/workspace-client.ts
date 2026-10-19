@@ -2,6 +2,7 @@ import type { AtheneHttpClient } from '../http';
 import type {
   CreateInviteRequest,
   InvitationResponse,
+  RenameWorkspaceRequest,
   WorkspaceMemberResponse,
   WorkspaceResponse,
 } from '../payloads/workspace';
@@ -20,6 +21,13 @@ export class WorkspaceApiClient {
 
   listWorkspaces(): Promise<WorkspaceResponse[]> {
     return this.http.get<ApiEnvelope<WorkspaceResponse[]>>('/workspaces').then(unwrap);
+  }
+
+  /** Rename a workspace. Its owners and admins only; the slug stays. */
+  renameWorkspace(workspaceId: string, body: RenameWorkspaceRequest): Promise<WorkspaceResponse> {
+    return this.http
+      .patch<ApiEnvelope<WorkspaceResponse>>(`/workspaces/${workspaceId}`, body)
+      .then(unwrap);
   }
 
   /** Members of one workspace, with their identities resolved. */
