@@ -208,6 +208,10 @@ export class WorkApiClient {
   assignTicketsToSprint(id: string, body: AssignTicketsRequest): Promise<void> {
     return this.http.post(`/work/sprints/${id}/assign`, body).then(() => undefined);
   }
+  /** Take tickets back out of a sprint, into the backlog. */
+  unassignTicketsFromSprint(id: string, body: AssignTicketsRequest): Promise<void> {
+    return this.http.post(`/work/sprints/${id}/unassign`, body).then(() => undefined);
+  }
   sprintBurnDown(id: string): Promise<SprintBurnDownResponse> {
     return this.http
       .get<ApiEnvelope<SprintBurnDownResponse>>(`/work/sprints/${id}/burndown`)
