@@ -4,6 +4,9 @@ import type {
   BulkUpdateTicketsResponse,
   AssignTicketsRequest,
   CompleteSprintRequest,
+  CreateMilestoneRequest,
+  MilestoneResponse,
+  UpdateMilestoneRequest,
   ProjectReportResponse,
   DeletedTicketResponse,
   CreateLabelRequest,
@@ -246,6 +249,26 @@ export class WorkApiClient {
   unassignTicketsFromSprint(id: string, body: AssignTicketsRequest): Promise<void> {
     return this.http.post(`/work/sprints/${id}/unassign`, body).then(() => undefined);
   }
+  // ---------- Releases ----------
+  listMilestones(projectId: string): Promise<MilestoneResponse[]> {
+    return this.http
+      .get<ApiEnvelope<MilestoneResponse[]>>(`/work/projects/${projectId}/milestones`)
+      .then(unwrap);
+  }
+  createMilestone(projectId: string, body: CreateMilestoneRequest): Promise<MilestoneResponse> {
+    return this.http
+      .post<ApiEnvelope<MilestoneResponse>>(`/work/projects/${projectId}/milestones`, body)
+      .then(unwrap);
+  }
+  updateMilestone(id: string, body: UpdateMilestoneRequest): Promise<MilestoneResponse> {
+    return this.http
+      .patch<ApiEnvelope<MilestoneResponse>>(`/work/milestones/${id}`, body)
+      .then(unwrap);
+  }
+  deleteMilestone(id: string): Promise<void> {
+    return this.http.delete(`/work/milestones/${id}`).then(() => undefined);
+  }
+
   /**
    * Burndown, velocity and flow for a project. `sprintId` picks the sprint
    * whose burndown is drawn; by default the running one, else the last

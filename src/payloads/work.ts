@@ -198,6 +198,8 @@ export interface UpdateTicketRequest {
   due_date?: string | null;
   story_points?: number | null;
   parent_ticket_id?: string | null;
+  /** The release the ticket ships in; `null` takes it out of any. */
+  milestone_id?: string | null;
 }
 
 /**
@@ -334,15 +336,6 @@ export interface UpcomingEntry {
   title: string;
   due_date: string;
   project_key?: string;
-}
-
-export interface MilestoneResponse {
-  id: string;
-  title: string;
-  description: string | null;
-  due_date: string;
-  created_by: string;
-  created_at: string;
 }
 
 export interface DashboardWidgetLayout {
@@ -549,4 +542,42 @@ export interface ProjectReportResponse {
   /** The last 28 days, oldest first. */
   flow: FlowPointResponse[];
   statuses: StatusShareResponse[];
+}
+
+// ---------- Releases (milestones) ----------
+
+export type MilestoneStatus = 'open' | 'released';
+
+/** A release — Jira's version — with how far along it is. */
+export interface MilestoneResponse {
+  id: string;
+  project_id: string;
+  title: string;
+  description: string | null;
+  /** `YYYY-MM-DD`, or `null` when no date is set. */
+  due_date: string | null;
+  status: MilestoneStatus;
+  created_at: string;
+  updated_at: string;
+  progress: {
+    tickets: number;
+    done: number;
+    points: number;
+    done_points: number;
+  };
+}
+
+export interface CreateMilestoneRequest {
+  title: string;
+  description?: string | null;
+  /** `YYYY-MM-DD` */
+  due_date?: string | null;
+}
+
+/** An absent key leaves that part as it is; `null` clears it. */
+export interface UpdateMilestoneRequest {
+  title?: string;
+  description?: string | null;
+  due_date?: string | null;
+  status?: MilestoneStatus;
 }
