@@ -108,7 +108,7 @@ export interface TicketResponse {
  * wins, because "assigned to you" explains an entry better than "you watch
  * this" even when both are true.
  */
-export type InboxReason = 'assigned' | 'reported' | 'watching';
+export type InboxReason = 'assigned' | 'reported' | 'watching' | 'mentioned';
 
 /**
  * One inbox entry: something that happened, on a ticket the reader is
