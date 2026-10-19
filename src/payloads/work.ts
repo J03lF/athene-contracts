@@ -581,3 +581,30 @@ export interface UpdateMilestoneRequest {
   due_date?: string | null;
   status?: MilestoneStatus;
 }
+
+// ---------- Work logs ----------
+
+/** Time someone booked on a ticket. */
+export interface WorkLogResponse {
+  id: string;
+  ticket_id: string;
+  user_id: string;
+  minutes: number;
+  /** RFC3339 — when the stretch of work began. */
+  started_at: string;
+  note: string | null;
+  created_at: string;
+}
+
+export interface WorkLogListResponse {
+  total_minutes: number;
+  /** Newest first. */
+  entries: WorkLogResponse[];
+}
+
+export interface AddWorkLogRequest {
+  minutes: number;
+  /** RFC3339; defaults to the stretch that just ended. */
+  started_at?: string;
+  note?: string | null;
+}

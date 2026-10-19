@@ -3,10 +3,13 @@ import type {
   BulkUpdateTicketsRequest,
   BulkUpdateTicketsResponse,
   AssignTicketsRequest,
+  AddWorkLogRequest,
   CompleteSprintRequest,
   CreateMilestoneRequest,
   MilestoneResponse,
   UpdateMilestoneRequest,
+  WorkLogListResponse,
+  WorkLogResponse,
   ProjectReportResponse,
   DeletedTicketResponse,
   CreateLabelRequest,
@@ -249,6 +252,21 @@ export class WorkApiClient {
   unassignTicketsFromSprint(id: string, body: AssignTicketsRequest): Promise<void> {
     return this.http.post(`/work/sprints/${id}/unassign`, body).then(() => undefined);
   }
+  // ---------- Work logs ----------
+  listWorkLogs(ticketId: string): Promise<WorkLogListResponse> {
+    return this.http
+      .get<ApiEnvelope<WorkLogListResponse>>(`/work/tickets/${ticketId}/worklogs`)
+      .then(unwrap);
+  }
+  addWorkLog(ticketId: string, body: AddWorkLogRequest): Promise<WorkLogResponse> {
+    return this.http
+      .post<ApiEnvelope<WorkLogResponse>>(`/work/tickets/${ticketId}/worklogs`, body)
+      .then(unwrap);
+  }
+  deleteWorkLog(id: string): Promise<void> {
+    return this.http.delete(`/work/worklogs/${id}`).then(() => undefined);
+  }
+
   // ---------- Releases ----------
   listMilestones(projectId: string): Promise<MilestoneResponse[]> {
     return this.http
