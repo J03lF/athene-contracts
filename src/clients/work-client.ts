@@ -142,6 +142,25 @@ export class WorkApiClient {
       .post<ApiEnvelope<TicketCommentResponse>>(`/work/tickets/${id}/comments`, body)
       .then(unwrap);
   }
+  /** Change a comment's text. Its author only. */
+  editTicketComment(
+    ticketId: string,
+    commentId: string,
+    body: AddTicketCommentRequest,
+  ): Promise<TicketCommentResponse> {
+    return this.http
+      .patch<ApiEnvelope<TicketCommentResponse>>(
+        `/work/tickets/${ticketId}/comments/${commentId}`,
+        body,
+      )
+      .then(unwrap);
+  }
+  /** Remove a comment. Its author, or an operator. */
+  deleteTicketComment(ticketId: string, commentId: string): Promise<void> {
+    return this.http
+      .delete(`/work/tickets/${ticketId}/comments/${commentId}`)
+      .then(() => undefined);
+  }
 
   /** Board drag: target column and position in one request. */
   moveTicket(id: string, body: MoveTicketRequest): Promise<TicketResponse> {

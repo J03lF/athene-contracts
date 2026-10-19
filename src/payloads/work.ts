@@ -139,6 +139,8 @@ export interface TicketCommentResponse {
   body: string;
   /** RFC3339 timestamp. */
   created_at: string;
+  /** RFC3339; when the author last changed the text, absent if never. */
+  edited_at?: string | null;
 }
 
 export interface AddTicketCommentRequest {
