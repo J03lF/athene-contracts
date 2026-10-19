@@ -381,6 +381,13 @@ export interface CreateSprintRequest {
   goal_points?: number | null;
 }
 
+/** What a ticket delete took with it. */
+export interface DeletedTicketResponse {
+  id: string;
+  /** Subtasks removed along with the ticket, at any depth. */
+  subtasks: number;
+}
+
 export interface AssignTicketsRequest {
   ticket_ids: string[];
 }

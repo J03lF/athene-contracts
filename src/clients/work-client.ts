@@ -4,6 +4,7 @@ import type {
   BulkUpdateTicketsResponse,
   AssignTicketsRequest,
   CompleteSprintRequest,
+  DeletedTicketResponse,
   CreateLabelRequest,
   LabelAssignmentResponse,
   CreateProjectRequest,
@@ -97,6 +98,15 @@ export class WorkApiClient {
   updateTicket(id: string, body: UpdateTicketRequest): Promise<TicketResponse> {
     return this.http
       .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}`, body)
+      .then(unwrap);
+  }
+  /**
+   * Delete a ticket for good, with its subtasks, comments, labels, links
+   * and watchers. Operators only.
+   */
+  deleteTicket(id: string): Promise<DeletedTicketResponse> {
+    return this.http
+      .delete<ApiEnvelope<DeletedTicketResponse>>(`/work/tickets/${id}`)
       .then(unwrap);
   }
   /**
