@@ -3,6 +3,7 @@ import type {
   BulkUpdateTicketsRequest,
   BulkUpdateTicketsResponse,
   AssignTicketsRequest,
+  CompleteSprintRequest,
   CreateLabelRequest,
   CreateProjectRequest,
   CreateSprintRequest,
@@ -197,9 +198,10 @@ export class WorkApiClient {
       .post<ApiEnvelope<SprintResponse>>(`/work/sprints/${id}/start`)
       .then(unwrap);
   }
-  completeSprint(id: string): Promise<SprintResponse> {
+  /** Complete a sprint; its unfinished tickets move as `body` says. */
+  completeSprint(id: string, body: CompleteSprintRequest = {}): Promise<SprintResponse> {
     return this.http
-      .post<ApiEnvelope<SprintResponse>>(`/work/sprints/${id}/complete`)
+      .post<ApiEnvelope<SprintResponse>>(`/work/sprints/${id}/complete`, body)
       .then(unwrap);
   }
   deleteSprint(id: string): Promise<void> {

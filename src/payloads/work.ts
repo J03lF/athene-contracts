@@ -385,6 +385,14 @@ export interface AssignTicketsRequest {
   ticket_ids: string[];
 }
 
+/**
+ * Where a completed sprint's unfinished tickets go: another sprint of the
+ * same project that is not completed, or — absent or `null` — the backlog.
+ */
+export interface CompleteSprintRequest {
+  move_open_to?: string | null;
+}
+
 export interface SprintBurnDownResponse {
   sprint_id: string;
   total_points: number;
