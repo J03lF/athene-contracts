@@ -123,6 +123,11 @@ export interface InboxEntryResponse {
   /** The activity event's id. */
   id: string;
   actor_id: string | null;
+  /**
+   * Display name of the actor, resolved by the server. `null` for system
+   * events and deleted accounts; absent from servers that predate it.
+   */
+  actor_name?: string | null;
   action: ActivityAction;
   detail: string | null;
   metadata: Record<string, unknown> | null;

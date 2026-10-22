@@ -28,6 +28,11 @@ export interface InboxState {
   /** RFC3339. Absent means nothing has been marked read yet. */
   seen_at?: string | null;
   archived?: string[];
+  /**
+   * Entries opened one at a time since the watermark. Bounded, and emptied
+   * whenever the watermark moves past them.
+   */
+  read?: string[];
 }
 
 export interface UserSettingsResponse {
