@@ -48,7 +48,14 @@ export interface UserSettingsResponse {
   inbox_state: InboxState;
   notifications_enabled: boolean;
   email_notifications: boolean;
+  /** An IANA zone (`Europe/Berlin`); `null` = use the browser's. */
+  timezone: string | null;
+  /** The client's own preferences; `{}` until something is stored. */
+  preferences: Record<string, unknown>;
 }
+
+/** The most the merged `preferences` object may hold, serialized. */
+export const USER_PREFERENCES_MAX_BYTES = 16 * 1024;
 
 export interface UpdateUserSettingsRequest {
   theme?: string | null;
@@ -66,6 +73,14 @@ export interface UpdateUserSettingsRequest {
   inbox_state?: InboxState;
   notifications_enabled?: boolean | null;
   email_notifications?: boolean | null;
+  /** An IANA zone (400 otherwise); `null` = back to the browser's. */
+  timezone?: string | null;
+  /**
+   * Merged key by key into the stored object: a key with a value sets it,
+   * a key with `null` deletes it, keys not sent stay. 400 when the merged
+   * object would exceed `USER_PREFERENCES_MAX_BYTES`.
+   */
+  preferences?: Record<string, unknown>;
 }
 
 export interface UserProfileResponse {

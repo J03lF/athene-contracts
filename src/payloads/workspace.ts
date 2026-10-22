@@ -1,3 +1,5 @@
+import type { TicketTypeColor } from './ticket-types';
+
 export interface WorkspaceResponse {
   id: string;
   name: string;
@@ -7,6 +9,58 @@ export interface WorkspaceResponse {
   role: string;
   joined_at: string;
   created_at: string;
+  /** ≤ 500 chars. */
+  description: string | null;
+  /** A `TicketTypeColor` token (`blue`, `purple`, …), never hex. */
+  color: TicketTypeColor | null;
+  /** Every key present; `null` = the product default. */
+  settings: WorkspaceSettings;
+}
+
+/** The composer properties a workspace may order and hide. */
+export const COMPOSER_PROPERTIES = [
+  'type',
+  'project',
+  'status',
+  'priority',
+  'assignee',
+  'due',
+  'labels',
+  'points',
+  'sprint',
+  'release',
+] as const;
+export type ComposerProperty = (typeof COMPOSER_PROPERTIES)[number];
+
+export interface ComposerPropertiesSetting {
+  /** Display order; properties not listed follow in the default order. */
+  order: ComposerProperty[];
+  hidden: ComposerProperty[];
+}
+
+export interface WorkspaceSettings {
+  /** A project of this workspace (400 otherwise). */
+  default_project_id: string | null;
+  default_assignee: 'creator' | 'none' | null;
+  default_priority: 'low' | 'medium' | 'high' | 'critical' | null;
+  /** When `true`, `POST /work/tickets` without `story_points` answers 400. */
+  require_estimate: boolean | null;
+  composer_properties: ComposerPropertiesSetting | null;
+  sprint_week_start: 'monday' | 'sunday' | null;
+}
+
+/**
+ * `PATCH /workspaces/:id` — owners and admins (403 otherwise). An absent key
+ * leaves that part as it is; `null` clears `description` / `color`.
+ * `settings` is merged key by key: a value sets the key, `null` unsets it,
+ * an unknown key or a bad value refuses the whole patch (400). An empty
+ * patch is 400.
+ */
+export interface UpdateWorkspaceRequest {
+  name?: string;
+  description?: string | null;
+  color?: TicketTypeColor | null;
+  settings?: Partial<{ [K in keyof WorkspaceSettings]: WorkspaceSettings[K] | null }>;
 }
 
 export interface InviteDetailsResponse {
@@ -14,6 +68,21 @@ export interface InviteDetailsResponse {
   workspace_slug: string;
   role: string;
   email_restricted: boolean;
+  /** Display name of whoever created the invite; `null` when that user is gone. */
+  invited_by_name: string | null;
+  /**
+   * The address the invite is restricted to, in full; `null` for an open
+   * link. Joining is refused to any other account.
+   */
+  invited_email: string | null;
+  /**
+   * The signed-in caller is already a member. Then a spent, revoked or
+   * expired invite is answered too (instead of 400), so the page can say
+   * "you're already in <workspace_name>".
+   */
+  already_member: boolean;
+  /** Only when `already_member`. */
+  workspace_id: string | null;
 }
 
 export interface JoinInviteResponse {
@@ -75,6 +144,15 @@ export interface CreateInviteRequest {
   max_uses?: number | null;
   /** RFC3339. */
   expires_at?: string | null;
+}
+
+/**
+ * `PATCH /workspaces/:id/members/:user_id`. Owners and admins only; only an
+ * owner may grant, change or remove the owner role; the last owner cannot
+ * be demoted (409).
+ */
+export interface UpdateMemberRoleRequest {
+  role: WorkspaceMemberRole;
 }
 
 export interface RenameWorkspaceRequest {

@@ -21,14 +21,18 @@ import type {
   InboxEntryResponse,
   LabelResponse,
   LinkRelation,
+  ListProjectsQuery,
+  PerUserListQuery,
   ListTicketsQuery,
   ProjectResponse,
   SetLabelsRequest,
   UpdateLabelRequest,
+  WorkActivityEntryResponse,
   SprintBurnDownResponse,
   SprintResponse,
   TicketLinkResponse,
   TicketResponse,
+  TriageTicketRequest,
   TicketWatcherListResponse,
   UpdateTicketCustomValuesRequest,
   UpdateProjectCustomValuesRequest,
@@ -50,13 +54,25 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
   return envelope.data;
 }
 
+function perUserQs(q: PerUserListQuery): string {
+  const params = new URLSearchParams();
+  if (q.limit != null) params.set('limit', String(q.limit));
+  if (q.workspace_id) params.set('workspace_id', q.workspace_id);
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
 export class WorkApiClient {
   constructor(private readonly http: AtheneHttpClient) {}
 
   // ---------- Projects ----------
-  listProjects(): Promise<ProjectResponse[]> {
+  /** Without `workspace_id`: every workspace the caller belongs to. */
+  listProjects(query: ListProjectsQuery = {}): Promise<ProjectResponse[]> {
+    const qs = query.workspace_id
+      ? `?workspace_id=${encodeURIComponent(query.workspace_id)}`
+      : '';
     return this.http
-      .get<ApiEnvelope<ProjectResponse[]>>('/work/projects')
+      .get<ApiEnvelope<ProjectResponse[]>>(`/work/projects${qs}`)
       .then(unwrap);
   }
   createProject(body: CreateProjectRequest): Promise<ProjectResponse> {
@@ -71,18 +87,33 @@ export class WorkApiClient {
    * first. Relevance is decided by the server: it needs the watcher table
    * and ticket ownership, neither of which the client has.
    */
-  inbox(limit?: number): Promise<InboxEntryResponse[]> {
-    const qs = limit != null ? `?limit=${limit}` : '';
+  /**
+   * `inbox(20)` still works; `inbox({ limit, workspace_id })` keeps it to
+   * one workspace (403 for a non-member).
+   */
+  inbox(arg?: number | PerUserListQuery): Promise<InboxEntryResponse[]> {
+    const q: PerUserListQuery = typeof arg === 'number' ? { limit: arg } : (arg ?? {});
     return this.http
-      .get<ApiEnvelope<InboxEntryResponse[]>>(`/work/inbox${qs}`)
+      .get<ApiEnvelope<InboxEntryResponse[]>>(`/work/inbox${perUserQs(q)}`)
+      .then(unwrap);
+  }
+
+  /**
+   * Recent work changes from the audit trail — only projects and tickets the
+   * caller can open; one workspace's with `workspace_id` (403 otherwise).
+   */
+  activity(query: PerUserListQuery = {}): Promise<WorkActivityEntryResponse[]> {
+    return this.http
+      .get<ApiEnvelope<WorkActivityEntryResponse[]>>(`/work/activity${perUserQs(query)}`)
       .then(unwrap);
   }
 
   // ---------- Tickets ----------
   listTickets(query: ListTicketsQuery = {}): Promise<TicketResponse[]> {
-    const qs = query.project_id
-      ? `?project_id=${encodeURIComponent(query.project_id)}`
-      : '';
+    const params = new URLSearchParams();
+    if (query.project_id) params.set('project_id', query.project_id);
+    if (query.workspace_id) params.set('workspace_id', query.workspace_id);
+    const qs = params.toString() ? `?${params.toString()}` : '';
     return this.http
       .get<ApiEnvelope<TicketResponse[]>>(`/work/tickets${qs}`)
       .then(unwrap);
@@ -181,6 +212,12 @@ export class WorkApiClient {
   ): Promise<TicketResponse> {
     return this.http
       .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}/assign`, body)
+      .then(unwrap);
+  }
+  /** Any workspace member but a guest. */
+  triageTicket(id: string, body: TriageTicketRequest): Promise<TicketResponse> {
+    return this.http
+      .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}/triage`, body)
       .then(unwrap);
   }
   updateTicketCustomValues(

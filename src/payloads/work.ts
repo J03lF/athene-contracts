@@ -49,7 +49,14 @@ export type TicketStatus =
 
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
 
-export type TicketType = 'task' | 'bug' | 'feature' | 'support' | 'epic';
+/** The five types every workspace starts with. */
+export type BuiltInTicketType = 'task' | 'bug' | 'feature' | 'support' | 'epic';
+/**
+ * A ticket type key. Workspaces configure their own types (see
+ * `TicketTypeResponse`); the built-in keys are listed for convenience, any
+ * other key of the workspace is valid too.
+ */
+export type TicketType = BuiltInTicketType | (string & {});
 
 export interface TicketResponse {
   id: string;
@@ -154,6 +161,47 @@ export interface AddTicketCommentRequest {
 
 export interface ListTicketsQuery {
   project_id?: string;
+  /**
+   * Only this workspace's tickets (403 for a non-member). Project and ticket
+   * keys are unique per workspace only, so a client showing one workspace
+   * should pass it — otherwise two tenants' `WR-1` can sit side by side.
+   */
+  workspace_id?: string;
+}
+
+/**
+ * Triage a ticket. Allowed to any member of its workspace except guests
+ * (platform operators who are members too).
+ */
+export interface TriageTicketRequest {
+  category?: string | null;
+  reason?: string | null;
+  priority?: TicketPriority;
+  sla_policy_id?: string | null;
+}
+
+/** For the per-user lists (inbox, activity). */
+export interface PerUserListQuery {
+  limit?: number;
+  /** Only this workspace (403 for a non-member). */
+  workspace_id?: string;
+}
+
+/** One entry of `GET /work/activity`. */
+export interface WorkActivityEntryResponse {
+  actor_initials: string;
+  actor_name: string | null;
+  action: string;
+  action_label: string;
+  resource_type: string;
+  resource_id: string | null;
+  details: unknown | null;
+  created_at: string;
+}
+
+export interface ListProjectsQuery {
+  /** Only this workspace's projects (403 for a non-member). */
+  workspace_id?: string;
 }
 
 export interface CreateTicketRequest {
@@ -161,6 +209,11 @@ export interface CreateTicketRequest {
   title: string;
   description: string;
   priority: string;
+  /**
+   * A live ticket-type key of the project's workspace. Absent = the
+   * workspace's default type. Required custom fields and defaults follow it.
+   */
+  ticket_type?: TicketType;
   assignee_id?: string | null;
   sla_policy_id?: string | null;
   /** RFC3339 timestamp. */
@@ -290,6 +343,12 @@ export interface ProjectResponse {
   /** 0..1 — completion ratio, manually set or derived from tickets. */
   progress: number;
   lead_id: string | null;
+  /**
+   * Who created the project. With the lead and the workspace's managers,
+   * the people who may edit its settings and overview. `null` for older
+   * projects whose creator the audit trail no longer records.
+   */
+  created_by: string | null;
   status: string;
   /**
    * Values for the workspace's `applies_to = project` field definitions,

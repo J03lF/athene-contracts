@@ -20,6 +20,12 @@ pub struct UserSettingsResponse {
     pub inbox_state: serde_json::Value,
     pub notifications_enabled: bool,
     pub email_notifications: bool,
+    /// An IANA zone (`Europe/Berlin`); `None` = the browser's.
+    #[serde(default)]
+    pub timezone: Option<String>,
+    /// The client's own preferences object.
+    #[serde(default)]
+    pub preferences: serde_json::Value,
 }
 
 /// A settings patch.
@@ -41,6 +47,28 @@ pub struct UpdateUserSettingsRequest {
     pub inbox_state: Option<serde_json::Value>,
     pub notifications_enabled: Option<bool>,
     pub email_notifications: Option<bool>,
+    /// Absent = unchanged; `null` = back to the browser's zone (kept as two
+    /// levels so a `null` survives the gateway).
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<String>)]
+    pub timezone: Option<Option<String>>,
+    /// Merged key by key into the stored object; a `null` value deletes
+    /// that key. At most 16 KB once merged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    pub preferences: Option<serde_json::Map<String, serde_json::Value>>,
+}
+
+fn present<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::deserialize(deserializer).map(Some)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]

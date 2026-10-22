@@ -47,6 +47,18 @@ pub struct FieldDefinitionResponse {
     pub options: JsonValue,
     pub required: bool,
     pub position: i32,
+    /// Ticket-type keys the field applies to; `None` = every type.
+    #[serde(default)]
+    pub ticket_type_keys: Option<Vec<String>>,
+    /// Filled in on create when the field applies and no value is sent.
+    #[serde(default)]
+    pub default_value: Option<JsonValue>,
+    #[serde(default)]
+    pub help_text: Option<String>,
+    #[serde(default)]
+    pub show_on_card: bool,
+    #[serde(default)]
+    pub placeholder: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -64,6 +76,17 @@ pub struct CreateFieldDefinitionRequest {
     pub required: bool,
     /// Tail by default — server places new fields at the end.
     pub position: Option<i32>,
+    /// `None` or empty = every type.
+    #[serde(default)]
+    pub ticket_type_keys: Option<Vec<String>>,
+    #[serde(default)]
+    pub default_value: Option<JsonValue>,
+    #[serde(default)]
+    pub help_text: Option<String>,
+    #[serde(default)]
+    pub show_on_card: Option<bool>,
+    #[serde(default)]
+    pub placeholder: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema, Validate)]
@@ -73,6 +96,28 @@ pub struct UpdateFieldDefinitionRequest {
     pub options: Option<JsonValue>,
     pub required: Option<bool>,
     pub position: Option<i32>,
+    /// `null` or empty = every type. (`Some(None)` = sent as null.)
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<Vec<String>>)]
+    pub ticket_type_keys: Option<Option<Vec<String>>>,
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<Object>)]
+    pub default_value: Option<Option<JsonValue>>,
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<String>)]
+    pub help_text: Option<Option<String>>,
+    pub show_on_card: Option<bool>,
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<String>)]
+    pub placeholder: Option<Option<String>>,
+}
+
+fn present<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::deserialize(deserializer).map(Some)
 }
 
 /// Bulk-reorder definitions within a workspace + scope. Server applies the

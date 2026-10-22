@@ -54,8 +54,27 @@ export interface FieldDefinitionResponse {
   label: string;
   field_type: FieldType;
   options: FieldOptions;
+  /** Required only for tickets of the types it applies to. */
   required: boolean;
   position: number;
+  /**
+   * Ticket-type keys this field applies to; `null` = every type. (Ticket
+   * fields only; always `null` for project fields.) A ticket of another
+   * type does not show or require the field — and keeps any value it
+   * already has, so changing a ticket's type loses nothing.
+   */
+  ticket_type_keys: string[] | null;
+  /**
+   * Filled in on create when the field applies and no value is sent.
+   * Same shape as a value of this field (validated like one).
+   */
+  default_value: unknown | null;
+  /** Shown under the field. ≤ 200 chars. */
+  help_text: string | null;
+  /** Show the value on board cards and list rows. */
+  show_on_card: boolean;
+  /** Input placeholder. ≤ 80 chars. */
+  placeholder: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -69,13 +88,26 @@ export interface CreateFieldDefinitionRequest {
   required?: boolean;
   /** Tail by default — server places new fields at the end. */
   position?: number;
+  /** Absent, `null` or `[]` = every type. Keys must be types of the workspace. */
+  ticket_type_keys?: string[] | null;
+  default_value?: unknown | null;
+  help_text?: string | null;
+  show_on_card?: boolean;
+  placeholder?: string | null;
 }
 
+/** An absent key leaves that part as it is; `null` clears it. */
 export interface UpdateFieldDefinitionRequest {
   label?: string;
   options?: FieldOptions;
   required?: boolean;
   position?: number;
+  /** `null` or `[]` = every type. */
+  ticket_type_keys?: string[] | null;
+  default_value?: unknown | null;
+  help_text?: string | null;
+  show_on_card?: boolean;
+  placeholder?: string | null;
 }
 
 export interface ReorderFieldDefinitionsRequest {

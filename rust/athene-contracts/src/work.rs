@@ -8,6 +8,37 @@ use utoipa::ToSchema;
 use validator::Validate;
 
 // ============================================================
+// Projects
+// ============================================================
+
+/// A project as `GET /work/projects` returns it. Mirrors
+/// `ProjectResponse` in `src/payloads/work.ts`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+pub struct ProjectResponse {
+    pub id: String,
+    /// `None` for projects created before projects carried a workspace.
+    pub workspace_id: Option<String>,
+    pub key: String,
+    pub name: String,
+    pub description: Option<String>,
+    /// `#RRGGBB`; `None` = derived from the key.
+    pub color: Option<String>,
+    pub health: String,
+    /// 0..1.
+    pub progress: f32,
+    pub lead_id: Option<String>,
+    /// Who created the project; with the lead and the workspace's managers,
+    /// the people who may edit it. `None` when no longer known.
+    #[serde(default)]
+    pub created_by: Option<String>,
+    pub status: String,
+    /// Values for the workspace's project field definitions.
+    pub custom_values: serde_json::Value,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// ============================================================
 // Sprints
 // ============================================================
 

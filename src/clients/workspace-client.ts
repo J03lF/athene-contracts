@@ -3,6 +3,8 @@ import type {
   CreateInviteRequest,
   InvitationResponse,
   RenameWorkspaceRequest,
+  UpdateWorkspaceRequest,
+  UpdateMemberRoleRequest,
   WorkspaceMemberResponse,
   WorkspaceResponse,
 } from '../payloads/workspace';
@@ -30,6 +32,16 @@ export class WorkspaceApiClient {
       .then(unwrap);
   }
 
+  /**
+   * Change name, description, colour and/or settings (settings merged key
+   * by key). Owners and admins only.
+   */
+  updateWorkspace(workspaceId: string, body: UpdateWorkspaceRequest): Promise<WorkspaceResponse> {
+    return this.http
+      .patch<ApiEnvelope<WorkspaceResponse>>(`/workspaces/${workspaceId}`, body)
+      .then(unwrap);
+  }
+
   /** Members of one workspace, with their identities resolved. */
   listMembers(workspaceId: string): Promise<WorkspaceMemberResponse[]> {
     return this.http
@@ -51,6 +63,45 @@ export class WorkspaceApiClient {
   ): Promise<InvitationResponse> {
     return this.http
       .post<ApiEnvelope<InvitationResponse>>(`/workspaces/${workspaceId}/invites`, body)
+      .then(unwrap);
+  }
+
+  /**
+   * Change a member's role. Owners and admins only; only an owner touches
+   * owners; 409 when it would leave the workspace without an owner.
+   */
+  updateMemberRole(
+    workspaceId: string,
+    userId: string,
+    body: UpdateMemberRoleRequest,
+  ): Promise<WorkspaceMemberResponse> {
+    return this.http
+      .patch<ApiEnvelope<WorkspaceMemberResponse>>(
+        `/workspaces/${workspaceId}/members/${userId}`,
+        body,
+      )
+      .then(unwrap);
+  }
+
+  /** Remove a member (owners and admins; only an owner removes an owner). */
+  removeMember(workspaceId: string, userId: string): Promise<void> {
+    return this.http
+      .delete(`/workspaces/${workspaceId}/members/${userId}`)
+      .then(() => undefined);
+  }
+
+  /** Leave a workspace. 409 for its last owner. Access ends immediately. */
+  leaveWorkspace(workspaceId: string, ownUserId: string): Promise<void> {
+    return this.removeMember(workspaceId, ownUserId);
+  }
+
+  /** Revoke an invite so its link stops working. Idempotent. */
+  revokeInvite(workspaceId: string, inviteId: string): Promise<InvitationResponse> {
+    return this.http
+      .post<ApiEnvelope<InvitationResponse>>(
+        `/workspaces/${workspaceId}/invites/${inviteId}/revoke`,
+        {},
+      )
       .then(unwrap);
   }
 }
