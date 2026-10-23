@@ -47,7 +47,18 @@ export interface WorkspaceSettings {
   require_estimate: boolean | null;
   composer_properties: ComposerPropertiesSetting | null;
   sprint_week_start: 'monday' | 'sunday' | null;
+  /** `"HH:MM"` (24h), when the working day starts; `null` = {@link DEFAULT_WORK_DAY_START}. */
+  work_day_start: string | null;
+  /** `"HH:MM"`, after `work_day_start` (400 otherwise); `null` = {@link DEFAULT_WORK_DAY_END}. */
+  work_day_end: string | null;
+  /** ISO weekdays 1 (Mon) – 7 (Sun), ascending, non-empty; `null` = {@link DEFAULT_WORK_DAYS}. */
+  work_days: number[] | null;
 }
+
+/** The working day a workspace has when it has not set one. */
+export const DEFAULT_WORK_DAY_START = '08:00';
+export const DEFAULT_WORK_DAY_END = '18:00';
+export const DEFAULT_WORK_DAYS: readonly number[] = [1, 2, 3, 4, 5];
 
 /**
  * `PATCH /workspaces/:id` — owners and admins (403 otherwise). An absent key

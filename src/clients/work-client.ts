@@ -5,6 +5,8 @@ import type {
   AssignTicketsRequest,
   AddWorkLogRequest,
   CompleteSprintRequest,
+  UpdateSprintRequest,
+  UpdateSprintResponse,
   CreateMilestoneRequest,
   MilestoneResponse,
   UpdateMilestoneRequest,
@@ -272,6 +274,15 @@ export class WorkApiClient {
     return this.http
       .post<ApiEnvelope<SprintResponse>>(`/work/sprints/${id}/start`)
       .then(unwrap);
+  }
+  /** Move a sprint's dates, optionally with the own due dates named. */
+  updateSprint(id: string, body: UpdateSprintRequest): Promise<UpdateSprintResponse> {
+    return this.http
+      .post<ApiEnvelope<SprintResponse> & { moved_tickets?: number }>(
+        `/work/sprints/${id}/update`,
+        body
+      )
+      .then((res) => ({ sprint: unwrap(res), moved_tickets: res.moved_tickets ?? 0 }));
   }
   /** Complete a sprint; its unfinished tickets move as `body` says. */
   completeSprint(id: string, body: CompleteSprintRequest = {}): Promise<SprintResponse> {

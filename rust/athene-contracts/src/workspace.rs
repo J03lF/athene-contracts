@@ -15,8 +15,10 @@ pub struct WorkspaceResponse {
     #[serde(default)]
     pub color: Option<String>,
     /// `{ default_project_id, default_assignee, default_priority,
-    /// require_estimate, composer_properties, sprint_week_start }`, every key
-    /// present (`null` = unset). See `src/payloads/workspace.ts`.
+    /// require_estimate, composer_properties, sprint_week_start,
+    /// work_day_start, work_day_end, work_days }`, every key present
+    /// (`null` = unset; the working day defaults to 08:00–18:00, Mon–Fri).
+    /// See `src/payloads/workspace.ts`.
     #[serde(default)]
     pub settings: serde_json::Value,
 }

@@ -440,6 +440,24 @@ export interface CreateSprintRequest {
   goal_points?: number | null;
 }
 
+/**
+ * Move a sprint's dates. Tickets without an own due date follow the end by
+ * themselves (their deadline is the sprint's end, derived, never stored);
+ * `move_due_ticket_ids` names tickets of this sprint whose own due date
+ * moves by as many days as the end does ("Mitverschieben").
+ */
+export interface UpdateSprintRequest {
+  start_date?: string;
+  end_date?: string;
+  move_due_ticket_ids?: string[];
+}
+
+export interface UpdateSprintResponse {
+  sprint: SprintResponse;
+  /** Tickets whose own due date moved with the end. */
+  moved_tickets: number;
+}
+
 /** What a ticket delete took with it. */
 export interface DeletedTicketResponse {
   id: string;
