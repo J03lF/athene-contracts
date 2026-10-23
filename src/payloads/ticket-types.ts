@@ -15,6 +15,8 @@
  * - `name` 1..40 chars, unique per workspace among live types (case
  *   ignored); `description` ≤ 200; `icon` from `TICKET_TYPE_ICONS`; `color`
  *   from `TICKET_TYPE_COLORS` (a token name, not hex).
+ * - `description_template`: optional Markdown (≤ 8 KB, blank = none) the
+ *   create composer prefills an empty description with. Never seeded.
  * - Exactly one live type is the default (used when a ticket is created
  *   without a type). The default cannot be archived; the last live type
  *   cannot be archived.
@@ -74,6 +76,8 @@ export interface TicketTypeResponse {
   key: string;
   name: string;
   description: string | null;
+  /** Markdown prefilled into a new ticket's empty description; `null` = none. */
+  description_template: string | null;
   icon: TicketTypeIcon;
   color: TicketTypeColor;
   position: number;
@@ -97,6 +101,7 @@ export interface CreateTicketTypeRequest {
   /** Absent = derived from the name (`"Change request"` → `change_request`). */
   key?: string;
   description?: string | null;
+  description_template?: string | null;
   /** Default `circle-dot`. */
   icon?: TicketTypeIcon;
   /** Default `neutral`. */
@@ -107,10 +112,11 @@ export interface CreateTicketTypeRequest {
   is_default?: boolean;
 }
 
-/** An absent key leaves that part as it is; `null` clears `description`. */
+/** An absent key leaves that part as it is; `null` clears `description` or `description_template`. */
 export interface UpdateTicketTypeRequest {
   name?: string;
   description?: string | null;
+  description_template?: string | null;
   icon?: TicketTypeIcon;
   color?: TicketTypeColor;
   hierarchy_level?: TicketTypeHierarchyLevel;

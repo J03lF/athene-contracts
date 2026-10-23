@@ -206,7 +206,19 @@ pub struct SessionInfo {
     pub is_current: bool,
 }
 
+/// A verification code sent again (`POST /auth/challenge/{id}/resend`).
+/// The previous code of the challenge stops working.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct ChallengeResend {
+    pub challenge_id: String,
+    pub expires_at: DateTime<Utc>,
+    /// Seconds until another resend is allowed; 0 when none are left.
+    pub retry_after_seconds: i64,
+    pub resends_remaining: u32,
+}
+
 pub type AuthChallengeResponse = ApiResponse<AuthChallenge>;
+pub type ChallengeResendResponse = ApiResponse<ChallengeResend>;
 pub type AuthSessionResponse = ApiResponse<AuthSession>;
 pub type AuthUserResponse = ApiResponse<AuthUser>;
 pub type RegistrationPolicyResponse = ApiResponse<RegistrationPolicy>;

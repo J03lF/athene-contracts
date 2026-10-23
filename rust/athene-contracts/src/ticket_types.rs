@@ -45,6 +45,9 @@ pub struct TicketTypeResponse {
     pub key: String,
     pub name: String,
     pub description: Option<String>,
+    /// Markdown the composer prefills an empty description with (≤ 8 KB).
+    #[serde(default)]
+    pub description_template: Option<String>,
     pub icon: String,
     pub color: String,
     pub position: i32,
@@ -65,6 +68,8 @@ pub struct CreateTicketTypeRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description_template: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
@@ -74,7 +79,8 @@ pub struct CreateTicketTypeRequest {
     pub is_default: Option<bool>,
 }
 
-/// An absent key leaves that part as it is; `null` clears `description`.
+/// An absent key leaves that part as it is; `null` clears `description` or
+/// `description_template`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
 pub struct UpdateTicketTypeRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -86,6 +92,13 @@ pub struct UpdateTicketTypeRequest {
     )]
     #[schema(value_type = Option<String>)]
     pub description: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<String>)]
+    pub description_template: Option<Option<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

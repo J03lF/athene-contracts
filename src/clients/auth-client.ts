@@ -2,6 +2,7 @@ import type {
   AuthChallengeResponse,
   AuthSessionResponse,
   AuthUserResponse,
+  ChallengeResendResponse,
   FeatureFlagListResponse,
   LoginConfirmRequest,
   LoginRequest,
@@ -34,6 +35,11 @@ export class AuthApiClient {
 
   confirmRegister(request: RegisterConfirmRequest): Promise<AuthSessionResponse> {
     return this.http.post('/auth/register/confirm', request);
+  }
+
+  /** Sends a new code for an open login or register challenge. */
+  resendChallenge(challengeId: string): Promise<ChallengeResendResponse> {
+    return this.http.post(`/auth/challenge/${encodeURIComponent(challengeId)}/resend`, {});
   }
 
   me(): Promise<AuthUserResponse> {

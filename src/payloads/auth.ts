@@ -76,7 +76,30 @@ export interface FeatureFlagState {
   enabled: boolean;
 }
 
+/**
+ * A verification code sent again (`POST /auth/challenge/{id}/resend`).
+ * The previous code of the challenge stops working.
+ */
+export interface ChallengeResend {
+  challenge_id: string;
+  expires_at: string;
+  /** Seconds until another resend is allowed; 0 when none are left. */
+  retry_after_seconds: number;
+  resends_remaining: number;
+}
+
+/**
+ * `error.details` of a refused resend (HTTP 429).
+ * `retry_after_seconds` is null once every resend is used.
+ */
+export interface ChallengeResendRefusal {
+  reason: 'too_soon' | 'exhausted';
+  retry_after_seconds: number | null;
+  resends_remaining: number;
+}
+
 export type AuthChallengeResponse = ApiResponse<AuthChallenge>;
+export type ChallengeResendResponse = ApiResponse<ChallengeResend>;
 export type AuthSessionResponse = ApiResponse<AuthSession>;
 export type AuthUserResponse = ApiResponse<AuthUser>;
 export type RegistrationPolicyResponse = ApiResponse<RegistrationPolicy>;
