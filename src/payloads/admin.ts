@@ -1,95 +1,27 @@
-export interface FeatureFlagRequest {
-  key: string;
-  description: string;
-  enabled: boolean;
-  requires_api_key?: boolean;
-}
-
-export interface ToggleRequest {
-  enabled: boolean;
-}
-
-export interface FeatureFlagResponse {
-  key: string;
-  description: string;
-  enabled: boolean;
-  requires_api_key: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateApiKeyRequest {
-  name: string;
-  expires_in: string;
-}
-
-export interface ApiKeyResponse {
-  id: string;
-  name: string;
-  prefix: string;
-  status: string;
-  created_at: string;
-  expires_at?: string | null;
-  last_used_at?: string | null;
-}
-
-export interface ApiKeyCreatedResponse {
-  id: string;
-  key: string;
-  name: string;
-  prefix: string;
-  expires_at?: string | null;
-}
-
-export interface MaintenanceRequest {
-  enabled: boolean;
-  message?: string | null;
-  until?: string | null;
-  force_logout_at?: string | null;
-  dismiss_seconds?: number | null;
-  warn_minutes?: number | null;
-}
-
-export interface UpdateSettingsRequest {
-  registration_mode?: string | null;
-  max_users?: number | null;
-  session_timeout_minutes?: number | null;
-  allowed_email_domains?: string[] | null;
-  maintenance_mode?: boolean | null;
-  maintenance_message?: string | null;
-  maintenance_until?: string | null;
-}
-
-export interface SettingsResponse {
-  registration_mode: string;
-  max_users: number;
-  session_timeout_minutes: number;
-  allowed_email_domains: string[];
-  maintenance_mode: boolean;
-  maintenance_message?: string | null;
-  maintenance_until?: string | null;
-  maintenance_force_logout_at?: string | null;
-  maintenance_dismiss_seconds: number;
-  maintenance_warn_minutes: number;
-}
-
-export interface MaintenanceStatusResponse {
-  active: boolean;
-  message?: string | null;
-  force_logout_at?: string | null;
-  until?: string | null;
-  dismiss_seconds: number;
-  warn_minutes: number;
-}
-
-export interface TerminateSessionsResponse {
-  terminated_count: number;
-}
-
-export interface OverviewResponse {
-  total_users: number;
-  active_sessions: number;
-  active_api_keys: number;
-  feature_flags_enabled: number;
-  feature_flags_total: number;
-}
+/**
+ * Admin wire types (`/admin/*`, `/maintenance/status`).
+ *
+ * Generated from the Rust contracts in `rust/athene-contracts/src/admin.rs`
+ * by ts-rs; do not add hand-written shapes here. After changing a Rust type,
+ * run `npm run generate` and commit `src/generated/`.
+ *
+ * `RegistrationMode` is generated too (`src/generated/auth/`) but is exported
+ * from `./auth`.
+ */
+export type { FeatureFlagRequest } from '../generated/admin/FeatureFlagRequest';
+export type { UpdateFeatureFlagRequest } from '../generated/admin/UpdateFeatureFlagRequest';
+export type { ToggleRequest } from '../generated/admin/ToggleRequest';
+export type { FeatureFlagResponse } from '../generated/admin/FeatureFlagResponse';
+export type { CreateApiKeyRequest } from '../generated/admin/CreateApiKeyRequest';
+export type { ApiKeyResponse } from '../generated/admin/ApiKeyResponse';
+export type { ApiKeyCreatedResponse } from '../generated/admin/ApiKeyCreatedResponse';
+export type { ApiKeyRevokedResponse } from '../generated/admin/ApiKeyRevokedResponse';
+export type { MaintenanceRequest } from '../generated/admin/MaintenanceRequest';
+export type { UpdateSettingsRequest } from '../generated/admin/UpdateSettingsRequest';
+export type { SettingsResponse } from '../generated/admin/SettingsResponse';
+export type { MaintenanceStatusResponse } from '../generated/admin/MaintenanceStatusResponse';
+export type { TerminateSessionsResponse } from '../generated/admin/TerminateSessionsResponse';
+export type { AuditEntryResponse } from '../generated/admin/AuditEntryResponse';
+export type { CacheRefreshResponse } from '../generated/admin/CacheRefreshResponse';
+export type { OverviewCounts } from '../generated/admin/OverviewCounts';
+export type { OverviewResponse } from '../generated/admin/OverviewResponse';

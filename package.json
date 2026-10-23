@@ -17,6 +17,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "generate": "ATHENE_CONTRACTS_REGENERATE=1 cargo test -p athene-contracts --test ts_bindings",
+    "check:generated": "cargo test -p athene-contracts --test ts_bindings",
     "prepare": "npm run build"
   },
   "devDependencies": {

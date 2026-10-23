@@ -1,0 +1,57 @@
+# cargo-deny configuration (Athene quality overhaul, step 1.1).
+# Run: cargo deny check            (CI: .github/workflows/ci.yml, local: scripts/ci-local.sh)
+# Docs: https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+# Every platform we build or might build for; keeps the license/advisory set
+# independent of the machine that runs the check.
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+]
+all-features = true
+
+[advisories]
+version = 2
+# Version 2: vulnerability and unsound advisories always fail. Unmaintained
+# crates fail when we depend on them directly; transitive ones we cannot
+# replace alone are tracked upstream instead of turning the gate red.
+yanked = "deny"
+unmaintained = "workspace"
+# Each ignore needs an id, a reason and the step that removes it.
+ignore = [
+]
+
+[licenses]
+version = 2
+# Derived from the licenses actually in Cargo.lock on 2026-10-24. Adding a
+# license here is a deliberate decision, not a way to make CI green.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.93
+
+[licenses.private]
+# Our own crates are not published and carry no license field.
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+# The path patches mean a git source only appears when a patch is removed.
+unused-allowed-source = "allow"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# Sibling repos that Cargo.toml references by git URL (path-patched locally,
+# checked out at pinned SHAs in CI, see artifacts/quality/phase1/CI.md).
+allow-git = []

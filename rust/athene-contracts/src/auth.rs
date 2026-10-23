@@ -165,7 +165,11 @@ pub struct RegistrationPolicy {
     pub max_users: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+/// Who may register: nobody, holders of an API key, or anyone.
+// Generated into `src/generated/auth/` because the admin settings use it; the
+// rest of the auth contracts are still hand-written in `src/payloads/auth.ts`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, ts_rs::TS)]
+#[ts(export_to = "auth/")]
 pub enum RegistrationMode {
     #[serde(rename = "disabled")]
     Disabled,
