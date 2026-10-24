@@ -21,6 +21,8 @@ authors = ["Athene Team"]
 [dependencies]
 bytes = "1"
 http = "1"
+# `SlotBody`: a response body that holds a stream's concurrency slot.
+http-body = "1"
 tower = { version = "0.5", default-features = false }
 tokio = { version = "1.41", features = ["time", "sync", "net", "signal", "rt", "macros"] }
 tracing = "0.1"

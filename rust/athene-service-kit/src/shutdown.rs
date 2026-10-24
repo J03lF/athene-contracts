@@ -15,13 +15,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use http::header::{HeaderName, HeaderValue, RETRY_AFTER};
-use http::{Request, Response, StatusCode};
-use serde::Serialize;
+use http::{Request, Response};
 use tower::{Layer, Service};
 
 use crate::service_auth::PROBE_PATHS;
-use crate::util::{json_response, BoxFuture, Render};
+use crate::util::{unavailable_response, BoxFuture, Render};
 
 /// Whether the service is draining. Shared by the drain layer, `/ready`
 /// and the shutdown future.
@@ -87,56 +85,10 @@ pub async fn drain_on_signal(drain: Arc<Drain>, service: &str) {
 #[derive(Debug, Clone, Copy)]
 pub struct Draining;
 
-#[derive(Serialize)]
-struct Envelope<'a> {
-    error: Body<'a>,
-}
-
-#[derive(Serialize)]
-struct Body<'a> {
-    code: &'static str,
-    message: &'static str,
-    message_key: &'static str,
-    details: Details,
-    retryable: bool,
-    request_id: &'a str,
-}
-
-#[derive(Serialize)]
-struct Details {
-    reason: &'static str,
-    retry_after_seconds: u64,
-}
-
 /// `503 ATH-SYS-005` with `Retry-After: 1`, the request id and the retry
 /// details — the same envelope athene's `AppError` writes.
 pub fn draining_response<B: From<String>>(_: &Draining) -> Response<B> {
-    let request_id =
-        crate::request_id::current().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-    let body = serde_json::to_string(&Envelope {
-        error: Body {
-            code: "ATH-SYS-005",
-            message: "Service is restarting",
-            message_key: "errors.unavailable",
-            details: Details {
-                reason: "draining",
-                retry_after_seconds: 1,
-            },
-            retryable: true,
-            request_id: &request_id,
-        },
-    })
-    .unwrap_or_default();
-    let mut response = json_response(StatusCode::SERVICE_UNAVAILABLE, body);
-    response
-        .headers_mut()
-        .insert(RETRY_AFTER, HeaderValue::from_static("1"));
-    if let Ok(value) = HeaderValue::from_str(&request_id) {
-        response
-            .headers_mut()
-            .insert(HeaderName::from_static("x-request-id"), value);
-    }
-    response
+    unavailable_response("ATH-SYS-005", "Service is restarting", "draining", 1)
 }
 
 /// Refuses every request but the exempt paths while draining.
@@ -241,6 +193,8 @@ mod tests {
     use std::convert::Infallible;
 
     use super::*;
+    use http::header::RETRY_AFTER;
+    use http::StatusCode;
     use tower::ServiceExt;
 
     async fn ok(_: Request<()>) -> Result<Response<String>, Infallible> {

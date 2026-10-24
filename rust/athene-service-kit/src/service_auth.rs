@@ -4,8 +4,8 @@
 //! compares it, in constant time, with the token it is configured with
 //! (`<PREFIX>_INTERNAL_SERVICE_AUTH_TOKEN` or `..._FILE`).
 //!
-//! **Modes.** `enforce` refuses a request without a valid token with the
-//! module's own 401. `report` lets it through and logs a structured warning
+//! **Modes.** `enforce` refuses a request without a valid token (the
+//! answer is below). `report` lets it through and logs a structured warning
 //! once per caller — a rollout stage only. **Enforce is the default**: the
 //! old default, "enforce when a token is set", switched service auth off
 //! exactly when the token was missing. Enforcing without a token is a
@@ -20,6 +20,15 @@
 //! only such a request may carry a principal the core trusts
 //! ([`crate::principal`]).
 //!
+//! **The refusal is not a 401** (3.6b, S2). A refused service token is
+//! `503` [`REFUSED_CODE`] (`ATH-SYS-006`), retryable, with `Retry-After`
+//! ([`refused_response`], or the module's own envelope with that code). A
+//! 401 means "this user's token is bad" to every hop above: the gateway
+//! answers it with a 401 and the web refreshes and signs the user out. A
+//! service token that does not match is a deployment fault between two
+//! services, the same for every user, so it must read as an outage — the
+//! user's session is untouched and comes back once the tokens agree.
+//!
 //! [`ServiceCredential`] is the other side: the token a caller sends.
 
 use std::collections::HashSet;
@@ -33,7 +42,7 @@ use tower::{Layer, Service};
 
 use crate::client_ip::peer_of;
 use crate::config::{flag_from, secret_from, ConfigError, Secret};
-use crate::util::{BoxFuture, Render};
+use crate::util::{unavailable_response, BoxFuture, Render};
 
 pub const SERVICE_TOKEN_HEADER: &str = "x-fenrir-service-token";
 /// Informational only: the host sets it on public ingress; never trusted.
@@ -51,6 +60,18 @@ pub const PROBE_PATHS: &[&str] = &[
 ];
 /// Upper bound on distinct callers remembered for report-mode logging.
 const MAX_REPORTED_CALLERS: usize = 256;
+/// The code of a refused service credential: `503`, retryable, never a 401
+/// (the module doc says why). Every service answers it with this code; the
+/// gateway recognises it whatever the status (athene-api
+/// `transport/http/response.rs`).
+pub const REFUSED_CODE: &str = "ATH-SYS-006";
+/// `Retry-After` of [`refused_response`]: a mismatch is a deployment fault
+/// and will not clear within a second, but it does clear when the tokens
+/// agree again.
+pub const REFUSED_RETRY_AFTER_SECS: u64 = 5;
+/// `details.reason` of [`refused_response`]: the same word for every
+/// refusal, so a client learns nothing about the token from it.
+pub const REFUSED_REASON: &str = "service_auth";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServiceAuthMode {
@@ -361,6 +382,20 @@ pub struct ServiceAuthDenied {
     pub path: String,
 }
 
+/// The kit's answer to a refused service credential: `503 ATH-SYS-006`
+/// in athene's envelope (`message_key: errors.unavailable`, `retryable`,
+/// `details {reason: "service_auth", retry_after_seconds}`) with
+/// `Retry-After` and the request id. Which check failed (missing, invalid,
+/// not configured) goes to the log, not to the caller.
+pub fn refused_response<B: From<String>>(_: &ServiceAuthDenied) -> Response<B> {
+    unavailable_response(
+        REFUSED_CODE,
+        "Service authentication refused",
+        REFUSED_REASON,
+        REFUSED_RETRY_AFTER_SECS,
+    )
+}
+
 /// Checks the service token of every request but the open paths.
 pub struct ServiceAuthLayer<B> {
     auth: Arc<ServiceAuth>,
@@ -377,8 +412,17 @@ impl<B> Clone for ServiceAuthLayer<B> {
 }
 
 impl<B> ServiceAuthLayer<B> {
+    /// `reject` answers a refusal; it must keep [`REFUSED_CODE`] and a 503
+    /// (see the module doc), as [`refused_response`] does.
     pub fn new(auth: Arc<ServiceAuth>, reject: Render<ServiceAuthDenied, B>) -> Self {
         Self { auth, reject }
+    }
+}
+
+impl<B: From<String> + 'static> ServiceAuthLayer<B> {
+    /// With [`refused_response`].
+    pub fn with_default_answer(auth: Arc<ServiceAuth>) -> Self {
+        Self::new(auth, Arc::new(refused_response::<B>))
     }
 }
 
@@ -762,6 +806,60 @@ mod tests {
         let narrow =
             app(ServiceAuthConfig::enforce(Secret::new(TOKEN)).with_open_paths(&["/health"]));
         assert_eq!(call(&narrow, "/metrics/internal", None).await.0, 401);
+    }
+
+    /// S2 (3.6b): a refused service token reads as an outage, never as a
+    /// rejected user — one code for every check that failed, a 503 the
+    /// caller may retry, and nothing about the token.
+    #[tokio::test]
+    async fn the_default_refusal_is_a_retryable_503_not_a_401() {
+        fn ok(_: Request<()>) -> std::future::Ready<Result<Response<String>, Infallible>> {
+            std::future::ready(Ok(Response::new("ok".to_string())))
+        }
+        let with_default = |config: ServiceAuthConfig| {
+            ServiceAuthLayer::<String>::with_default_answer(Arc::new(ServiceAuth::new(config)))
+                .layer(tower::service_fn(ok))
+        };
+        let enforce = with_default(ServiceAuthConfig::enforce(Secret::new(TOKEN)));
+        let broken = with_default(ServiceAuthConfig::new(ServiceAuthMode::Enforce, None));
+        for (service, token) in [
+            (&enforce, None),
+            (&enforce, Some("wrong-token")),
+            (&broken, Some(TOKEN)),
+        ] {
+            let mut request = Request::builder().uri("/api/thing").body(()).unwrap();
+            if let Some(token) = token {
+                request.headers_mut().insert(
+                    SERVICE_TOKEN_HEADER,
+                    HeaderValue::from_str(&format!("Bearer {token}")).unwrap(),
+                );
+            }
+            let response = service.clone().oneshot(request).await.unwrap();
+            assert_eq!(
+                response.status(),
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                "{token:?}"
+            );
+            assert_eq!(response.headers()[http::header::RETRY_AFTER], "5");
+            let request_id = response.headers()["x-request-id"].clone();
+            let body: serde_json::Value = serde_json::from_str(response.body()).unwrap();
+            assert_eq!(body["error"]["code"], REFUSED_CODE);
+            assert_eq!(body["error"]["message_key"], "errors.unavailable");
+            assert_eq!(body["error"]["retryable"], true);
+            assert_eq!(
+                body["error"]["details"],
+                serde_json::json!({ "reason": "service_auth", "retry_after_seconds": 5 })
+            );
+            assert_eq!(body["error"]["request_id"], request_id.to_str().unwrap());
+            assert!(!response.body().contains(TOKEN));
+            assert!(!response.body().contains("missing_service_token"));
+        }
+        let probe = enforce
+            .clone()
+            .oneshot(Request::builder().uri("/health").body(()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(probe.status(), http::StatusCode::OK);
     }
 
     #[tokio::test]

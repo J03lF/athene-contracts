@@ -12,7 +12,7 @@
 //! |---|---|
 //! | [`config`] | `bind_addr()` (`FENRIR_SERVICE_ADDR`, loopback default), `*_FILE` secrets, [`config::Secret`] |
 //! | [`client_ip`] | client address from trusted proxies only: layer and extractor |
-//! | [`rate_limit`] | bounded per-key limiter with eviction, keys by IP / token / account, a layer per [`rate_limit::RateClass`] |
+//! | [`rate_limit`] | bounded per-key limiter with eviction, keys by IP / verified token / account, a layer per [`rate_limit::RateClass`], a cap on open streams per caller |
 //! | [`request_id`] | accept or mint `x-request-id`, `http` span, response header, [`request_id::current`] |
 //! | [`service_auth`] | `x-fenrir-service-token`, report or enforce, fail-closed, constant time, open probes |
 //! | [`principal`] | the gateway signs `x-athene-principal`, the core verifies it (identity once at the edge) |
@@ -46,7 +46,10 @@ mod util;
 pub use client_ip::{ClientIp, ClientIpLayer, TrustedProxies};
 pub use config::{ConfigError, Secret};
 pub use error_class::ErrorClass;
-pub use rate_limit::{RateClass, RateLimitLayer, RateLimiter, RateRule};
+pub use rate_limit::{
+    ConcurrencyLimitLayer, ConcurrencyLimiter, RateClass, RateLimitLayer, RateLimiter, RateRule,
+    VerifiedCallers,
+};
 pub use request_id::RequestIdLayer;
 pub use service_auth::{
     AuthenticatedService, ServiceAuth, ServiceAuthConfig, ServiceAuthLayer, ServiceAuthMode,

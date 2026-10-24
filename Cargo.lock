@@ -83,6 +83,7 @@ dependencies = [
  "bytes",
  "hmac",
  "http",
+ "http-body",
  "http-body-util",
  "opentelemetry",
  "opentelemetry-otlp",
