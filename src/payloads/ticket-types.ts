@@ -1,6 +1,7 @@
 /**
- * Ticket-type wire shapes — the configurable kinds of ticket per workspace.
- * Mirrored by hand in `rust/athene-contracts/src/ticket_types.rs`.
+ * Ticket-type wire types: the configurable kinds of ticket per workspace.
+ * Generated from `rust/athene-contracts/src/ticket_types.rs` by ts-rs; the
+ * value lists below mirror the constants there.
  *
  * Every response is wrapped as `{ data: … }`. Ids are UUID strings,
  * timestamps RFC 3339.
@@ -25,6 +26,18 @@
  *   while any ticket uses the type.
  * - Members read; workspace owners and admins manage.
  */
+
+import type { Assert, Covers } from '../internal/covers';
+import type { TicketTypeColor } from '../generated/ticket_types/TicketTypeColor';
+import type { TicketTypeIcon } from '../generated/ticket_types/TicketTypeIcon';
+
+export type { CreateTicketTypeRequest } from '../generated/ticket_types/CreateTicketTypeRequest';
+export type { ListTicketTypesQuery } from '../generated/ticket_types/ListTicketTypesQuery';
+export type { ReorderTicketTypesRequest } from '../generated/ticket_types/ReorderTicketTypesRequest';
+export type { TicketTypeColor } from '../generated/ticket_types/TicketTypeColor';
+export type { TicketTypeIcon } from '../generated/ticket_types/TicketTypeIcon';
+export type { TicketTypeResponse } from '../generated/ticket_types/TicketTypeResponse';
+export type { UpdateTicketTypeRequest } from '../generated/ticket_types/UpdateTicketTypeRequest';
 
 export const TICKET_TYPE_ICONS = [
   'square-check',
@@ -51,8 +64,8 @@ export const TICKET_TYPE_ICONS = [
   'package',
   'megaphone',
   'flask-conical',
-] as const;
-export type TicketTypeIcon = (typeof TICKET_TYPE_ICONS)[number];
+] as const satisfies readonly TicketTypeIcon[];
+type _IconsComplete = Assert<Covers<TicketTypeIcon, typeof TICKET_TYPE_ICONS>>;
 
 /** Token names (`--blue`, `--blue-tint`, …), never hex. */
 export const TICKET_TYPE_COLORS = [
@@ -63,70 +76,8 @@ export const TICKET_TYPE_COLORS = [
   'red',
   'purple',
   'pink',
-] as const;
-export type TicketTypeColor = (typeof TICKET_TYPE_COLORS)[number];
+] as const satisfies readonly TicketTypeColor[];
+type _ColorsComplete = Assert<Covers<TicketTypeColor, typeof TICKET_TYPE_COLORS>>;
 
 /** 0 = an ordinary ticket, 1 = an epic-like parent of ordinary tickets. */
 export type TicketTypeHierarchyLevel = 0 | 1;
-
-export interface TicketTypeResponse {
-  id: string;
-  workspace_id: string;
-  /** Stable; what tickets store in `ticket_type`. */
-  key: string;
-  name: string;
-  description: string | null;
-  /** Markdown prefilled into a new ticket's empty description; `null` = none. */
-  description_template: string | null;
-  icon: TicketTypeIcon;
-  color: TicketTypeColor;
-  position: number;
-  is_default: boolean;
-  hierarchy_level: TicketTypeHierarchyLevel;
-  /** `null` while live. */
-  archived_at: string | null;
-  /** Tickets of the workspace that carry this type. */
-  ticket_count: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ListTicketTypesQuery {
-  /** Include archived types (settings page). Default: live types only. */
-  include_archived?: boolean;
-}
-
-export interface CreateTicketTypeRequest {
-  name: string;
-  /** Absent = derived from the name (`"Change request"` → `change_request`). */
-  key?: string;
-  description?: string | null;
-  description_template?: string | null;
-  /** Default `circle-dot`. */
-  icon?: TicketTypeIcon;
-  /** Default `neutral`. */
-  color?: TicketTypeColor;
-  /** Default 0. */
-  hierarchy_level?: TicketTypeHierarchyLevel;
-  /** `true` makes it the workspace default (the previous one stops being it). */
-  is_default?: boolean;
-}
-
-/** An absent key leaves that part as it is; `null` clears `description` or `description_template`. */
-export interface UpdateTicketTypeRequest {
-  name?: string;
-  description?: string | null;
-  description_template?: string | null;
-  icon?: TicketTypeIcon;
-  color?: TicketTypeColor;
-  hierarchy_level?: TicketTypeHierarchyLevel;
-  /** Only `true` is meaningful: make this the default. */
-  is_default?: boolean;
-  /** `true` archives, `false` restores. */
-  archived?: boolean;
-}
-
-export interface ReorderTicketTypesRequest {
-  /** Every live and archived type id of the workspace, in the new order. */
-  ordered_ids: string[];
-}

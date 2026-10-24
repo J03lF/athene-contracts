@@ -58,3 +58,6 @@ large_futures = "warn"
 large_stack_arrays = "warn"
 implicit_clone = "warn"
 cloned_instead_of_copied = "warn"
+# A partial update says "absent / null / value" with `Patch<T>`
+# (athene_contracts::patch), never with `Option<Option<T>>` (BE-22, C2).
+option_option = "deny"

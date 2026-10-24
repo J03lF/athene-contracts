@@ -34,6 +34,13 @@
 //!   `null`.
 //! - ts-rs reads the pair as "may be omitted", so the field becomes
 //!   `due_date?: string | null` (`T | null | undefined`).
+//!
+//! The core's edit structs (`TicketEdit`, `ProjectEdit`, …) carry `Patch`
+//! as well, so a body reaches the domain without a conversion:
+//! [`Patch::try_map`] / [`Patch::try_and_then`] parse and validate a sent
+//! value, [`Patch::apply`] writes the patch into an `Option` field and says
+//! whether it changed, [`Patch::resolve`] computes the value after the
+//! patch. `Option<Option<T>>` is denied by clippy (`option_option`).
 
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Error as _, Serialize, Serializer};
@@ -58,6 +65,13 @@ impl<T> Default for Patch<T> {
 }
 
 impl<T> Patch<T> {
+    /// `Some(v)` sets `v`, `None` leaves the value alone. For an optional
+    /// request field that can set but not clear. (`Option::into` is the
+    /// other reading: `None` = `Null`.)
+    pub fn set_or_keep(value: Option<T>) -> Self {
+        value.map_or(Self::Absent, Self::Value)
+    }
+
     /// `true` when the key was not sent. Used as `skip_serializing_if`.
     pub const fn is_absent(&self) -> bool {
         matches!(self, Self::Absent)
@@ -68,8 +82,23 @@ impl<T> Patch<T> {
         !self.is_absent()
     }
 
+    /// `true` when the key was sent as `null`.
+    pub const fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+
     /// The value, when one was sent.
     pub const fn value(&self) -> Option<&T> {
+        match self {
+            Self::Value(value) => Some(value),
+            Self::Absent | Self::Null => None,
+        }
+    }
+
+    /// The value, when one was sent; `None` for `Absent` and `Null` alike.
+    /// Pair it with [`Patch::is_present`] to set an optional value only when
+    /// the key was sent.
+    pub fn into_value(self) -> Option<T> {
         match self {
             Self::Value(value) => Some(value),
             Self::Absent | Self::Null => None,
@@ -102,14 +131,57 @@ impl<T> Patch<T> {
         })
     }
 
-    /// The domain's edit shape: `None` = leave alone, `Some(None)` = clear,
-    /// `Some(Some(v))` = set.
-    pub fn into_option(self) -> Option<Option<T>> {
+    /// Like [`Patch::map`], for a conversion that may find nothing to set:
+    /// a `None` from `f` becomes `Null`. For normalising input where a blank
+    /// value means "clear" (`"  "` → `Null`).
+    pub fn and_then<U>(self, f: impl FnOnce(T) -> Option<U>) -> Patch<U> {
         match self {
-            Self::Absent => None,
-            Self::Null => Some(None),
-            Self::Value(value) => Some(Some(value)),
+            Self::Absent => Patch::Absent,
+            Self::Null => Patch::Null,
+            Self::Value(value) => f(value).map_or(Patch::Null, Patch::Value),
         }
+    }
+
+    /// [`Patch::try_map`] for a check that may also find nothing to set:
+    /// `Ok(None)` becomes `Null`. For validators of the shape
+    /// `Option<T> -> Result<Option<U>, E>` that trim a blank value away.
+    pub fn try_and_then<U, E>(
+        self,
+        f: impl FnOnce(T) -> Result<Option<U>, E>,
+    ) -> Result<Patch<U>, E> {
+        Ok(match self {
+            Self::Absent => Patch::Absent,
+            Self::Null => Patch::Null,
+            Self::Value(value) => f(value)?.map_or(Patch::Null, Patch::Value),
+        })
+    }
+
+    /// What an optional value becomes under this patch: `Absent` keeps
+    /// `current`, `Null` clears it, `Value` replaces it.
+    pub fn resolve(self, current: Option<T>) -> Option<T> {
+        match self {
+            Self::Absent => current,
+            Self::Null => None,
+            Self::Value(value) => Some(value),
+        }
+    }
+
+    /// Writes the patch into `target` and says whether that changed it.
+    /// `Absent` leaves it alone; restating the current value is no change.
+    pub fn apply(self, target: &mut Option<T>) -> bool
+    where
+        T: PartialEq,
+    {
+        let next = match self {
+            Self::Absent => return false,
+            Self::Null => None,
+            Self::Value(value) => Some(value),
+        };
+        if *target == next {
+            return false;
+        }
+        *target = next;
+        true
     }
 }
 
@@ -270,10 +342,62 @@ mod tests {
     }
 
     #[test]
-    fn into_option_is_the_domain_edit_shape() {
-        assert_eq!(Patch::<i32>::Absent.into_option(), None);
-        assert_eq!(Patch::<i32>::Null.into_option(), Some(None));
-        assert_eq!(Patch::Value(1).into_option(), Some(Some(1)));
+    fn an_option_is_null_or_a_value_unless_it_only_sets() {
+        assert_eq!(Patch::<i32>::from(None), Patch::Null);
+        assert_eq!(Patch::from(Some(1)), Patch::Value(1));
+        assert_eq!(Patch::<i32>::set_or_keep(None), Patch::Absent);
+        assert_eq!(Patch::set_or_keep(Some(1)), Patch::Value(1));
+        assert_eq!(Patch::Value(1).into_value(), Some(1));
+        assert_eq!(Patch::<i32>::Null.into_value(), None);
+    }
+
+    #[test]
+    fn resolve_keeps_clears_or_replaces() {
+        assert_eq!(Patch::<i32>::Absent.resolve(Some(1)), Some(1));
+        assert_eq!(Patch::<i32>::Null.resolve(Some(1)), None);
+        assert_eq!(Patch::Value(2).resolve(Some(1)), Some(2));
+        assert_eq!(Patch::Value(2).resolve(None), Some(2));
+    }
+
+    #[test]
+    fn apply_reports_whether_the_value_changed() {
+        let mut target = Some(1);
+        assert!(!Patch::Absent.apply(&mut target));
+        assert!(!Patch::Value(1).apply(&mut target));
+        assert_eq!(target, Some(1));
+        assert!(Patch::Value(2).apply(&mut target));
+        assert_eq!(target, Some(2));
+        assert!(Patch::Null.apply(&mut target));
+        assert_eq!(target, None);
+        assert!(!Patch::Null.apply(&mut target));
+    }
+
+    #[test]
+    fn try_and_then_validates_and_turns_nothing_into_null() {
+        let check = |s: &str| match s.trim() {
+            "" => Ok(None),
+            "bad" => Err("bad"),
+            t => Ok(Some(t.to_string())),
+        };
+        assert_eq!(
+            Patch::Value(" a ").try_and_then(check),
+            Ok(Patch::Value("a".into()))
+        );
+        assert_eq!(Patch::Value(" ").try_and_then(check), Ok(Patch::Null));
+        assert_eq!(Patch::Value("bad").try_and_then(check), Err("bad"));
+        assert_eq!(Patch::<&str>::Absent.try_and_then(check), Ok(Patch::Absent));
+    }
+
+    #[test]
+    fn and_then_turns_nothing_into_null() {
+        let trim = |s: &str| {
+            let t = s.trim();
+            (!t.is_empty()).then(|| t.to_string())
+        };
+        assert_eq!(Patch::Value(" a ").and_then(trim), Patch::Value("a".into()));
+        assert_eq!(Patch::Value("  ").and_then(trim), Patch::Null);
+        assert_eq!(Patch::<&str>::Absent.and_then(trim), Patch::Absent);
+        assert_eq!(Patch::<&str>::Null.and_then(trim), Patch::Null);
     }
 
     #[test]

@@ -84,7 +84,11 @@ impl ApiErrorEnvelope {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+/// The gateway's own error codes (`error.code` of an answer the gateway
+/// itself refused). Generated into `src/generated/common/`; the core's
+/// codes are its own.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema, ts_rs::TS)]
+#[ts(export_to = "common/")]
 pub enum ApiErrorCode {
     #[serde(rename = "ATH-API-GW-001")]
     GatewayRequestFailed,

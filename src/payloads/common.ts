@@ -1,3 +1,10 @@
+import type { ApiErrorCode } from '../generated/common/ApiErrorCode';
+import type { Assert, Covers } from '../internal/covers';
+
+export type { ApiErrorCode } from '../generated/common/ApiErrorCode';
+
+// The envelopes are generic and stay hand-written: ts-rs would export one
+// copy per instantiation.
 export interface ApiResponse<T> {
   data: T;
 }
@@ -23,6 +30,7 @@ export interface ApiErrorEnvelope {
   error: ApiError;
 }
 
+/** The gateway's own error codes by name (`ApiErrorCode` in `common.rs`). */
 export const API_ERROR_CODES = {
   gatewayRequestFailed: 'ATH-API-GW-001',
   validationFailed: 'ATH-API-VAL-001',
@@ -30,6 +38,9 @@ export const API_ERROR_CODES = {
   rateLimitExceeded: 'ATH-API-RATE-001',
   unauthorized: 'ATH-API-AUTH-001',
   forbidden: 'ATH-API-AUTH-002',
-} as const;
+} as const satisfies Record<string, ApiErrorCode>;
 
-export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];
+// Compile-time: the names above cover every generated code.
+type _Complete = Assert<
+  Covers<ApiErrorCode, Array<(typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]>>
+>;

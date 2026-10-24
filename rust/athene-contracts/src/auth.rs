@@ -166,8 +166,9 @@ pub struct RegistrationPolicy {
 }
 
 /// Who may register: nobody, holders of an API key, or anyone.
-// Generated into `src/generated/auth/` because the admin settings use it; the
-// rest of the auth contracts are still hand-written in `src/payloads/auth.ts`.
+// Generated into `src/generated/auth/` because the admin settings use it; of
+// the rest of the auth contracts only `FeatureFlagState` is generated, the
+// others are still hand-written in `src/payloads/auth.ts`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, ts_rs::TS)]
 #[ts(export_to = "auth/")]
 pub enum RegistrationMode {
@@ -248,7 +249,12 @@ pub struct PasswordConfirmResponseData {
 
 pub type PasswordConfirmResponse = ApiResponse<PasswordConfirmResponseData>;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+/// One feature flag as every signed-in client sees it
+/// (`GET /auth/features`): just the key and whether it is on. The
+/// admin view with description and audit fields is
+/// `admin::FeatureFlagResponse`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, ts_rs::TS)]
+#[ts(export_to = "auth/")]
 pub struct FeatureFlagState {
     pub key: String,
     pub enabled: bool,

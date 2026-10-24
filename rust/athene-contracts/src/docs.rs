@@ -1,5 +1,6 @@
-//! Docs DTOs — a workspace's markdown pages and the collections that group
-//! them. Mirrored by hand in `src/payloads/docs.ts`.
+//! Docs contracts: a workspace's markdown pages and the collections that
+//! group them. The TypeScript in `src/generated/docs/` is generated from
+//! them (see `tests/ts_bindings.rs`). Request bodies refuse unknown fields.
 //!
 //! Every response is wrapped as `{ "data": … }`; the page list adds
 //! `meta: { count, total }`. Ids and timestamps travel as strings (UUID,
@@ -11,15 +12,19 @@
 //! and never changes on rename. Deleting a page archives it; deleting a
 //! collection leaves its pages unfiled.
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 use utoipa::ToSchema;
 use validator::Validate;
+
+use crate::Patch;
 
 /// The most a page body may hold, in UTF-8 bytes.
 pub const DOC_MAX_BODY_BYTES: usize = 48 * 1024;
 pub const DOC_MAX_TITLE_CHARS: usize = 200;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, TS)]
+#[ts(export_to = "docs/")]
 pub struct DocCollectionResponse {
     pub id: String,
     pub workspace_id: String,
@@ -35,41 +40,47 @@ pub struct DocCollectionResponse {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, Validate)]
+/// `POST /work/workspaces/:id/doc-collections`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema, Validate, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "docs/")]
 pub struct CreateDocCollectionRequest {
+    /// 1..80 chars.
     #[validate(length(min = 1, max = 80))]
     pub name: String,
+    /// ≤ 500 chars.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[validate(length(max = 500))]
     pub description: Option<String>,
+    /// ≤ 32 chars.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[validate(length(max = 32))]
     pub icon: Option<String>,
 }
 
-/// An absent key leaves that part as it is; `null` clears it.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
+/// `PATCH /work/doc-collections/:id`. An absent key leaves that part as
+/// it is; `null` clears it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "docs/")]
 pub struct UpdateDocCollectionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub name: Option<String>,
-    #[serde(
-        default,
-        deserialize_with = "present",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<String>)]
-    pub description: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "present",
-        skip_serializing_if = "Option::is_none"
-    )]
+    pub description: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<String>)]
-    pub icon: Option<Option<String>>,
+    pub icon: Patch<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub position: Option<i32>,
 }
 
 /// A page in a list: everything but the body.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, TS)]
+#[ts(export_to = "docs/")]
 pub struct DocSummaryResponse {
     pub id: String,
     pub workspace_id: String,
@@ -87,7 +98,8 @@ pub struct DocSummaryResponse {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, TS)]
+#[ts(export_to = "docs/")]
 pub struct DocListMeta {
     /// Rows in this response.
     pub count: usize,
@@ -95,14 +107,16 @@ pub struct DocListMeta {
     pub total: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, TS)]
+#[ts(export_to = "docs/")]
 pub struct DocListResponse {
     pub data: Vec<DocSummaryResponse>,
     pub meta: DocListMeta,
 }
 
 /// A whole page.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, TS)]
+#[ts(export_to = "docs/")]
 pub struct DocResponse {
     pub id: String,
     pub workspace_id: String,
@@ -120,43 +134,48 @@ pub struct DocResponse {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, Validate)]
+/// `POST /work/workspaces/:id/docs`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema, Validate, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "docs/")]
 pub struct CreateDocRequest {
+    /// 1..200 chars, one line.
     #[validate(length(min = 1, max = 200))]
     pub title: String,
-    /// Defaults to empty.
+    /// Defaults to empty. ≤ 48 KB.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[validate(length(max = 49152))]
+    #[ts(optional)]
     pub body_md: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collection_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
 }
 
-/// An absent key leaves that part as it is; `null` unfiles / unlinks.
-/// The slug never changes.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
+/// `PATCH /work/docs/:id`. An absent key leaves that part as it is;
+/// `null` unfiles / unlinks. The slug never changes.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "docs/")]
 pub struct UpdateDocRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub body_md: Option<String>,
-    #[serde(
-        default,
-        deserialize_with = "present",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<String>)]
-    pub collection_id: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "present",
-        skip_serializing_if = "Option::is_none"
-    )]
+    pub collection_id: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<String>)]
-    pub project_id: Option<Option<String>>,
+    pub project_id: Patch<String>,
 }
 
 /// Query of `GET /work/workspaces/:id/docs`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize, ToSchema, TS)]
+#[ts(export_to = "docs/", optional_fields)]
 pub struct DocListQuery {
     /// A collection id, or `unfiled`. Absent = every page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -166,19 +185,21 @@ pub struct DocListQuery {
     pub q: Option<String>,
     /// `updated` (default, newest first) or `title`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(as = "Option<DocSort>")]
     pub sort: Option<String>,
     /// 1..=200, default 50.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<usize>,
 }
 
-/// Tells "key absent" (`None`) from "key set to null" (`Some(None)`).
-fn present<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    Option::deserialize(deserializer).map(Some)
+/// How a page list is ordered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "docs/")]
+pub enum DocSort {
+    /// Newest change first (the default).
+    Updated,
+    Title,
 }
 
 #[cfg(test)]
@@ -188,10 +209,10 @@ mod tests {
     #[test]
     fn an_update_tells_absent_from_null() {
         let absent: UpdateDocRequest = serde_json::from_str(r#"{"title":"T"}"#).unwrap_or_default();
-        assert_eq!(absent.collection_id, None);
+        assert_eq!(absent.collection_id, Patch::Absent);
         let cleared: UpdateDocRequest =
             serde_json::from_str(r#"{"collection_id":null}"#).unwrap_or_default();
-        assert_eq!(cleared.collection_id, Some(None));
+        assert_eq!(cleared.collection_id, Patch::Null);
         assert_eq!(
             serde_json::to_string(&cleared).unwrap_or_default(),
             r#"{"collection_id":null}"#

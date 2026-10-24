@@ -1,4 +1,14 @@
-import { ApiResponse, ListResponse } from './common';
+import type { ApiResponse, ListResponse } from './common';
+import type { FeatureFlagState } from '../generated/auth/FeatureFlagState';
+import type { RegistrationMode } from '../generated/auth/RegistrationMode';
+
+/**
+ * Auth wire types. `RegistrationMode` and `FeatureFlagState` are generated
+ * from `rust/athene-contracts/src/auth.rs` (ts-rs); the rest is still
+ * hand-written and mirrors that file.
+ */
+export type { FeatureFlagState } from '../generated/auth/FeatureFlagState';
+export type { RegistrationMode } from '../generated/auth/RegistrationMode';
 
 export interface LoginRequest {
   email: string;
@@ -60,8 +70,6 @@ export interface RegistrationPolicy {
   max_users: number;
 }
 
-export type RegistrationMode = 'disabled' | 'api_key_required' | 'open';
-
 export interface SessionInfo {
   id: string;
   ip_address?: string | null;
@@ -69,11 +77,6 @@ export interface SessionInfo {
   created_at: string;
   last_activity: string;
   is_current: boolean;
-}
-
-export interface FeatureFlagState {
-  key: string;
-  enabled: boolean;
 }
 
 /**

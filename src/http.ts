@@ -1,3 +1,9 @@
+/**
+ * What a client method passes through to a request: today the abort
+ * signal (a resource that is no longer wanted cancels its load).
+ */
+export type RequestOptions = Pick<RequestInit, 'signal'>;
+
 export interface AtheneHttpClient {
   get<T>(path: string, config?: RequestInit): Promise<T>;
   post<T>(path: string, body?: unknown, config?: RequestInit): Promise<T>;

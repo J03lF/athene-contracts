@@ -12,6 +12,7 @@ export * from './payloads/teams';
 export * from './payloads/ticket-types';
 export * from './http';
 export * from './clients/auth-client';
+export * from './clients/user-client';
 export * from './clients/work-client';
 export * from './clients/workspace-client';
 export * from './clients/dashboard-client';

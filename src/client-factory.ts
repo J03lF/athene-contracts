@@ -1,5 +1,6 @@
 import { FetchAtheneClient, type AtheneHttpClient } from './http';
 import { AuthApiClient } from './clients/auth-client';
+import { UserApiClient } from './clients/user-client';
 import { WorkApiClient } from './clients/work-client';
 import { DashboardApiClient } from './clients/dashboard-client';
 import { ActivityApiClient } from './clients/activity-client';
@@ -11,12 +12,14 @@ export interface AtheneClientOptions {
 
 export class AtheneClient {
   readonly auth: AuthApiClient;
+  readonly user: UserApiClient;
   readonly work: WorkApiClient;
   readonly dashboard: DashboardApiClient;
   readonly activity: ActivityApiClient;
 
   constructor(http: AtheneHttpClient) {
     this.auth = new AuthApiClient(http);
+    this.user = new UserApiClient(http);
     this.work = new WorkApiClient(http);
     this.dashboard = new DashboardApiClient(http);
     this.activity = new ActivityApiClient(http);

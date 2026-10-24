@@ -36,8 +36,7 @@ import type {
   TicketResponse,
   TriageTicketRequest,
   TicketWatcherListResponse,
-  UpdateTicketCustomValuesRequest,
-  UpdateProjectCustomValuesRequest,
+  UpdateCustomValuesRequest,
   UpdateProjectRequest,
   UpdateTicketRequest,
   AddTicketCommentRequest,
@@ -45,8 +44,9 @@ import type {
   TicketCommentResponse,
   UpdateTicketStatusRequest,
   WatchStateResponse,
+  WorkStatsResponse,
 } from '../payloads/work';
-import type { AtheneHttpClient } from '../http';
+import type { AtheneHttpClient, RequestOptions } from '../http';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -54,6 +54,11 @@ interface ApiEnvelope<T> {
 
 function unwrap<T>(envelope: ApiEnvelope<T>): T {
   return envelope.data;
+}
+
+/** `?workspace_id=…`, or nothing without a workspace. */
+function workspaceQs(workspaceId: string | null | undefined): string {
+  return workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
 }
 
 function perUserQs(q: PerUserListQuery): string {
@@ -101,12 +106,52 @@ export class WorkApiClient {
   }
 
   /**
-   * Recent work changes from the audit trail — only projects and tickets the
-   * caller can open; one workspace's with `workspace_id` (403 otherwise).
+   * Recent work changes from the audit trail, newest first: only projects
+   * and tickets the caller can open; one workspace's with `workspaceId`
+   * (403 for a non-member), else every workspace the caller is in.
+   * `activity({ limit, workspace_id })` still works.
    */
-  activity(query: PerUserListQuery = {}): Promise<WorkActivityEntryResponse[]> {
+  activity(
+    workspaceId?: string | null,
+    limit?: number,
+    init?: RequestOptions,
+  ): Promise<WorkActivityEntryResponse[]>;
+  activity(query: PerUserListQuery): Promise<WorkActivityEntryResponse[]>;
+  activity(
+    arg?: string | null | PerUserListQuery,
+    limit?: number,
+    init: RequestOptions = {},
+  ): Promise<WorkActivityEntryResponse[]> {
+    const q: PerUserListQuery =
+      arg !== null && typeof arg === 'object'
+        ? arg
+        : { ...(arg ? { workspace_id: arg } : {}), ...(limit != null ? { limit } : {}) };
     return this.http
-      .get<ApiEnvelope<WorkActivityEntryResponse[]>>(`/work/activity${perUserQs(query)}`)
+      .get<ApiEnvelope<WorkActivityEntryResponse[]>>(`/work/activity${perUserQs(q)}`, {
+        signal: init.signal,
+      })
+      .then(unwrap);
+  }
+
+  /**
+   * Open and in-progress tickets and the project count, for the dashboard:
+   * one workspace's with `workspaceId` (403 for a non-member), else every
+   * workspace the caller is in.
+   */
+  stats(workspaceId?: string | null, init: RequestOptions = {}): Promise<WorkStatsResponse> {
+    return this.http
+      .get<ApiEnvelope<WorkStatsResponse>>(`/work/stats${workspaceQs(workspaceId)}`, {
+        signal: init.signal,
+      })
+      .then(unwrap);
+  }
+
+  /** The caller's assigned tickets, as full tickets; scoped like `stats`. */
+  myTickets(workspaceId?: string | null, init: RequestOptions = {}): Promise<TicketResponse[]> {
+    return this.http
+      .get<ApiEnvelope<TicketResponse[]>>(`/work/my-tickets${workspaceQs(workspaceId)}`, {
+        signal: init.signal,
+      })
       .then(unwrap);
   }
 
@@ -224,7 +269,7 @@ export class WorkApiClient {
   }
   updateTicketCustomValues(
     id: string,
-    body: UpdateTicketCustomValuesRequest,
+    body: UpdateCustomValuesRequest,
   ): Promise<TicketResponse> {
     return this.http
       .patch<ApiEnvelope<TicketResponse>>(
@@ -240,7 +285,7 @@ export class WorkApiClient {
   }
   updateProjectCustomValues(
     id: string,
-    body: UpdateProjectCustomValuesRequest,
+    body: UpdateCustomValuesRequest,
   ): Promise<ProjectResponse> {
     return this.http
       .patch<ApiEnvelope<ProjectResponse>>(

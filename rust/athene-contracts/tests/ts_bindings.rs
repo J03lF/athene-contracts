@@ -19,7 +19,10 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use athene_contracts::{admin, work};
+use athene_contracts::{
+    activity, admin, auth, common, dashboard, docs, field_definitions, teams, ticket_types, user,
+    work, workspace,
+};
 use ts_rs::{Config, TS};
 
 const REGENERATE_ENV: &str = "ATHENE_CONTRACTS_REGENERATE";
@@ -123,6 +126,89 @@ fn render(out: &Path) {
         work::StatusShareResponse,
         work::ReportSprintResponse,
         work::ProjectReportResponse,
+        // auth (the rest of auth is still hand-written)
+        auth::FeatureFlagState,
+        // common
+        common::ApiErrorCode,
+        // user
+        user::Theme,
+        user::Density,
+        user::DashboardWidgetLayout,
+        user::SavedView,
+        user::InboxState,
+        user::UserSettingsResponse,
+        user::UpdateUserSettingsRequest,
+        user::UserProfileResponse,
+        user::UpdateProfileRequest,
+        // activity and dashboard
+        activity::ActivityEventResponse,
+        dashboard::KpiTile,
+        dashboard::KpisResponse,
+        dashboard::FocusTicket,
+        dashboard::FocusTab,
+        dashboard::OnTrackState,
+        dashboard::OnTrackResponse,
+        dashboard::DashboardOverviewResponse,
+        // workspace
+        workspace::WorkspaceResponse,
+        workspace::WorkspaceSettings,
+        workspace::WorkspaceSettingsPatch,
+        workspace::ComposerProperty,
+        workspace::ComposerPropertiesSetting,
+        workspace::DefaultAssignee,
+        workspace::WeekStart,
+        workspace::UpdateWorkspaceRequest,
+        workspace::CreateWorkspaceRequest,
+        workspace::InviteDetailsResponse,
+        workspace::JoinInviteResponse,
+        workspace::WorkspaceMemberRole,
+        workspace::WorkspaceMemberResponse,
+        workspace::InvitationStatus,
+        workspace::InvitationResponse,
+        workspace::CreateInviteRequest,
+        workspace::UpdateMemberRoleRequest,
+        // field definitions
+        field_definitions::AppliesTo,
+        field_definitions::FieldType,
+        field_definitions::SelectChoice,
+        field_definitions::SelectFieldOptions,
+        field_definitions::NumberFieldOptions,
+        field_definitions::TextFieldOptions,
+        field_definitions::FieldOptions,
+        field_definitions::FieldDefinitionResponse,
+        field_definitions::CreateFieldDefinitionRequest,
+        field_definitions::UpdateFieldDefinitionRequest,
+        field_definitions::ReorderFieldDefinitionsRequest,
+        // teams
+        teams::TeamRole,
+        teams::TeamMemberResponse,
+        teams::TeamResponse,
+        teams::TeamMemberInput,
+        teams::CreateTeamRequest,
+        teams::UpdateTeamRequest,
+        teams::AddTeamMembersRequest,
+        teams::UpdateTeamMemberRequest,
+        teams::TeamListQuery,
+        // ticket types
+        ticket_types::TicketTypeIcon,
+        ticket_types::TicketTypeColor,
+        ticket_types::TicketTypeResponse,
+        ticket_types::CreateTicketTypeRequest,
+        ticket_types::UpdateTicketTypeRequest,
+        ticket_types::ReorderTicketTypesRequest,
+        ticket_types::ListTicketTypesQuery,
+        // docs
+        docs::DocCollectionResponse,
+        docs::CreateDocCollectionRequest,
+        docs::UpdateDocCollectionRequest,
+        docs::DocSummaryResponse,
+        docs::DocListMeta,
+        docs::DocListResponse,
+        docs::DocResponse,
+        docs::CreateDocRequest,
+        docs::UpdateDocRequest,
+        docs::DocListQuery,
+        docs::DocSort,
     );
 }
 

@@ -1,6 +1,7 @@
 /**
- * Docs wire shapes — a workspace's markdown pages and the collections that
- * group them. Mirrored by hand in `rust/athene-contracts/src/docs.rs`.
+ * Docs wire types: a workspace's markdown pages and the collections that
+ * group them. Generated from `rust/athene-contracts/src/docs.rs` by ts-rs;
+ * the limits below mirror the constants there.
  *
  * Every response is wrapped as `{ data: … }`; the page list adds
  * `meta: { count, total }`. Ids are UUID strings, timestamps RFC 3339.
@@ -16,114 +17,14 @@
 export const DOC_MAX_BODY_BYTES = 48 * 1024;
 export const DOC_MAX_TITLE_CHARS = 200;
 
-export interface DocCollectionResponse {
-  id: string;
-  workspace_id: string;
-  name: string;
-  description: string | null;
-  /** A short token or emoji the client renders; free text, ≤ 32 chars. */
-  icon: string | null;
-  position: number;
-  /** Live (not archived) pages filed in this collection. */
-  doc_count: number;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateDocCollectionRequest {
-  /** 1..80 chars. */
-  name: string;
-  /** ≤ 500 chars. */
-  description?: string | null;
-  /** ≤ 32 chars. */
-  icon?: string | null;
-}
-
-/** An absent key leaves that part as it is; `null` clears it. */
-export interface UpdateDocCollectionRequest {
-  name?: string;
-  description?: string | null;
-  icon?: string | null;
-  position?: number;
-}
-
-/** A page in a list: everything but the body. */
-export interface DocSummaryResponse {
-  id: string;
-  workspace_id: string;
-  collection_id: string | null;
-  project_id: string | null;
-  title: string;
-  slug: string;
-  /** Plain-text preview of the body, ≤ 200 chars (markdown stripped). */
-  excerpt: string;
-  created_by: string;
-  updated_by: string;
-  /** `null` when the editor's user record is gone. */
-  updated_by_name: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DocListMeta {
-  /** Rows in this response. */
-  count: number;
-  /** Rows matching the filter, ignoring `limit`. */
-  total: number;
-}
-
-export interface DocListResponse {
-  data: DocSummaryResponse[];
-  meta: DocListMeta;
-}
-
-/** A whole page. */
-export interface DocResponse {
-  id: string;
-  workspace_id: string;
-  collection_id: string | null;
-  project_id: string | null;
-  title: string;
-  slug: string;
-  /** Markdown source. Render it sanitised — it is user input. */
-  body_md: string;
-  created_by: string;
-  created_by_name: string | null;
-  updated_by: string;
-  updated_by_name: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateDocRequest {
-  /** 1..200 chars, one line. */
-  title: string;
-  /** Defaults to empty. ≤ 48 KB. */
-  body_md?: string;
-  collection_id?: string | null;
-  project_id?: string | null;
-}
-
-/**
- * An absent key leaves that part as it is; `null` unfiles / unlinks.
- * The slug never changes.
- */
-export interface UpdateDocRequest {
-  title?: string;
-  body_md?: string;
-  collection_id?: string | null;
-  project_id?: string | null;
-}
-
-/** Query of `GET /work/workspaces/:id/docs`. */
-export interface DocListQuery {
-  /** A collection id, or `'unfiled'`. Absent = every page. */
-  collection?: string;
-  /** Case-insensitive substring of title or body, ≤ 100 chars. */
-  q?: string;
-  /** `'updated'` (default, newest first) or `'title'`. */
-  sort?: 'updated' | 'title';
-  /** 1..200, default 50. */
-  limit?: number;
-}
+export type { CreateDocCollectionRequest } from '../generated/docs/CreateDocCollectionRequest';
+export type { CreateDocRequest } from '../generated/docs/CreateDocRequest';
+export type { DocCollectionResponse } from '../generated/docs/DocCollectionResponse';
+export type { DocListMeta } from '../generated/docs/DocListMeta';
+export type { DocListQuery } from '../generated/docs/DocListQuery';
+export type { DocListResponse } from '../generated/docs/DocListResponse';
+export type { DocResponse } from '../generated/docs/DocResponse';
+export type { DocSort } from '../generated/docs/DocSort';
+export type { DocSummaryResponse } from '../generated/docs/DocSummaryResponse';
+export type { UpdateDocCollectionRequest } from '../generated/docs/UpdateDocCollectionRequest';
+export type { UpdateDocRequest } from '../generated/docs/UpdateDocRequest';

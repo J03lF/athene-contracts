@@ -9,8 +9,7 @@
  * A field that can be cleared by a PATCH is `key?: T | null`: omit the key
  * to leave the value alone, send `null` to clear it (`Patch<T>` in Rust).
  *
- * Below the re-exports: client helper types (no wire type of their own) and
- * the deprecated names older code still imports.
+ * Below the re-exports: client helper types (no wire type of their own).
  */
 export type { AddTicketCommentRequest } from '../generated/work/AddTicketCommentRequest';
 export type { AddWorkLogRequest } from '../generated/work/AddWorkLogRequest';
@@ -76,11 +75,7 @@ export type { WorkLogResponse } from '../generated/work/WorkLogResponse';
 export type { WorkScopeQuery } from '../generated/work/WorkScopeQuery';
 export type { WorkStatsResponse } from '../generated/work/WorkStatsResponse';
 
-import type { TicketResponse } from '../generated/work/TicketResponse';
 import type { SprintResponse } from '../generated/work/SprintResponse';
-import type { UpdateCustomValuesRequest } from '../generated/work/UpdateCustomValuesRequest';
-import type { WorkActivityEntryResponse } from '../generated/work/WorkActivityEntryResponse';
-import type { WorkStatsResponse } from '../generated/work/WorkStatsResponse';
 
 // ---------- Client helpers ----------
 
@@ -104,16 +99,3 @@ export interface UpdateSprintResponse {
   /** Tickets whose own due date moved with the end. */
   moved_tickets: number;
 }
-
-// ---------- Deprecated names ----------
-
-/** @deprecated `GET /work/my-tickets` returns full tickets: use `TicketResponse`. */
-export type MyTicketEntry = TicketResponse;
-/** @deprecated Use `WorkActivityEntryResponse`. */
-export type ActivityEntry = WorkActivityEntryResponse;
-/** @deprecated Use `WorkStatsResponse`. */
-export type WorkspaceStats = WorkStatsResponse;
-/** @deprecated Use `UpdateCustomValuesRequest`. */
-export type UpdateTicketCustomValuesRequest = UpdateCustomValuesRequest;
-/** @deprecated Use `UpdateCustomValuesRequest`. */
-export type UpdateProjectCustomValuesRequest = UpdateCustomValuesRequest;

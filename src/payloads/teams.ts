@@ -1,6 +1,7 @@
 /**
- * Teams wire shapes — named groups of a workspace's members. Mirrored by
- * hand in `rust/athene-contracts/src/teams.rs`.
+ * Teams wire types: named groups of a workspace's members. Generated from
+ * `rust/athene-contracts/src/teams.rs` by ts-rs; the limits below mirror
+ * the constants there.
  *
  * Every response is wrapped as `{ data: … }`. Ids are UUID strings,
  * timestamps RFC 3339.
@@ -26,82 +27,12 @@ export const TEAM_MEMBER_PREVIEW = 5;
 /** The most people one add-members request may name. */
 export const TEAM_MAX_MEMBERS_PER_REQUEST = 100;
 
-export type TeamRole = 'lead' | 'member';
-
-export interface TeamMemberResponse {
-  user_id: string;
-  role: TeamRole;
-  added_at: string;
-  /** `null` when the user record is gone. */
-  display_name: string | null;
-  email: string | null;
-}
-
-export interface TeamResponse {
-  id: string;
-  workspace_id: string;
-  name: string;
-  key: string;
-  description: string | null;
-  /** `#RRGGBB`. */
-  color: string | null;
-  /** Everyone in the team. */
-  member_count: number;
-  /**
-   * Leads first, then by when they joined. In a list, the first
-   * `TEAM_MEMBER_PREVIEW`; for a single team, everyone.
-   */
-  members: TeamMemberResponse[];
-  /** The caller's role in the team; `null` when they are not in it. */
-  my_role: TeamRole | null;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface TeamMemberInput {
-  user_id: string;
-  /** Defaults to `member`. */
-  role?: TeamRole;
-}
-
-export interface CreateTeamRequest {
-  /** 1..80 chars. */
-  name: string;
-  /** Absent = suggested from the name. */
-  key?: string;
-  /** ≤ 500 chars. */
-  description?: string | null;
-  /** `#RRGGBB`. */
-  color?: string | null;
-  /** People to put in the team straight away; each a workspace member. */
-  members?: TeamMemberInput[];
-}
-
-/** An absent key leaves that part as it is; `null` clears it. */
-export interface UpdateTeamRequest {
-  name?: string;
-  key?: string;
-  description?: string | null;
-  color?: string | null;
-}
-
-/**
- * Either `members` (a role each) or `user_ids` sharing `role`, or both.
- * Someone already in the team keeps their role.
- */
-export interface AddTeamMembersRequest {
-  members?: TeamMemberInput[];
-  user_ids?: string[];
-  /** For `user_ids`; defaults to `member`. */
-  role?: TeamRole;
-}
-
-export interface UpdateTeamMemberRequest {
-  role: TeamRole;
-}
-
-export interface TeamListQuery {
-  /** A user id, or `'me'`: only the teams that person is in. */
-  member?: string;
-}
+export type { AddTeamMembersRequest } from '../generated/teams/AddTeamMembersRequest';
+export type { CreateTeamRequest } from '../generated/teams/CreateTeamRequest';
+export type { TeamListQuery } from '../generated/teams/TeamListQuery';
+export type { TeamMemberInput } from '../generated/teams/TeamMemberInput';
+export type { TeamMemberResponse } from '../generated/teams/TeamMemberResponse';
+export type { TeamResponse } from '../generated/teams/TeamResponse';
+export type { TeamRole } from '../generated/teams/TeamRole';
+export type { UpdateTeamMemberRequest } from '../generated/teams/UpdateTeamMemberRequest';
+export type { UpdateTeamRequest } from '../generated/teams/UpdateTeamRequest';
