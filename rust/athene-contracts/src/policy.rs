@@ -39,7 +39,7 @@ use crate::workspace::WorkspaceMemberRole;
 
 /// The rules' revision. Bumped whenever a verdict in the matrix changes
 /// (`tests/policy_matrix.rs` keeps the history).
-pub const POLICY_REVISION: u32 = 2;
+pub const POLICY_REVISION: u32 = 3;
 
 /// The most an open link may grant (J6). Admins and owners are invited by
 /// email only: a forwarded link must not hand out the workspace.
@@ -102,9 +102,14 @@ pub enum Action {
     /// Facts: `owns` (creator or lead).
     #[serde(rename = "project.edit")]
     ProjectEdit,
-    /// Sprints, releases, putting tickets into them.
+    /// Sprints and releases themselves: create, edit, start, complete,
+    /// delete. Managers only, whatever the workspace's `ticket_planning`.
     #[serde(rename = "project.plan")]
     ProjectPlan,
+    /// Put a ticket into a sprint or a release, or take it out. Facts:
+    /// `editors_plan` (the workspace's `ticket_planning` is `editors`).
+    #[serde(rename = "ticket.plan")]
+    TicketPlan,
     #[serde(rename = "ticket.create")]
     TicketCreate,
     /// Edit, move, assign, triage, label, link.
@@ -176,11 +181,14 @@ pub enum Fact {
     TargetRole,
     /// The role an invitation or a role change would hand out.
     GrantedRole,
+    /// The workspace lets everyone who edits a ticket plan it
+    /// (`WorkspaceSettings::ticket_planning` = `editors`, the default).
+    EditorsPlan,
 }
 
 impl Action {
     /// Every action, in wire order.
-    pub const ALL: [Action; 32] = [
+    pub const ALL: [Action; 33] = [
         Action::AdminAccess,
         Action::WorkspaceCreate,
         Action::SlaRead,
@@ -213,6 +221,7 @@ impl Action {
         Action::TimeDelete,
         Action::TimeModerate,
         Action::TicketCheck,
+        Action::TicketPlan,
     ];
 
     /// The wire name (`ticket.edit`), the same string serde writes.
@@ -250,6 +259,7 @@ impl Action {
             Action::TimeDelete => "time.delete",
             Action::TimeModerate => "time.moderate",
             Action::TicketCheck => "ticket.check",
+            Action::TicketPlan => "ticket.plan",
         }
     }
 
@@ -269,6 +279,7 @@ impl Action {
                 ActionScope::Project
             }
             Action::TicketEdit
+            | Action::TicketPlan
             | Action::TicketDelete
             | Action::TicketWatch
             | Action::CommentCreate
@@ -295,13 +306,16 @@ impl Action {
             | Action::CommentEdit
             | Action::CommentDelete
             | Action::TimeDelete => &[Fact::Owns],
+            Action::TicketPlan => &[Fact::EditorsPlan],
             _ => &[],
         }
     }
 
-    /// Whether the verdict depends on the resource (see [`Action::reads`]).
+    /// Whether the verdict depends on the resource or the person acted on
+    /// (see [`Action::reads`]). A workspace fact (`editors_plan`) is not
+    /// context: the capabilities answer it per workspace.
     pub const fn contextual(self) -> bool {
-        !self.reads().is_empty()
+        !matches!(self.reads(), [] | [Fact::EditorsPlan])
     }
 }
 
@@ -360,6 +374,10 @@ pub struct Facts {
     /// The role being handed out; `None` = any the actor may grant.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub granted_role: Option<WorkspaceMemberRole>,
+    /// The workspace lets editors plan tickets (`ticket_planning` =
+    /// `editors`). A workspace fact, the same for every resource in it.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub editors_plan: bool,
 }
 
 fn is_false(value: &bool) -> bool {
@@ -374,6 +392,7 @@ impl Facts {
         target_is_self: false,
         target_role: None,
         granted_role: None,
+        editors_plan: false,
     };
 
     pub const fn owned(owns: bool) -> Self {
@@ -398,6 +417,12 @@ impl Facts {
 
     pub const fn granting(mut self, role: WorkspaceMemberRole) -> Self {
         self.granted_role = Some(role);
+        self
+    }
+
+    /// The workspace's `ticket_planning` (true: `editors`).
+    pub const fn planning(mut self, editors_plan: bool) -> Self {
+        self.editors_plan = editors_plan;
         self
     }
 }
@@ -488,6 +513,9 @@ fn in_workspace(subject: &Subject, standing: Standing, action: Action, facts: &F
         | Action::TicketEdit
         | Action::TicketCheck
         | Action::TimeLog => contributor,
+        // Into a sprint or a release: managers, and editors where the
+        // workspace says so (`ticket_planning`, default `editors`).
+        Action::TicketPlan => manager || (contributor && facts.editors_plan),
         // Deleting has no undo: managers anything, contributors their own.
         Action::DocDelete | Action::ProjectEdit | Action::TicketDelete | Action::TimeDelete => {
             manager || (contributor && facts.owns)
@@ -593,18 +621,25 @@ pub struct CapabilitiesResponse {
 }
 
 /// The capabilities of a member; `None` for a non-member (the endpoint
-/// answers `403`, as for a workspace that does not exist).
-pub fn capabilities(subject: &Subject, workspace_id: String) -> Option<CapabilitiesResponse> {
+/// answers `403`, as for a workspace that does not exist). `editors_plan`
+/// is the workspace's `ticket_planning` (true: `editors`), so `ticket.plan`
+/// is answered for this workspace.
+pub fn capabilities(
+    subject: &Subject,
+    workspace_id: String,
+    editors_plan: bool,
+) -> Option<CapabilitiesResponse> {
     let role = subject.membership?;
     let standing = standing(subject, false)?;
+    let workspace = Facts::NONE.planning(editors_plan);
     let actions = Action::ALL
         .into_iter()
-        .map(|action| (action, allows(subject, action, &Facts::NONE)))
+        .map(|action| (action, allows(subject, action, &workspace)))
         .collect();
     let own = Facts {
         owns: true,
         target_is_self: true,
-        ..Facts::NONE
+        ..workspace
     };
     let on_own = Action::ALL
         .into_iter()
@@ -715,6 +750,7 @@ pub mod matrix {
                 }
             }
             Action::TeamsMemberRemove => out.push(Facts::target(None, true)),
+            Action::TicketPlan => out.push(Facts::NONE.planning(true)),
             _ => {}
         }
         if action.scope() != ActionScope::Platform {
@@ -849,7 +885,7 @@ mod tests {
                 serde_json::from_value(serde_json::json!(action.as_str())).expect("parse");
             assert_eq!(back, action);
         }
-        assert_eq!(seen.len(), 32);
+        assert_eq!(seen.len(), 33);
     }
 
     #[test]

@@ -17,7 +17,11 @@ use athene_contracts::workspace::WorkspaceMemberRole as R;
 /// Every revision of the rules with the fingerprint of its matrix
 /// (`matrix::digest`). Changing a verdict: append `(POLICY_REVISION + 1,
 /// "<new digest>")` and bump `POLICY_REVISION` in `src/policy.rs`.
-const RECORDED: &[(u32, &str)] = &[(1, "61b199d11696ad0c"), (2, "aaa9fb11da7f0950")];
+const RECORDED: &[(u32, &str)] = &[
+    (1, "61b199d11696ad0c"),
+    (2, "aaa9fb11da7f0950"),
+    (3, "db757b6523ad1ec2"),
+];
 
 /// Subjects, in the table's column order.
 const COLUMNS: [&str; 10] = ["O", "A", "M", "G", "OpM", "AdM", "AdG", "OpG", "PgM", "X"];
@@ -58,6 +62,8 @@ const TABLE: &[(Action, [Cell; 10])] = &[
     (Action::TicketTypesManage,    [Y,   Y,   N,   N,   Y,   Y,   N,   N,   N,   N]),
     (Action::FieldsManage,         [Y,   Y,   N,   N,   Y,   Y,   N,   N,   N,   N]),
     (Action::ProjectPlan,          [Y,   Y,   N,   N,   Y,   Y,   N,   N,   N,   N]),
+    // `ticket_planning = managers`; with `editors` see below.
+    (Action::TicketPlan,           [Y,   Y,   N,   N,   Y,   Y,   N,   N,   N,   N]),
     (Action::CommentModerate,      [Y,   Y,   N,   N,   Y,   Y,   N,   N,   N,   N]),
     (Action::TimeModerate,         [Y,   Y,   N,   N,   Y,   Y,   N,   N,   N,   N]),
     (Action::TeamsMemberRemove,    [Y,   Y,   Slf, Slf, Y,   Y,   Slf, Slf, N,   N]),
@@ -306,11 +312,47 @@ fn work_goes_to_members_including_guests_but_never_to_platform_guests() {
     assert!(!assignable(&subject("PgX"), true));
 }
 
+/// "Wer darf Tickets einplanen" (Joel, after R1): with `editors` (the
+/// default) everyone who edits a ticket puts it into a sprint or a release;
+/// with `managers` only managers. Sprints and releases themselves stay the
+/// managers' either way.
+#[test]
+fn editors_plan_tickets_where_the_workspace_says_so() {
+    let open = Facts::NONE.planning(true);
+    for name in COLUMNS {
+        let s = subject(name);
+        assert_eq!(
+            allows(&s, Action::TicketPlan, &open),
+            allows(&s, Action::TicketEdit, &Facts::NONE),
+            "ticket.plan with editors as {name}"
+        );
+        assert_eq!(
+            allows(&s, Action::TicketPlan, &Facts::NONE),
+            allows(&s, Action::ProjectPlan, &Facts::NONE),
+            "ticket.plan with managers as {name}"
+        );
+        assert_eq!(
+            allows(&s, Action::ProjectPlan, &open),
+            allows(&s, Action::ProjectPlan, &Facts::NONE),
+            "project.plan ignores the setting as {name}"
+        );
+    }
+    assert!(!Action::TicketPlan.contextual());
+    let member = capabilities(&subject("M"), "ws".into(), true).unwrap();
+    assert!(member.actions[&Action::TicketPlan]);
+    assert!(!member.actions[&Action::ProjectPlan]);
+    assert!(!member.on_own.contains_key(&Action::TicketPlan));
+    let member = capabilities(&subject("M"), "ws".into(), false).unwrap();
+    assert!(!member.actions[&Action::TicketPlan]);
+    let guest = capabilities(&subject("G"), "ws".into(), true).unwrap();
+    assert!(!guest.actions[&Action::TicketPlan]);
+}
+
 #[test]
 fn capabilities_say_what_allows_says() {
     for (name, _, membership) in matrix::SUBJECTS {
         let s = subject(name);
-        let caps = capabilities(&s, "ws".into());
+        let caps = capabilities(&s, "ws".into(), false);
         let Some(caps) = caps else {
             assert!(
                 membership.is_none(),
@@ -340,7 +382,7 @@ fn capabilities_say_what_allows_says() {
         }
         assert_eq!(caps.grantable_roles, grantable_roles(&s));
     }
-    let member = capabilities(&subject("M"), "ws".into()).unwrap();
+    let member = capabilities(&subject("M"), "ws".into(), false).unwrap();
     assert_eq!(member.standing, Standing::Contributor);
     assert!(!member.actions[&Action::TicketDelete]);
     assert!(member.on_own[&Action::TicketDelete]);

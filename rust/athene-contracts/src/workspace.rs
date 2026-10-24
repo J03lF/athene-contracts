@@ -62,6 +62,31 @@ pub enum WeekStart {
     Sunday,
 }
 
+/// Who may put tickets into a sprint or a release (and take them out).
+/// Creating, starting and completing sprints and releases stays with the
+/// workspace's managers either way (`policy::Action::ProjectPlan`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "workspace/")]
+pub enum TicketPlanning {
+    /// Owners and admins (and platform operators or admins who are
+    /// members): the workspace's managers.
+    Managers,
+    /// Everyone who may edit the ticket.
+    Editors,
+}
+
+impl TicketPlanning {
+    /// The product default when a workspace has not chosen.
+    pub const DEFAULT: TicketPlanning = TicketPlanning::Editors;
+
+    /// Whether editors plan too: the `editors_plan` fact of
+    /// `policy::Action::TicketPlan`. Unset is [`Self::DEFAULT`].
+    pub fn editors_plan(setting: Option<TicketPlanning>) -> bool {
+        setting.unwrap_or(Self::DEFAULT) == TicketPlanning::Editors
+    }
+}
+
 /// A property of the ticket composer a workspace may order and hide.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
 #[serde(rename_all = "snake_case")]
@@ -130,6 +155,9 @@ pub struct WorkspaceSettings {
     /// The secret warning before saving (`null` = on).
     #[serde(default)]
     pub ticket_check_secrets: Option<bool>,
+    /// Who may put tickets into a sprint or a release (`null` = editors).
+    #[serde(default)]
+    pub ticket_planning: Option<TicketPlanning>,
 }
 
 /// The settings part of a workspace patch, merged key by key: a value sets
@@ -177,6 +205,9 @@ pub struct WorkspaceSettingsPatch {
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<bool>)]
     pub ticket_check_secrets: Patch<bool>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<TicketPlanning>)]
+    pub ticket_planning: Patch<TicketPlanning>,
 }
 
 /// `PATCH /workspaces/:id`: owners and admins (403 otherwise). An absent
@@ -428,6 +459,26 @@ mod tests {
         assert!(
             serde_json::from_value::<CreateInviteRequest>(json!({ "roles": "member" })).is_err()
         );
+    }
+
+    #[test]
+    fn ticket_planning_defaults_to_editors() {
+        assert!(TicketPlanning::editors_plan(None));
+        assert!(TicketPlanning::editors_plan(Some(TicketPlanning::Editors)));
+        assert!(!TicketPlanning::editors_plan(Some(
+            TicketPlanning::Managers
+        )));
+        let req: UpdateWorkspaceRequest =
+            serde_json::from_value(json!({ "settings": { "ticket_planning": "managers" } }))
+                .expect("patch");
+        assert_eq!(
+            req.settings.expect("settings").ticket_planning,
+            Patch::Value(TicketPlanning::Managers)
+        );
+        assert!(serde_json::from_value::<UpdateWorkspaceRequest>(
+            json!({ "settings": { "ticket_planning": "everyone" } })
+        )
+        .is_err());
     }
 
     #[test]

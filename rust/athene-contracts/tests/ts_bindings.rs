@@ -173,6 +173,7 @@ fn render(out: &Path) {
         workspace::ComposerPropertiesSetting,
         workspace::DefaultAssignee,
         workspace::WeekStart,
+        workspace::TicketPlanning,
         workspace::UpdateWorkspaceRequest,
         workspace::CreateWorkspaceRequest,
         workspace::InviteDetailsResponse,
