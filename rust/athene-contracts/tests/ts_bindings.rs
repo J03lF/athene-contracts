@@ -13,6 +13,10 @@
 //! integers become `number`: the counts and ids they carry stay far below
 //! 2^53, and the JSON on the wire is a plain number. A `Patch<T>` field
 //! becomes `key?: T | null` (see `athene_contracts::patch`).
+//!
+//! Besides the types, `policy/policy-matrix.json` is rendered here: every
+//! verdict of `athene_contracts::policy::allows` for the matrix subjects,
+//! so a rule change shows up as a diff of that file too.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;
@@ -20,8 +24,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use athene_contracts::{
-    activity, admin, auth, common, dashboard, docs, edit, field_definitions, teams, ticket_types,
-    user, work, workspace,
+    activity, admin, auth, common, dashboard, docs, edit, field_definitions, policy, teams,
+    ticket_types, user, work, workspace,
 };
 use ts_rs::{Config, TS};
 
@@ -222,7 +226,18 @@ fn render(out: &Path) {
         docs::DocEdit,
         docs::DocListQuery,
         docs::DocSort,
+        // policy (3.8a)
+        policy::Action,
+        policy::ActionKind,
+        policy::ActionScope,
+        policy::Fact,
+        policy::Standing,
+        policy::CapabilitiesResponse,
     );
+    // The verdicts the web's local rules are tested against (3.12).
+    let matrix = policy::matrix::to_json(&policy::matrix::build()).expect("policy matrix");
+    fs::create_dir_all(out.join("policy")).expect("policy dir");
+    fs::write(out.join("policy/policy-matrix.json"), matrix).expect("write policy matrix");
 }
 
 /// Every file under `root`, keyed by its `/`-separated path relative to it.

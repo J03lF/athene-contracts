@@ -12,7 +12,7 @@ use utoipa::ToSchema;
 
 use crate::ticket_types::TicketTypeColor;
 use crate::work::TicketPriority;
-use crate::Patch;
+use crate::{DbEnum, Patch};
 
 /// A workspace, as the caller sees it: with their own role and join date.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, TS)]
@@ -231,6 +231,48 @@ pub enum WorkspaceMemberRole {
     Admin,
     Member,
     Guest,
+}
+
+impl WorkspaceMemberRole {
+    /// Every role, most privileged first.
+    pub const ALL: [WorkspaceMemberRole; 4] = [Self::Owner, Self::Admin, Self::Member, Self::Guest];
+
+    /// The wire and storage spelling (`owner`, …).
+    pub fn as_str(&self) -> &'static str {
+        self.to_db()
+    }
+
+    /// What the role may hand out: nobody grants above their own rank
+    /// (`crate::policy`). Guest 0, member 1, admin 2, owner 3.
+    pub const fn rank(self) -> u8 {
+        match self {
+            Self::Guest => 0,
+            Self::Member => 1,
+            Self::Admin => 2,
+            Self::Owner => 3,
+        }
+    }
+}
+
+impl DbEnum for WorkspaceMemberRole {
+    fn from_db(value: Option<&str>) -> Result<Self, String> {
+        match value.unwrap_or("member") {
+            "owner" => Ok(Self::Owner),
+            "admin" => Ok(Self::Admin),
+            "member" => Ok(Self::Member),
+            "guest" => Ok(Self::Guest),
+            other => Err(format!("invalid workspace member role '{other}'")),
+        }
+    }
+
+    fn to_db(&self) -> &'static str {
+        match self {
+            Self::Owner => "owner",
+            Self::Admin => "admin",
+            Self::Member => "member",
+            Self::Guest => "guest",
+        }
+    }
 }
 
 /// One member of a workspace, with their identity resolved.
