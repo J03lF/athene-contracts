@@ -7,6 +7,7 @@ import type { WorkspaceMemberRole } from "./WorkspaceMemberRole";
  * Owners and admins only; only an owner may grant, change or remove the
  * owner role; the last owner cannot be demoted (409). `DELETE` on the same
  * path removes the member, or leaves when the id is the caller's own;
- * `POST /workspaces/:id/invites/:invite_id/revoke` revokes an invite.
+ * `POST /workspaces/:id/invites/:invite_id/revoke` revokes an invite and
+ * `…/rotate` gives it a new link (the old one stops working).
  */
 export type UpdateMemberRoleRequest = { role: WorkspaceMemberRole, };

@@ -625,7 +625,7 @@ where
                 window_ms = millis(refused.rule.window),
                 retry_after_ms = millis(refused.retry_after),
                 caller = %refused.caller,
-                path = %refused.path,
+                path = %crate::observability::redact::path(&refused.path),
             );
             Ok((layer.reject)(&refused))
         })
@@ -935,7 +935,7 @@ where
                     open = layer.limiter.open(&key),
                     retry_after_ms = millis(refused.retry_after),
                     caller = %refused.caller,
-                    path = %refused.path,
+                    path = %crate::observability::redact::path(&refused.path),
                 );
                 return Ok((layer.reject)(&refused).map(|body| SlotBody::new(body, None)));
             };

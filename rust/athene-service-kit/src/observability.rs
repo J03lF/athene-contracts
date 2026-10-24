@@ -300,6 +300,61 @@ pub mod redact {
             None => REDACTED.to_string(),
         }
     }
+
+    /// Free text as it may be logged (an error message, a body excerpt):
+    /// every `/invite/<token>` in it becomes `/invite/<redacted>`, the token
+    /// being whatever follows up to the next `/`, `?`, `#`, quote, bracket,
+    /// comma, semicolon or whitespace. For texts that quote a URL — the
+    /// host's client error names its target (3.8a, N1).
+    pub fn text(text: &str) -> std::borrow::Cow<'_, str> {
+        const MARK: &str = "/invite/";
+        let ends = |c: char| {
+            matches!(
+                c,
+                '/' | '?' | '#' | '"' | '\'' | ')' | ']' | '>' | ',' | ';'
+            ) || c.is_whitespace()
+        };
+        let mut out = String::new();
+        let mut rest = text;
+        let mut changed = false;
+        while let Some(at) = rest.find(MARK) {
+            let (before, after) = rest.split_at(at + MARK.len());
+            let len = after.find(ends).unwrap_or(after.len());
+            out.push_str(before);
+            if len > 0 {
+                out.push_str(REDACTED);
+                changed = true;
+            }
+            rest = &after[len..];
+        }
+        if !changed {
+            return std::borrow::Cow::Borrowed(text);
+        }
+        out.push_str(rest);
+        std::borrow::Cow::Owned(out)
+    }
+
+    /// A request path as it may be logged: the secret segment of an invite
+    /// link (`/invite/<token>`, `/api/v1/invite/<token>/join`) becomes
+    /// `<redacted>` (step 3.8a). The token is the whole credential of a
+    /// link invite; the access logs, the `http` span and the refusal logs
+    /// all print paths, so every one of them goes through here.
+    pub fn path(path: &str) -> std::borrow::Cow<'_, str> {
+        let segments: Vec<&str> = path.split('/').collect();
+        let secret =
+            |idx: usize| idx > 0 && segments[idx - 1] == "invite" && !segments[idx].is_empty();
+        if !(0..segments.len()).any(secret) {
+            return std::borrow::Cow::Borrowed(path);
+        }
+        std::borrow::Cow::Owned(
+            segments
+                .iter()
+                .enumerate()
+                .map(|(idx, segment)| if secret(idx) { REDACTED } else { segment })
+                .collect::<Vec<_>>()
+                .join("/"),
+        )
+    }
 }
 
 #[cfg(test)]
@@ -369,5 +424,58 @@ mod tests {
         );
         assert_eq!(redact::email("joel@example.com"), "j***@example.com");
         assert_eq!(redact::email("not-an-address"), "<redacted>");
+    }
+
+    #[test]
+    fn an_invite_token_in_free_text_is_masked() {
+        let token = "AbCdEfGh0123456789AbCdEfGh012345";
+        let text = format!(
+            "error sending request for url (http://127.0.0.1:41001/invite/{token}/join?x=1): \
+             connection refused; retried /api/v1/invite/{token} and \"/invite/{token}\""
+        );
+        let masked = redact::text(&text);
+        assert!(!masked.contains(token), "{masked}");
+        assert_eq!(
+            masked,
+            "error sending request for url (http://127.0.0.1:41001/invite/<redacted>/join?x=1): \
+             connection refused; retried /api/v1/invite/<redacted> and \"/invite/<redacted>\""
+        );
+        for plain in [
+            "no path here",
+            "/workspaces/7e8f/invites/1c2d/rotate",
+            "/invite/",
+            "",
+        ] {
+            assert!(
+                matches!(redact::text(plain), std::borrow::Cow::Borrowed(p) if p == plain),
+                "{plain:?} must stay as it is"
+            );
+        }
+    }
+
+    #[test]
+    fn an_invite_token_in_a_path_is_masked() {
+        let token = "AbCdEfGh0123456789AbCdEfGh012345";
+        for (path, logged) in [
+            (format!("/invite/{token}"), "/invite/<redacted>"),
+            (format!("/invite/{token}/join"), "/invite/<redacted>/join"),
+            (
+                format!("/api/v1/invite/{token}/join"),
+                "/api/v1/invite/<redacted>/join",
+            ),
+        ] {
+            assert_eq!(redact::path(&path), logged);
+        }
+        for path in [
+            "/workspaces/7e8f/invites/1c2d/rotate",
+            "/invite/",
+            "/work/tickets/7e8f",
+            "/",
+        ] {
+            assert!(
+                matches!(redact::path(path), std::borrow::Cow::Borrowed(p) if p == path),
+                "{path} must stay as it is"
+            );
+        }
     }
 }

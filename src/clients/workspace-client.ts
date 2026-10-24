@@ -49,14 +49,18 @@ export class WorkspaceApiClient {
       .then(unwrap);
   }
 
-  /** Invitations issued for a workspace, newest first. Members only. */
+  /** Invitations issued for a workspace, newest first, without tokens. Owners and admins only. */
   listInvites(workspaceId: string): Promise<InvitationResponse[]> {
     return this.http
       .get<ApiEnvelope<InvitationResponse[]>>(`/workspaces/${workspaceId}/invites`)
       .then(unwrap);
   }
 
-  /** Mint an invitation. Owners and admins only. */
+  /**
+   * Mint an invitation. Owners and admins only. The answer carries the
+   * link's `token` — the only time it is shown; an open link grants at
+   * most `member`.
+   */
   createInvite(
     workspaceId: string,
     body: CreateInviteRequest = {},
@@ -93,6 +97,20 @@ export class WorkspaceApiClient {
   /** Leave a workspace. 409 for its last owner. Access ends immediately. */
   leaveWorkspace(workspaceId: string, ownUserId: string): Promise<void> {
     return this.removeMember(workspaceId, ownUserId);
+  }
+
+  /**
+   * Give a live invitation a new link: the old one stops working at once,
+   * and the answer carries the new `token` (shown this once). 400 for an
+   * invite that is no longer active.
+   */
+  rotateInvite(workspaceId: string, inviteId: string): Promise<InvitationResponse> {
+    return this.http
+      .post<ApiEnvelope<InvitationResponse>>(
+        `/workspaces/${workspaceId}/invites/${inviteId}/rotate`,
+        {},
+      )
+      .then(unwrap);
   }
 
   /** Revoke an invite so its link stops working. Idempotent. */

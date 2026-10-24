@@ -302,15 +302,18 @@ pub enum InvitationStatus {
 
 /// An invitation to a workspace.
 ///
-/// Carries the `token` because the point of creating one is a link to
-/// send. Only members may read the list: every live token in it is a way
-/// in.
+/// The server keeps only a hash of the link's secret (step 3.8a): `token`
+/// is there exactly once, in the answer that minted it — `POST …/invites`
+/// or `POST …/invites/:invite_id/rotate` — and `null` everywhere else, the
+/// list included. A lost link is renewed (rotate), never read back.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, TS)]
 #[ts(export_to = "workspace/")]
 pub struct InvitationResponse {
     pub id: String,
     pub workspace_id: String,
-    pub token: String,
+    /// 32 letters and digits; only in the create and rotate answers.
+    #[serde(default)]
+    pub token: Option<String>,
     /// Addressed to one person, or `null` for a link anybody may use.
     pub email: Option<String>,
     pub role: WorkspaceMemberRole,
@@ -329,7 +332,9 @@ pub struct InvitationResponse {
 #[serde(deny_unknown_fields)]
 #[ts(export_to = "workspace/")]
 pub struct CreateInviteRequest {
-    /// `member` when omitted. Never more than the inviter holds.
+    /// `member` when omitted. Never more than the inviter holds; an open
+    /// link grants at most `member` (`policy::LINK_INVITE_MAX_ROLE`, J6),
+    /// admins and owners are invited by address.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub role: Option<WorkspaceMemberRole>,
@@ -338,17 +343,24 @@ pub struct CreateInviteRequest {
     pub email: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_uses: Option<i32>,
-    /// RFC 3339.
+    /// RFC 3339, in the future and at most [`INVITE_MAX_DAYS`] days ahead;
+    /// omitted: [`INVITE_DEFAULT_DAYS`] days from now (J4).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<String>,
 }
+
+/// How long an invitation lives when the request names no expiry (J4).
+pub const INVITE_DEFAULT_DAYS: i64 = 7;
+/// The longest an invitation may live (J4).
+pub const INVITE_MAX_DAYS: i64 = 30;
 
 /// `PATCH /workspaces/:id/members/:user_id`.
 ///
 /// Owners and admins only; only an owner may grant, change or remove the
 /// owner role; the last owner cannot be demoted (409). `DELETE` on the same
 /// path removes the member, or leaves when the id is the caller's own;
-/// `POST /workspaces/:id/invites/:invite_id/revoke` revokes an invite.
+/// `POST /workspaces/:id/invites/:invite_id/revoke` revokes an invite and
+/// `…/rotate` gives it a new link (the old one stops working).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, TS)]
 #[serde(deny_unknown_fields)]
 #[ts(export_to = "workspace/")]

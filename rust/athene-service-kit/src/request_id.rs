@@ -138,7 +138,7 @@ where
             "http",
             request_id = %request_id,
             method = %request.method(),
-            path = %request.uri().path(),
+            path = %crate::observability::redact::path(request.uri().path()),
         );
         let clone = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, clone);

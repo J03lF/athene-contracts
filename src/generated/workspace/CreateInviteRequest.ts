@@ -6,7 +6,9 @@ import type { WorkspaceMemberRole } from "./WorkspaceMemberRole";
  */
 export type CreateInviteRequest = { 
 /**
- * `member` when omitted. Never more than the inviter holds.
+ * `member` when omitted. Never more than the inviter holds; an open
+ * link grants at most `member` (`policy::LINK_INVITE_MAX_ROLE`, J6),
+ * admins and owners are invited by address.
  */
 role?: WorkspaceMemberRole, 
 /**
@@ -14,6 +16,7 @@ role?: WorkspaceMemberRole,
  */
 email?: string | null, max_uses?: number | null, 
 /**
- * RFC 3339.
+ * RFC 3339, in the future and at most [`INVITE_MAX_DAYS`] days ahead;
+ * omitted: [`INVITE_DEFAULT_DAYS`] days from now (J4).
  */
 expires_at?: string | null, };

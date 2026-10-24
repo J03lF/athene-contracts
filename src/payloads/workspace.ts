@@ -28,6 +28,11 @@ export type { WorkspaceMemberRole } from '../generated/workspace/WorkspaceMember
 export type { WorkspaceResponse } from '../generated/workspace/WorkspaceResponse';
 export type { WorkspaceSettings } from '../generated/workspace/WorkspaceSettings';
 export type { WorkspaceSettingsPatch } from '../generated/workspace/WorkspaceSettingsPatch';
+export {
+  INVITE_DEFAULT_DAYS,
+  INVITE_MAX_DAYS,
+  LINK_INVITE_MAX_ROLE,
+} from '../generated/workspace/invite-constants';
 
 /** The composer properties a workspace may order and hide, in default order. */
 export const COMPOSER_PROPERTIES = [

@@ -33,6 +33,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::error_class::ErrorClass;
+use crate::observability::redact;
 use crate::util::excerpt;
 
 /// How the client behaves. `Duration::ZERO` means "not set" for the
@@ -680,23 +681,90 @@ fn parse_reply(status: StatusCode, bytes: &[u8]) -> Result<GatewayReply, Upstrea
             UpstreamError::InvalidResponse(format!("{err} ({} bytes)", bytes.len()))
         });
     }
+    // The host's error text can name the target URL, an invite link's
+    // token included (3.8a, N1): masked before it is logged or handed on —
+    // the caller logs the message again.
     if let Ok(host) = serde_json::from_slice::<HostError>(bytes) {
+        let message = redact::text(&host.error).into_owned();
         tracing::warn!(
             event = "upstream.host_error",
             status = host.status,
-            error = %excerpt(&host.error, 200),
+            error = %excerpt(&message, 200),
         );
         return Err(UpstreamError::Gateway {
             status: host.status,
-            message: host.error,
+            message,
         });
     }
-    let text = excerpt(&String::from_utf8_lossy(bytes), 200);
+    let text = excerpt(&redact::text(&String::from_utf8_lossy(bytes)), 200);
     tracing::warn!(event = "upstream.host_error", status = status.as_u16(), body = %text);
     Err(UpstreamError::Gateway {
         status: status.as_u16(),
         message: text,
     })
+}
+
+#[cfg(test)]
+mod redaction_tests {
+    use std::sync::{Arc, Mutex};
+
+    use super::*;
+
+    const TOKEN: &str = "AbCdEfGh0123456789AbCdEfGh012345";
+
+    #[derive(Clone, Default)]
+    struct Captured(Arc<Mutex<Vec<u8>>>);
+
+    impl std::io::Write for Captured {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// N1 (3.8a): when the host cannot reach the core it answers with its
+    /// client's error text, which names the target URL — an invite link's
+    /// token included. Neither the log line nor the error handed on (the
+    /// gateway logs it again) may carry it.
+    #[test]
+    fn a_host_error_never_carries_an_invite_token() {
+        let log = Captured::default();
+        let writer = log.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_writer(move || writer.clone())
+            .finish();
+        let _second = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
+        let _guard = tracing::subscriber::set_default(subscriber);
+        tracing::callsite::rebuild_interest_cache();
+
+        let url = format!("http://127.0.0.1:41001/invite/{TOKEN}/join");
+        let json = serde_json::json!({
+            "status": 502,
+            "error": format!("error sending request for url ({url})"),
+        });
+        let as_json = parse_reply(StatusCode::BAD_GATEWAY, json.to_string().as_bytes());
+        let as_text = parse_reply(
+            StatusCode::BAD_GATEWAY,
+            format!("upstream failed: {url}").as_bytes(),
+        );
+        for outcome in [as_json, as_text] {
+            match outcome {
+                Err(UpstreamError::Gateway { message, .. }) => {
+                    assert!(!message.contains(TOKEN), "{message}");
+                    assert!(message.contains("/invite/<redacted>/join"), "{message}");
+                }
+                other => panic!("expected a gateway error, got {other:?}"),
+            }
+        }
+        let text = String::from_utf8_lossy(&log.0.lock().unwrap()).to_string();
+        assert!(text.contains("upstream.host_error"), "{text}");
+        assert!(!text.contains(TOKEN), "the token is in the log: {text}");
+    }
 }
 
 #[cfg(test)]

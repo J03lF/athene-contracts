@@ -5,11 +5,16 @@ import type { WorkspaceMemberRole } from "./WorkspaceMemberRole";
 /**
  * An invitation to a workspace.
  *
- * Carries the `token` because the point of creating one is a link to
- * send. Only members may read the list: every live token in it is a way
- * in.
+ * The server keeps only a hash of the link's secret (step 3.8a): `token`
+ * is there exactly once, in the answer that minted it — `POST …/invites`
+ * or `POST …/invites/:invite_id/rotate` — and `null` everywhere else, the
+ * list included. A lost link is renewed (rotate), never read back.
  */
-export type InvitationResponse = { id: string, workspace_id: string, token: string, 
+export type InvitationResponse = { id: string, workspace_id: string, 
+/**
+ * 32 letters and digits; only in the create and rotate answers.
+ */
+token: string | null, 
 /**
  * Addressed to one person, or `null` for a link anybody may use.
  */

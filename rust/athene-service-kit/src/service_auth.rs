@@ -484,7 +484,7 @@ where
                             reason = check.reason(),
                             caller = %caller,
                             method = %method,
-                            path = %path,
+                            path = %crate::observability::redact::path(&path),
                         );
                         let denied = ServiceAuthDenied {
                             check,
@@ -501,7 +501,7 @@ where
                                 reason = check.reason(),
                                 caller = %caller,
                                 method = %method,
-                                path = %path,
+                                path = %crate::observability::redact::path(&path),
                                 "unauthenticated service call allowed (report mode); logged once per caller"
                             );
                         }
