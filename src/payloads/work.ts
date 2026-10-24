@@ -15,6 +15,7 @@ export type { AddTicketCommentRequest } from '../generated/work/AddTicketComment
 export type { AddWorkLogRequest } from '../generated/work/AddWorkLogRequest';
 export type { AssignTicketRequest } from '../generated/work/AssignTicketRequest';
 export type { AssignTicketsRequest } from '../generated/work/AssignTicketsRequest';
+export type { BulkUpdateConflict } from '../generated/work/BulkUpdateConflict';
 export type { BulkUpdateFailure } from '../generated/work/BulkUpdateFailure';
 export type { BulkUpdateTicketsRequest } from '../generated/work/BulkUpdateTicketsRequest';
 export type { BulkUpdateTicketsResponse } from '../generated/work/BulkUpdateTicketsResponse';
@@ -66,6 +67,10 @@ export type { UpdateMilestoneRequest } from '../generated/work/UpdateMilestoneRe
 export type { UpdateProjectRequest } from '../generated/work/UpdateProjectRequest';
 export type { UpdateSprintRequest } from '../generated/work/UpdateSprintRequest';
 export type { UpdateTicketRequest } from '../generated/work/UpdateTicketRequest';
+export type { TicketEdit } from '../generated/work/TicketEdit';
+export type { TicketExpected } from '../generated/work/TicketExpected';
+export type { ProjectExpected } from '../generated/work/ProjectExpected';
+export type { SprintExpected } from '../generated/work/SprintExpected';
 export type { UpdateTicketStatusRequest } from '../generated/work/UpdateTicketStatusRequest';
 export type { VelocityEntryResponse } from '../generated/work/VelocityEntryResponse';
 export type { WatchStateResponse } from '../generated/work/WatchStateResponse';

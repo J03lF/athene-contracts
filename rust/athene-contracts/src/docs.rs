@@ -17,6 +17,7 @@ use ts_rs::TS;
 use utoipa::ToSchema;
 use validator::Validate;
 
+use crate::edit::TextHash;
 use crate::Patch;
 
 /// The most a page body may hold, in UTF-8 bytes.
@@ -130,6 +131,9 @@ pub struct DocResponse {
     pub created_by_name: Option<String>,
     pub updated_by: String,
     pub updated_by_name: Option<String>,
+    /// Rises with every write to the page; orders answers, decides no
+    /// conflict.
+    pub version: i64,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -171,6 +175,93 @@ pub struct UpdateDocRequest {
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<String>)]
     pub project_id: Patch<String>,
+}
+
+impl UpdateDocRequest {
+    /// `true` when the patch names no field.
+    pub fn is_empty(&self) -> bool {
+        self == &Self::default()
+    }
+}
+
+/// The base of a page edit (step 3.7): per field the client changes, what it
+/// saw. Title and body are long texts and are expected as the
+/// [`TextHash`] of the text the client started from; `null` for a link
+/// means "was not set".
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "docs/")]
+pub struct DocExpected {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<String>)]
+    #[ts(optional)]
+    pub title: Option<TextHash>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<String>)]
+    #[ts(optional)]
+    pub body_md: Option<TextHash>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<String>)]
+    pub collection_id: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<String>)]
+    pub project_id: Patch<String>,
+}
+
+/// A page edit: `PATCH /work/docs/:id` (step 3.7). `patch` names the changes,
+/// `expected` their base; a title or body someone else changed in the
+/// meantime is a `409` `ATH-RES-003` whose `details.current` carries the
+/// full page, so the client can show both versions and keep the user's
+/// text. Stage A also accepts the bare [`UpdateDocRequest`]
+/// ([`UpdateDocBody`]).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "docs/")]
+pub struct DocEdit {
+    #[serde(default, skip_serializing_if = "UpdateDocRequest::is_empty")]
+    #[ts(optional, as = "Option<UpdateDocRequest>")]
+    pub patch: UpdateDocRequest,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub expected: Option<DocExpected>,
+}
+
+/// The body of `PATCH /work/docs/:id`: a [`DocEdit`], or in stage A the bare
+/// [`UpdateDocRequest`] (an edit without `expected`). A body with a
+/// `patch` or `expected` key is a `DocEdit`. Not exported to TypeScript.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(untagged)]
+pub enum UpdateDocBody {
+    Edit(DocEdit),
+    Legacy(UpdateDocRequest),
+}
+
+impl UpdateDocBody {
+    /// The edit either shape asks for.
+    pub fn into_edit(self) -> DocEdit {
+        match self {
+            Self::Edit(edit) => edit,
+            Self::Legacy(patch) => DocEdit {
+                patch,
+                expected: None,
+            },
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for UpdateDocBody {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error as _;
+        let map = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
+        let edit = map.contains_key("patch") || map.contains_key("expected");
+        let value = serde_json::Value::Object(map);
+        if edit {
+            DocEdit::deserialize(value).map(Self::Edit)
+        } else {
+            UpdateDocRequest::deserialize(value).map(Self::Legacy)
+        }
+        .map_err(D::Error::custom)
+    }
 }
 
 /// Query of `GET /work/workspaces/:id/docs`.
@@ -217,5 +308,34 @@ mod tests {
             serde_json::to_string(&cleared).unwrap_or_default(),
             r#"{"collection_id":null}"#
         );
+    }
+
+    #[test]
+    fn a_doc_edit_and_the_bare_patch_are_both_read() {
+        let hash = "0".repeat(64);
+        let edit: UpdateDocBody = serde_json::from_value(serde_json::json!({
+            "patch": { "body_md": "new" },
+            "expected": { "body_md": hash }
+        }))
+        .unwrap_or(UpdateDocBody::Legacy(UpdateDocRequest::default()));
+        let UpdateDocBody::Edit(edit) = edit else {
+            panic!("read as the bare patch");
+        };
+        assert_eq!(edit.patch.body_md.as_deref(), Some("new"));
+        assert!(edit.expected.and_then(|e| e.body_md).is_some());
+
+        let bare: UpdateDocBody = serde_json::from_value(serde_json::json!({ "title": "T" }))
+            .unwrap_or(UpdateDocBody::Edit(DocEdit::default()));
+        assert!(matches!(bare, UpdateDocBody::Legacy(_)));
+        for refused in [
+            serde_json::json!({ "patch": { "titel": "x" } }),
+            serde_json::json!({ "expected": { "body_md": "short" } }),
+            serde_json::json!({ "title": "x", "force": true }),
+        ] {
+            assert!(
+                serde_json::from_value::<UpdateDocBody>(refused.clone()).is_err(),
+                "{refused}"
+            );
+        }
     }
 }

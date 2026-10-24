@@ -20,8 +20,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use athene_contracts::{
-    activity, admin, auth, common, dashboard, docs, field_definitions, teams, ticket_types, user,
-    work, workspace,
+    activity, admin, auth, common, dashboard, docs, edit, field_definitions, teams, ticket_types,
+    user, work, workspace,
 };
 use ts_rs::{Config, TS};
 
@@ -76,12 +76,16 @@ fn render(out: &Path) {
         work::ProjectResponse,
         work::CreateProjectRequest,
         work::UpdateProjectRequest,
+        work::ProjectExpected,
         work::UpdateCustomValuesRequest,
         work::TicketResponse,
         work::CreateTicketRequest,
         work::UpdateTicketRequest,
+        work::TicketExpected,
+        work::TicketEdit,
         work::BulkUpdateTicketsRequest,
         work::BulkUpdateFailure,
+        work::BulkUpdateConflict,
         work::BulkUpdateTicketsResponse,
         work::DeletedTicketResponse,
         work::UpdateTicketStatusRequest,
@@ -104,6 +108,7 @@ fn render(out: &Path) {
         work::SprintResponse,
         work::CreateSprintRequest,
         work::UpdateSprintRequest,
+        work::SprintExpected,
         work::CompleteSprintRequest,
         work::AssignTicketsRequest,
         work::SprintBurnDownResponse,
@@ -126,6 +131,12 @@ fn render(out: &Path) {
         work::StatusShareResponse,
         work::ReportSprintResponse,
         work::ProjectReportResponse,
+        // edits: conflict handling (step 3.7)
+        edit::SetOps<String>,
+        edit::TextHash,
+        edit::EditConflictDetails<work::TicketResponse>,
+        edit::FieldConflict,
+        edit::ChangedBy,
         // auth (the rest of auth is still hand-written)
         auth::FeatureFlagState,
         // common
@@ -207,6 +218,8 @@ fn render(out: &Path) {
         docs::DocResponse,
         docs::CreateDocRequest,
         docs::UpdateDocRequest,
+        docs::DocExpected,
+        docs::DocEdit,
         docs::DocListQuery,
         docs::DocSort,
     );

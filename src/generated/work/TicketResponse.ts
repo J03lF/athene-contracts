@@ -37,4 +37,10 @@ custom_values: Record<string, unknown>,
  * `null` for tickets written before ranking existed: sort a column by
  * this value and place the nulls last, newest first.
  */
-board_rank: number | null, created_at: string, updated_at: string, };
+board_rank: number | null, 
+/**
+ * Rises with every write to the ticket (also a background job's).
+ * Orders answers: a client drops one older than what it holds. It
+ * decides no conflict; `expected` does.
+ */
+version: number, created_at: string, updated_at: string, };

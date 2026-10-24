@@ -8,6 +8,7 @@ pub mod auth;
 pub mod common;
 pub mod dashboard;
 pub mod docs;
+pub mod edit;
 pub mod field_definitions;
 pub mod patch;
 pub mod persistence;

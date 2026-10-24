@@ -3,4 +3,9 @@
 /**
  * Why one ticket in a bulk edit did not move.
  */
-export type BulkUpdateFailure = { ticket_id: string, message: string, };
+export type BulkUpdateFailure = { ticket_id: string, 
+/**
+ * The error code the single edit would have answered
+ * (`ATH-RES-001`, `ATH-AUTH-002`, `ATH-VAL-001`, …).
+ */
+code: string, message: string, };

@@ -7,4 +7,9 @@ export type DocResponse = { id: string, workspace_id: string, collection_id: str
 /**
  * Markdown source. Render it sanitised — it is user input.
  */
-body_md: string, created_by: string, created_by_name: string | null, updated_by: string, updated_by_name: string | null, created_at: string, updated_at: string, };
+body_md: string, created_by: string, created_by_name: string | null, updated_by: string, updated_by_name: string | null, 
+/**
+ * Rises with every write to the page; orders answers, decides no
+ * conflict.
+ */
+version: number, created_at: string, updated_at: string, };

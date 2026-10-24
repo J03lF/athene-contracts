@@ -2,6 +2,7 @@ import type {
   CreateDocCollectionRequest,
   CreateDocRequest,
   DocCollectionResponse,
+  DocEdit,
   DocListQuery,
   DocListResponse,
   DocResponse,
@@ -94,7 +95,8 @@ export class DocsApiClient {
       .then(unwrap);
   }
 
-  update(id: string, body: UpdateDocRequest): Promise<DocResponse> {
+  /** A `DocEdit` (patch + `expected`); the bare patch is accepted in stage A. */
+  update(id: string, body: DocEdit | UpdateDocRequest): Promise<DocResponse> {
     return this.http
       .patch<ApiEnvelope<DocResponse>>(`/work/docs/${id}`, body)
       .then(unwrap);

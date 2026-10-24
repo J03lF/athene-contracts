@@ -10,4 +10,15 @@ export type UpdateCustomValuesRequest = {
 /**
  * Missing or `null` is treated as `{}`.
  */
-custom_values: Record<string, unknown>, };
+custom_values: Record<string, unknown>, 
+/**
+ * Per key the client changes, the value it saw (`null`: the key was
+ * empty). With `expected`, only these keys are written: a key whose
+ * stored value moved is a `409` `ATH-RES-003` (`field` =
+ * `custom_values.<key>`), and every other key of `custom_values` is
+ * read as context, not as a change, so another person's edit of it
+ * survives. A multi-value key (an array) is merged as a set: what the
+ * client added to its base is added, what it removed is removed.
+ * Without `expected` (stage A) every key that differs is written.
+ */
+expected?: Record<string, unknown>, };

@@ -8,6 +8,7 @@ export * from './payloads/activity';
 export * from './payloads/dashboard';
 export * from './payloads/field-definitions';
 export * from './payloads/docs';
+export * from './payloads/edit';
 export * from './payloads/teams';
 export * from './payloads/ticket-types';
 export * from './http';

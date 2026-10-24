@@ -39,6 +39,7 @@ import type {
   UpdateCustomValuesRequest,
   UpdateProjectRequest,
   UpdateTicketRequest,
+  TicketEdit,
   AddTicketCommentRequest,
   MoveTicketRequest,
   TicketCommentResponse,
@@ -178,9 +179,12 @@ export class WorkApiClient {
   }
   /**
    * Content patch. Omitted keys are left alone; an explicit `null` clears a
-   * nullable field. See `UpdateTicketRequest`.
+   * nullable field. Send a `TicketEdit` (patch + `expected` per changed
+   * field, labels/watchers as set operations); a stale base answers `409`
+   * `ATH-RES-003` with the current ticket in `details.current`. The bare
+   * `UpdateTicketRequest` is accepted during rollout stage A.
    */
-  updateTicket(id: string, body: UpdateTicketRequest): Promise<TicketResponse> {
+  updateTicket(id: string, body: TicketEdit | UpdateTicketRequest): Promise<TicketResponse> {
     return this.http
       .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}`, body)
       .then(unwrap);

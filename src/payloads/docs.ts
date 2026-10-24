@@ -28,3 +28,5 @@ export type { DocSort } from '../generated/docs/DocSort';
 export type { DocSummaryResponse } from '../generated/docs/DocSummaryResponse';
 export type { UpdateDocCollectionRequest } from '../generated/docs/UpdateDocCollectionRequest';
 export type { UpdateDocRequest } from '../generated/docs/UpdateDocRequest';
+export type { DocEdit } from '../generated/docs/DocEdit';
+export type { DocExpected } from '../generated/docs/DocExpected';

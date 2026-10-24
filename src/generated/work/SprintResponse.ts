@@ -9,4 +9,9 @@ start_date: string,
 /**
  * `YYYY-MM-DD`
  */
-end_date: string, goal_points: number | null, status: SprintStatus, created_at: string, updated_at: string, };
+end_date: string, goal_points: number | null, status: SprintStatus, 
+/**
+ * Rises with every write to the sprint; orders answers, decides no
+ * conflict.
+ */
+version: number, created_at: string, updated_at: string, };

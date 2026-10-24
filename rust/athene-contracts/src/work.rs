@@ -20,11 +20,15 @@
 //!   parses (it accepts a few legacy spellings and any case); the
 //!   TypeScript names the documented vocabulary.
 
+use std::collections::BTreeMap;
+
 use chrono::NaiveDate;
+use serde::de::{Deserializer, Error as _};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use ts_rs::TS;
 
+use crate::edit::{SetOps, TextHash};
 use crate::Patch;
 
 // ============================================================
@@ -211,6 +215,9 @@ pub struct ProjectResponse {
     /// object; `{}` when the workspace defines no project fields.
     #[ts(type = "Record<string, unknown>")]
     pub custom_values: JsonValue,
+    /// Rises with every write to the project. Orders answers (a client
+    /// drops one older than what it holds); it decides no conflict.
+    pub version: i64,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -261,6 +268,35 @@ pub struct UpdateProjectRequest {
     /// `null` leaves the project without a lead.
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub lead_id: Patch<String>,
+    /// Per changed field, the value the change is based on (step 3.7). A
+    /// field whose stored value differs is a `409` `ATH-RES-003`; the other
+    /// fields of the project are not touched either way.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub expected: Option<ProjectExpected>,
+}
+
+/// The base of a project edit: the values the client saw, per field it
+/// changes. Same keys as [`UpdateProjectRequest`]; `null` means "was empty".
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct ProjectExpected {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub description: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub color: Patch<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, as = "Option<ProjectHealth>")]
+    pub health: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, as = "Option<ProjectStatus>")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub lead_id: Patch<String>,
 }
 
 /// `PATCH /work/projects/:id/custom-values` and
@@ -275,6 +311,17 @@ pub struct UpdateCustomValuesRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional = false, type = "Record<string, unknown>")]
     pub custom_values: Option<JsonValue>,
+    /// Per key the client changes, the value it saw (`null`: the key was
+    /// empty). With `expected`, only these keys are written: a key whose
+    /// stored value moved is a `409` `ATH-RES-003` (`field` =
+    /// `custom_values.<key>`), and every other key of `custom_values` is
+    /// read as context, not as a change, so another person's edit of it
+    /// survives. A multi-value key (an array) is merged as a set: what the
+    /// client added to its base is added, what it removed is removed.
+    /// Without `expected` (stage A) every key that differs is written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "Record<string, unknown>")]
+    pub expected: Option<JsonValue>,
 }
 
 // ============================================================
@@ -324,6 +371,10 @@ pub struct TicketResponse {
     /// `null` for tickets written before ranking existed: sort a column by
     /// this value and place the nulls last, newest first.
     pub board_rank: Option<i64>,
+    /// Rises with every write to the ticket (also a background job's).
+    /// Orders answers: a client drops one older than what it holds. It
+    /// decides no conflict; `expected` does.
+    pub version: i64,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -413,6 +464,140 @@ pub struct UpdateTicketRequest {
     pub custom_values: Option<JsonValue>,
 }
 
+impl UpdateTicketRequest {
+    /// `true` when the patch names no field.
+    pub fn is_empty(&self) -> bool {
+        self == &Self::default()
+    }
+}
+
+/// The content patch of a ticket edit (`TicketEdit.patch`). The wire type
+/// keeps its name, `UpdateTicketRequest`, so clients built against it still
+/// compile.
+pub type TicketPatch = UpdateTicketRequest;
+
+/// The base of a ticket edit: per field the client changes, the value it
+/// saw before the change (step 3.7, `CONFLICTS.md`).
+///
+/// One shape for every ticket edit endpoint (content patch, status, move,
+/// assign, triage, bulk), keyed by the ticket's own field names as
+/// `TicketResponse` has them. A key that is absent is not checked; `null`
+/// means "was empty". The description is a long text and is expected as
+/// the [`TextHash`] of the text the client started from.
+///
+/// The server checks only fields the request changes. When one of them no
+/// longer holds its expected value, nothing is written and the answer is a
+/// `409` `ATH-RES-003` naming that field.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct TicketExpected {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub description: Option<TextHash>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub ticket_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, as = "Option<TicketPriority>")]
+    pub priority: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, as = "Option<TicketStatus>")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub assignee_id: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub due_date: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub story_points: Patch<i32>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub parent_ticket_id: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub milestone_id: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub sla_policy_id: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub triage_category: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub triage_reason: Patch<String>,
+}
+
+/// A ticket edit: `PATCH /work/tickets/:id` (step 3.7).
+///
+/// `patch` names the fields to change, `expected` their base. Labels and
+/// watchers are sets and change by operations: two people adding labels at
+/// once both keep theirs, so they need no base. `watchers` takes only the
+/// caller's own id, as `PUT|DELETE …/watchers/me` do.
+///
+/// Stage A also accepts the old body, the bare [`UpdateTicketRequest`],
+/// as an edit without `expected` ([`UpdateTicketBody`]).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct TicketEdit {
+    /// May be left out for an edit of labels or watchers only.
+    #[serde(default, skip_serializing_if = "UpdateTicketRequest::is_empty")]
+    #[ts(optional, as = "Option<UpdateTicketRequest>")]
+    pub patch: TicketPatch,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub expected: Option<TicketExpected>,
+    /// Label ids of the ticket's workspace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub labels: Option<SetOps<String>>,
+    /// User ids; only the caller's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub watchers: Option<SetOps<String>>,
+}
+
+/// The keys that mark a body as a [`TicketEdit`] rather than the stage-A
+/// bare patch. None of them is a field of [`UpdateTicketRequest`].
+const TICKET_EDIT_KEYS: [&str; 4] = ["patch", "expected", "labels", "watchers"];
+
+/// The body of `PATCH /work/tickets/:id`: a [`TicketEdit`], or during rollout
+/// stage A the bare [`UpdateTicketRequest`] older clients send (an edit
+/// without `expected`). Both shapes reject unknown fields; which one a body
+/// is follows from its keys. Not exported to TypeScript: clients send a
+/// `TicketEdit`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(untagged)]
+pub enum UpdateTicketBody {
+    Edit(Box<TicketEdit>),
+    Legacy(UpdateTicketRequest),
+}
+
+impl UpdateTicketBody {
+    /// The edit either shape asks for.
+    pub fn into_edit(self) -> TicketEdit {
+        match self {
+            Self::Edit(edit) => *edit,
+            Self::Legacy(patch) => TicketEdit {
+                patch,
+                ..TicketEdit::default()
+            },
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for UpdateTicketBody {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let map = serde_json::Map::<String, JsonValue>::deserialize(deserializer)?;
+        let edit = TICKET_EDIT_KEYS.iter().any(|key| map.contains_key(*key));
+        let value = JsonValue::Object(map);
+        if edit {
+            TicketEdit::deserialize(value).map(|edit| Self::Edit(Box::new(edit)))
+        } else {
+            UpdateTicketRequest::deserialize(value).map(Self::Legacy)
+        }
+        .map_err(D::Error::custom)
+    }
+}
+
 /// One patch applied to a selection of tickets: `POST /work/tickets/bulk`.
 ///
 /// The same patch shape as a single edit, so a field the one accepts cannot
@@ -430,6 +615,12 @@ pub struct BulkUpdateTicketsRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional, as = "Option<TicketStatus>")]
     pub status: Option<String>,
+    /// The base per ticket, keyed by ticket id: each ticket is checked and
+    /// written on its own, so a stale one lands in `conflicts` and the rest
+    /// are written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub expected: Option<BTreeMap<String, TicketExpected>>,
 }
 
 /// Why one ticket in a bulk edit did not move.
@@ -437,19 +628,33 @@ pub struct BulkUpdateTicketsRequest {
 #[ts(export_to = "work/")]
 pub struct BulkUpdateFailure {
     pub ticket_id: String,
+    /// The error code the single edit would have answered
+    /// (`ATH-RES-001`, `ATH-AUTH-002`, `ATH-VAL-001`, …).
+    pub code: String,
     pub message: String,
+}
+
+/// One ticket of a bulk edit whose base no longer held: nothing of it was
+/// written. `fields` as in the `409` of a single edit.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct BulkUpdateConflict {
+    pub ticket_id: String,
+    pub fields: Vec<String>,
 }
 
 /// What a bulk edit did, per ticket.
 ///
 /// Deliberately not all-or-nothing: a selection of fifty where one has been
 /// deleted under the user moves the other forty-nine and names the one that
-/// did not. `updated` replaces what the client holds, `failed` is what to
-/// tell the user about.
+/// did not. `updated` replaces what the client holds, `conflicts` are the
+/// tickets someone else changed in the meantime (re-read and decide),
+/// `failed` is what to tell the user about. Always HTTP 200.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
 #[ts(export_to = "work/")]
 pub struct BulkUpdateTicketsResponse {
     pub updated: Vec<TicketResponse>,
+    pub conflicts: Vec<BulkUpdateConflict>,
     pub failed: Vec<BulkUpdateFailure>,
 }
 
@@ -469,6 +674,11 @@ pub struct DeletedTicketResponse {
 pub struct UpdateTicketStatusRequest {
     /// A [`TicketStatus`] value.
     pub status: String,
+    /// The base of the change (step 3.7): for `status`, the status the
+    /// client saw. See [`TicketExpected`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub expected: Option<TicketExpected>,
 }
 
 /// A board drag: `PATCH /work/tickets/:id/move`.
@@ -487,6 +697,11 @@ pub struct MoveTicketRequest {
     /// (a negative index is the top), so a stale view lands the card at an
     /// end instead of failing.
     pub index: i64,
+    /// The base of the column change: `status` as the client saw it. The
+    /// position needs none (the last drag wins).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub expected: Option<TicketExpected>,
 }
 
 /// `PATCH /work/tickets/:id/assign`. `null` (or a missing key) unassigns.
@@ -496,6 +711,10 @@ pub struct MoveTicketRequest {
 pub struct AssignTicketRequest {
     #[serde(default)]
     pub assignee_id: Option<String>,
+    /// The base: `assignee_id` as the client saw it (`null`: unassigned).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub expected: Option<TicketExpected>,
 }
 
 /// Triage a ticket: `PATCH /work/tickets/:id/triage`. Allowed to any member
@@ -513,6 +732,12 @@ pub struct TriageTicketRequest {
     pub priority: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sla_policy_id: Option<String>,
+    /// The base: the ticket's `triage_category` and `triage_reason` (both
+    /// always written by a triage) and, when sent, `priority` and
+    /// `sla_policy_id`, as the client saw them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub expected: Option<TicketExpected>,
 }
 
 /// Ticket and project counts for the dashboard: `GET /work/stats`.
@@ -675,6 +900,9 @@ pub struct SprintResponse {
     pub end_date: String,
     pub goal_points: Option<i32>,
     pub status: SprintStatus,
+    /// Rises with every write to the sprint; orders answers, decides no
+    /// conflict.
+    pub version: i64,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -716,6 +944,24 @@ pub struct UpdateSprintRequest {
     pub end_date: Option<NaiveDate>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub move_due_ticket_ids: Vec<String>,
+    /// The base of the dates that change (step 3.7). A date someone else
+    /// moved in the meantime is a `409` `ATH-RES-003`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub expected: Option<SprintExpected>,
+}
+
+/// The dates a sprint edit is based on.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct SprintExpected {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub start_date: Option<NaiveDate>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub end_date: Option<NaiveDate>,
 }
 
 /// Where a completed sprint's unfinished tickets go:
@@ -1029,6 +1275,69 @@ mod tests {
             serde_json::to_value(&req).expect("serialise"),
             json!({ "title": "x", "due_date": null })
         );
+    }
+
+    #[test]
+    fn a_ticket_edit_carries_patch_expected_and_set_ops() {
+        let body = json!({
+            "patch": { "title": "New", "due_date": null },
+            "expected": { "title": "Old", "due_date": "2026-10-01T00:00:00Z" },
+            "labels": { "add": ["l1"], "remove": ["l2"] }
+        });
+        let parsed: UpdateTicketBody = serde_json::from_value(body.clone()).expect("edit");
+        let UpdateTicketBody::Edit(edit) = &parsed else {
+            panic!("read as the legacy shape: {parsed:?}");
+        };
+        assert_eq!(edit.patch.title.as_deref(), Some("New"));
+        assert_eq!(edit.patch.due_date, Patch::Null);
+        let expected = edit.expected.as_ref().expect("expected");
+        assert_eq!(expected.title.as_deref(), Some("Old"));
+        assert_eq!(expected.story_points, Patch::Absent);
+        assert_eq!(edit.labels.as_ref().map(|l| l.add.len()), Some(1));
+        // Forwarded by the gateway exactly as sent.
+        assert_eq!(serde_json::to_value(&parsed).expect("serialise"), body);
+    }
+
+    #[test]
+    fn the_bare_patch_is_still_an_edit_without_expected() {
+        let body = json!({ "title": "x", "story_points": 3 });
+        let parsed: UpdateTicketBody = serde_json::from_value(body.clone()).expect("legacy");
+        assert!(matches!(parsed, UpdateTicketBody::Legacy(_)));
+        assert_eq!(serde_json::to_value(&parsed).expect("serialise"), body);
+        let edit = parsed.into_edit();
+        assert_eq!(edit.patch.story_points, Patch::Value(3));
+        assert!(edit.expected.is_none());
+    }
+
+    #[test]
+    fn both_edit_shapes_refuse_unknown_fields() {
+        for body in [
+            json!({ "titel": "x" }),
+            json!({ "patch": { "titel": "x" } }),
+            json!({ "patch": {}, "expected": { "titel": "x" } }),
+            json!({ "patch": {}, "force": true }),
+            json!({ "title": "x", "expected": { "title": "y" } }),
+            json!({ "labels": { "put": ["a"] } }),
+            json!({ "expected": { "description": "not-a-hash" } }),
+        ] {
+            assert!(
+                serde_json::from_value::<UpdateTicketBody>(body.clone()).is_err(),
+                "accepted {body}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_bulk_edit_carries_a_base_per_ticket() {
+        let req: BulkUpdateTicketsRequest = serde_json::from_value(json!({
+            "ticket_ids": ["a", "b"],
+            "patch": { "priority": "high" },
+            "expected": { "a": { "priority": "low" } }
+        }))
+        .expect("bulk");
+        let expected = req.expected.expect("expected");
+        assert_eq!(expected["a"].priority.as_deref(), Some("low"));
+        assert!(!expected.contains_key("b"));
     }
 
     #[test]

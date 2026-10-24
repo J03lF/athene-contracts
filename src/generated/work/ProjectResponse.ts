@@ -33,4 +33,9 @@ created_by: string | null, status: ProjectStatus,
  * definitions, keyed by each definition's stable `key`. Always an
  * object; `{}` when the workspace defines no project fields.
  */
-custom_values: Record<string, unknown>, created_at: string, updated_at: string, };
+custom_values: Record<string, unknown>, 
+/**
+ * Rises with every write to the project. Orders answers (a client
+ * drops one older than what it holds); it decides no conflict.
+ */
+version: number, created_at: string, updated_at: string, };
