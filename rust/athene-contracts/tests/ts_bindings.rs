@@ -25,7 +25,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use athene_contracts::{
-    activity, admin, auth, common, dashboard, docs, edit, field_definitions, policy, teams,
+    activity, admin, auth, common, dashboard, docs, edit, field_definitions, policy, search, teams,
     ticket_types, user, work, workspace,
 };
 use ts_rs::{Config, TS};
@@ -234,6 +234,15 @@ fn render(out: &Path) {
         policy::Fact,
         policy::Standing,
         policy::CapabilitiesResponse,
+        // search (3.9)
+        search::SearchTicketsQuery,
+        search::TextPart,
+        search::TicketSearchHit,
+        search::SearchHitKind,
+        search::DocSearchHit,
+        search::FacetCount,
+        search::TicketSearchFacets,
+        search::TicketSearchResponse,
     );
     // The verdicts the web's local rules are tested against (3.12).
     let matrix = policy::matrix::to_json(&policy::matrix::build()).expect("policy matrix");

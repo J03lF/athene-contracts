@@ -13,6 +13,7 @@ pub mod field_definitions;
 pub mod patch;
 pub mod persistence;
 pub mod policy;
+pub mod search;
 pub mod teams;
 pub mod ticket_types;
 pub mod user;
