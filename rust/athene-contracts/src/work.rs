@@ -1,133 +1,99 @@
-//! Work-management DTOs: Sprints, Labels, TicketLinks, Watchers.
+//! Work contracts: projects, tickets, comments, links, watchers, the inbox,
+//! sprints, releases (milestones), labels, work logs and reports.
 //!
-//! These are the wire shapes used by `athene-api` and downstream clients.
-//! Domain entities live in the athene crate; these mirror their public fields.
+//! These are the wire types of `/work/*`. The core reads requests and
+//! builds responses with them, the gateway parses request bodies with them
+//! before forwarding, and the TypeScript in `src/generated/work/` is
+//! generated from them (see `tests/ts_bindings.rs`). The domain-to-wire
+//! mappers stay in the core.
+//!
+//! Every response travels in the core's `{ "data": … }` envelope (the label
+//! routes excepted); the types here are what sits inside it.
+//!
+//! Conventions:
+//! - Request bodies reject unknown fields, so a field the contract does not
+//!   know is a 400 at the edge instead of being dropped on the way.
+//! - A PATCH field that can be cleared is a [`Patch`]: absent = unchanged,
+//!   `null` = clear, a value = set.
+//! - Ids are UUID strings, timestamps RFC 3339 strings, dates `YYYY-MM-DD`.
+//! - Status, priority and relation fields in requests are strings the core
+//!   parses (it accepts a few legacy spellings and any case); the
+//!   TypeScript names the documented vocabulary.
 
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
-use validator::Validate;
+use serde_json::Value as JsonValue;
+use ts_rs::TS;
+
+use crate::Patch;
 
 // ============================================================
-// Projects
+// Vocabulary
 // ============================================================
 
-/// A project as `GET /work/projects` returns it. Mirrors
-/// `ProjectResponse` in `src/payloads/work.ts`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
-pub struct ProjectResponse {
-    pub id: String,
-    /// `None` for projects created before projects carried a workspace.
-    pub workspace_id: Option<String>,
-    pub key: String,
-    pub name: String,
-    pub description: Option<String>,
-    /// `#RRGGBB`; `None` = derived from the key.
-    pub color: Option<String>,
-    pub health: String,
-    /// 0..1.
-    pub progress: f32,
-    pub lead_id: Option<String>,
-    /// Who created the project; with the lead and the workspace's managers,
-    /// the people who may edit it. `None` when no longer known.
-    #[serde(default)]
-    pub created_by: Option<String>,
-    pub status: String,
-    /// Values for the workspace's project field definitions.
-    pub custom_values: serde_json::Value,
-    pub created_at: String,
-    pub updated_at: String,
+/// Where a ticket is in its workflow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "work/")]
+pub enum TicketStatus {
+    Open,
+    InProgress,
+    InReview,
+    Blocked,
+    Done,
+    Closed,
 }
 
-// ============================================================
-// Sprints
-// ============================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
+#[ts(export_to = "work/")]
+pub enum TicketPriority {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "work/")]
+pub enum ProjectHealth {
+    OnTrack,
+    AtRisk,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "work/")]
+pub enum ProjectStatus {
+    Active,
+    Archived,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "work/")]
 pub enum SprintStatus {
     Upcoming,
     Active,
     Completed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct SprintResponse {
-    pub id: String,
-    pub project_id: String,
-    pub name: String,
-    pub goal: Option<String>,
-    /// ISO date (`YYYY-MM-DD`)
-    pub start_date: String,
-    pub end_date: String,
-    pub goal_points: Option<i32>,
-    pub status: SprintStatus,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, Validate)]
-pub struct CreateSprintRequest {
-    #[validate(length(min = 1, max = 80))]
-    pub name: String,
-    pub goal: Option<String>,
-    pub start_date: String, // YYYY-MM-DD
-    pub end_date: String,
-    pub goal_points: Option<i32>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
-pub struct AssignTicketsRequest {
-    pub ticket_ids: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
-pub struct SprintBurnDownResponse {
-    pub sprint_id: String,
-    pub total_points: i32,
-    pub done_points: i32,
-    pub total_tickets: usize,
-    pub done_tickets: usize,
-    pub completion_pct: f32,
-}
-
-pub type SprintListResponse = crate::ListResponse<SprintResponse>;
-
-// ============================================================
-// Labels
-// ============================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct LabelResponse {
-    pub id: String,
-    pub workspace_id: String,
-    pub name: String,
-    pub color: Option<String>,
-    pub created_at: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, Validate)]
-pub struct CreateLabelRequest {
-    #[validate(length(min = 1, max = 32))]
-    pub name: String,
-    /// `#RRGGBB`
-    pub color: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
-pub struct SetLabelsRequest {
-    pub label_ids: Vec<String>,
-    /// Required if the activity-event scope can't be derived from the ticket.
-    pub workspace_id: Option<String>,
-}
-
-pub type LabelListResponse = crate::ListResponse<LabelResponse>;
-
-// ============================================================
-// Ticket Links
-// ============================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
+#[ts(export_to = "work/")]
+pub enum MilestoneStatus {
+    Open,
+    Released,
+}
+
+/// How one ticket relates to another. Reads from the perspective of the
+/// ticket that was asked about: `blocks` means *this* ticket blocks the
+/// other one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "work/")]
 pub enum LinkRelation {
     Blocks,
     BlockedBy,
@@ -138,37 +104,953 @@ pub enum LinkRelation {
     ParentOf,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+/// Why an inbox entry reached the reader.
+///
+/// Ordered by how directly it concerns them: when several apply the
+/// strongest wins, because "assigned to you" explains an entry better than
+/// "you watch this" even when both are true.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "work/")]
+pub enum InboxReason {
+    Assigned,
+    Reported,
+    Watching,
+    Mentioned,
+}
+
+// ============================================================
+// Query strings
+// ============================================================
+
+/// `GET /work/tickets`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/", optional_fields)]
+pub struct ListTicketsQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    /// Only this workspace's tickets (403 for a non-member). Project and
+    /// ticket keys are unique per workspace only, so a client showing one
+    /// workspace should pass it, otherwise two tenants' `WR-1` can sit side
+    /// by side.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+}
+
+/// `GET /work/projects`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/", optional_fields)]
+pub struct ListProjectsQuery {
+    /// Only this workspace's projects (403 for a non-member).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+}
+
+/// The per-user lists: `GET /work/inbox` and `GET /work/activity`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/", optional_fields)]
+pub struct PerUserListQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+    /// Only this workspace (403 for a non-member).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+}
+
+/// The per-user aggregates: `GET /work/stats` and `GET /work/my-tickets`.
+/// Without `workspace_id`: every workspace the caller is a member of.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/", optional_fields)]
+pub struct WorkScopeQuery {
+    /// Only this workspace (403 for a non-member).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+}
+
+/// `GET /work/projects/:id/reports`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/", optional_fields)]
+pub struct ProjectReportQuery {
+    /// Draw this sprint's burndown instead of the default one (the running
+    /// sprint, else the last completed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sprint_id: Option<String>,
+}
+
+// ============================================================
+// Projects
+// ============================================================
+
+/// A project, as every `/work/projects` route returns it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export_to = "work/")]
+pub struct ProjectResponse {
+    pub id: String,
+    /// The workspace the project belongs to. `null` for projects created
+    /// before projects carried a workspace; those are invisible to
+    /// workspace-scoped features (the activity feed, custom field
+    /// definitions).
+    pub workspace_id: Option<String>,
+    pub key: String,
+    pub name: String,
+    pub description: Option<String>,
+    /// Hex colour `#RRGGBB`. When `null` the frontend derives a stable
+    /// colour from the key.
+    pub color: Option<String>,
+    pub health: ProjectHealth,
+    /// 0..1: completion ratio, manually set or derived from tickets.
+    pub progress: f32,
+    pub lead_id: Option<String>,
+    /// Who created the project. With the lead and the workspace's managers,
+    /// the people who may edit its settings and overview. `null` for older
+    /// projects whose creator the audit trail no longer records.
+    pub created_by: Option<String>,
+    pub status: ProjectStatus,
+    /// Values for the workspace's `applies_to = project` field
+    /// definitions, keyed by each definition's stable `key`. Always an
+    /// object; `{}` when the workspace defines no project fields.
+    #[ts(type = "Record<string, unknown>")]
+    pub custom_values: JsonValue,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// `POST /work/projects`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct CreateProjectRequest {
+    pub key: String,
+    pub name: String,
+    /// Always send this. A project without a workspace records no activity
+    /// and gets none of the workspace's custom fields; the field is optional
+    /// only so older clients keep working.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Hex colour `#RRGGBB`; overrides the deterministic palette.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+}
+
+/// `PATCH /work/projects/:id`.
+///
+/// Only the fields present are applied, so a patch that mentions nothing is
+/// rejected rather than treated as "clear everything". `key` is not
+/// editable: it prefixes every ticket ever raised in the project.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct UpdateProjectRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub name: Option<String>,
+    /// `null` clears the description.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub description: Patch<String>,
+    /// `#RRGGBB`, or `null` to fall back to the derived palette colour.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub color: Patch<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, as = "Option<ProjectHealth>")]
+    pub health: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, as = "Option<ProjectStatus>")]
+    pub status: Option<String>,
+    /// `null` leaves the project without a lead.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub lead_id: Patch<String>,
+}
+
+/// `PATCH /work/projects/:id/custom-values` and
+/// `PATCH /work/tickets/:id/custom-values`: replace the bucket wholesale.
+/// The core validates it against the workspace's field definitions (for a
+/// ticket: those of its type) and stores the cleaned result.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct UpdateCustomValuesRequest {
+    /// Missing or `null` is treated as `{}`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional = false, type = "Record<string, unknown>")]
+    pub custom_values: Option<JsonValue>,
+}
+
+// ============================================================
+// Tickets
+// ============================================================
+
+/// A ticket, as the ticket routes, the board and `my-tickets` return it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export_to = "work/")]
+pub struct TicketResponse {
+    pub id: String,
+    pub project_id: String,
+    /// Per-project monotonic counter. Combined with the project's `key` it
+    /// produces the human-readable ticket key (e.g. `WEB-128`).
+    pub sequence: i64,
+    pub title: String,
+    pub description: String,
+    /// A ticket-type key of the workspace (`task`, `bug`, `feature`,
+    /// `support`, `epic` or one the workspace added).
+    pub ticket_type: String,
+    pub status: TicketStatus,
+    pub priority: TicketPriority,
+    pub assignee_id: Option<String>,
+    pub reporter_id: String,
+    pub sla_policy_id: Option<String>,
+    /// Set when this ticket is a subtask. The subtask tree is built from
+    /// this field, not from the link table, so a subtask has exactly one
+    /// parent by construction and the server rejects cycles.
+    pub parent_ticket_id: Option<String>,
+    pub sprint_id: Option<String>,
+    pub milestone_id: Option<String>,
+    /// Planning estimate, 0..1000.
+    pub story_points: Option<i32>,
+    pub triage_category: Option<String>,
+    pub triage_reason: Option<String>,
+    pub triaged_at: Option<String>,
+    pub first_response_at: Option<String>,
+    pub resolved_at: Option<String>,
+    pub due_date: Option<String>,
+    pub sla_breached: bool,
+    /// Custom field values keyed by `FieldDefinition.key`. Validated against
+    /// the workspace's definitions before persistence; unknown keys are
+    /// dropped. Always an object, `{}` when empty.
+    #[ts(type = "Record<string, unknown>")]
+    pub custom_values: JsonValue,
+    /// Position within the board column, ordered inside (project, status).
+    /// `null` for tickets written before ranking existed: sort a column by
+    /// this value and place the nulls last, newest first.
+    pub board_rank: Option<i64>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// `POST /work/tickets`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct CreateTicketRequest {
+    pub project_id: String,
+    pub title: String,
+    pub description: String,
+    /// `low`, `medium`, `high` or `critical`.
+    pub priority: String,
+    /// A live ticket-type key of the project's workspace. Absent = the
+    /// workspace's default type. Required custom fields and defaults follow
+    /// it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub ticket_type: Option<String>,
+    /// Planning estimate. Required when the workspace's `require_estimate`
+    /// setting is on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub story_points: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignee_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sla_policy_id: Option<String>,
+    /// RFC 3339 timestamp.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<String>,
+    /// Makes the new ticket a subtask of this one, in the same request, so a
+    /// subtask is never briefly a top-level ticket. The parent must exist.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_ticket_id: Option<String>,
+    /// Custom field values keyed by `FieldDefinition.key`; defaults to `{}`.
+    /// Validated against the project's workspace definitions: 400 for type
+    /// mismatches or missing required fields.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "Record<string, unknown>")]
+    pub custom_values: Option<JsonValue>,
+}
+
+/// Content patch for a ticket: `PATCH /work/tickets/:id`, and the `patch`
+/// of a bulk edit.
+///
+/// Only the keys present are touched. For the nullable fields that matters
+/// twice over: **omit** a key to leave it alone, send `null` to clear it.
+/// `{ title }` alone does not wipe the due date; `{ due_date: null }` does.
+///
+/// Status and assignee are deliberately absent: they have their own
+/// endpoints because they carry workflow side effects (SLA stamps,
+/// notifications) that a content edit should not trigger. Custom values
+/// have their own endpoint too, which validates them against the ticket's
+/// type.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct UpdateTicketRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub ticket_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, as = "Option<TicketPriority>")]
+    pub priority: Option<String>,
+    /// RFC 3339 timestamp, or `null` to clear.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub due_date: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub story_points: Patch<i32>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub parent_ticket_id: Patch<String>,
+    /// The release the ticket ships in; `null` takes it out of any.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub milestone_id: Patch<String>,
+    /// Not editable here: the core answers 400 and names the custom-values
+    /// endpoint. Declared so the refusal can say so; not part of the
+    /// TypeScript.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(skip)]
+    pub custom_values: Option<JsonValue>,
+}
+
+/// One patch applied to a selection of tickets: `POST /work/tickets/bulk`.
+///
+/// The same patch shape as a single edit, so a field the one accepts cannot
+/// quietly be ignored by the other.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct BulkUpdateTicketsRequest {
+    pub ticket_ids: Vec<String>,
+    #[serde(default)]
+    pub patch: UpdateTicketRequest,
+    /// Taken apart from the patch and applied through the status endpoint's
+    /// own path: a status change stamps SLA timers and clears a resolution
+    /// date, and writing it as a plain field would skip all of that.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, as = "Option<TicketStatus>")]
+    pub status: Option<String>,
+}
+
+/// Why one ticket in a bulk edit did not move.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct BulkUpdateFailure {
+    pub ticket_id: String,
+    pub message: String,
+}
+
+/// What a bulk edit did, per ticket.
+///
+/// Deliberately not all-or-nothing: a selection of fifty where one has been
+/// deleted under the user moves the other forty-nine and names the one that
+/// did not. `updated` replaces what the client holds, `failed` is what to
+/// tell the user about.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export_to = "work/")]
+pub struct BulkUpdateTicketsResponse {
+    pub updated: Vec<TicketResponse>,
+    pub failed: Vec<BulkUpdateFailure>,
+}
+
+/// What a ticket delete took with it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct DeletedTicketResponse {
+    pub id: String,
+    /// Subtasks removed along with the ticket, at any depth.
+    pub subtasks: usize,
+}
+
+/// `PATCH /work/tickets/:id/status`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct UpdateTicketStatusRequest {
+    /// A [`TicketStatus`] value.
+    pub status: String,
+}
+
+/// A board drag: `PATCH /work/tickets/:id/move`.
+///
+/// Status and position travel together because that is what the gesture
+/// means; splitting them would let a column change persist while the
+/// position failed, leaving the card visibly in the wrong place.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct MoveTicketRequest {
+    /// Target column. Same vocabulary as `UpdateTicketStatusRequest.status`.
+    pub status: String,
+    /// Zero-based position within the target column, counted after the
+    /// ticket has been removed from wherever it was. Clamped by the core
+    /// (a negative index is the top), so a stale view lands the card at an
+    /// end instead of failing.
+    pub index: i64,
+}
+
+/// `PATCH /work/tickets/:id/assign`. `null` (or a missing key) unassigns.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct AssignTicketRequest {
+    #[serde(default)]
+    pub assignee_id: Option<String>,
+}
+
+/// Triage a ticket: `PATCH /work/tickets/:id/triage`. Allowed to any member
+/// of its workspace except guests.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct TriageTicketRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, as = "Option<TicketPriority>")]
+    pub priority: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sla_policy_id: Option<String>,
+}
+
+/// Ticket and project counts for the dashboard: `GET /work/stats`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct WorkStatsResponse {
+    pub open_tickets: usize,
+    pub in_progress_tickets: usize,
+    pub total_projects: usize,
+}
+
+/// One entry of `GET /work/activity`: a recent change from the audit trail.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export_to = "work/")]
+pub struct WorkActivityEntryResponse {
+    pub actor_initials: String,
+    pub actor_name: Option<String>,
+    pub action: String,
+    /// English description of `action`.
+    pub action_label: String,
+    pub resource_type: String,
+    pub resource_id: Option<String>,
+    #[ts(type = "Record<string, unknown> | null")]
+    pub details: Option<JsonValue>,
+    pub created_at: String,
+}
+
+// ============================================================
+// Inbox
+// ============================================================
+
+/// One inbox entry: something that happened, on a ticket the reader is
+/// involved in.
+///
+/// Shaped like an activity event with the ticket attached, so the same
+/// renderer serves both surfaces. The reader's own actions are never
+/// included.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export_to = "work/")]
+pub struct InboxEntryResponse {
+    /// The activity event's id.
+    pub id: String,
+    pub actor_id: Option<String>,
+    /// Display name of the actor, resolved by the server. `null` for system
+    /// events and deleted accounts.
+    pub actor_name: Option<String>,
+    /// An activity verb (`ActivityAction`).
+    pub action: String,
+    pub detail: Option<String>,
+    #[ts(type = "Record<string, unknown> | null")]
+    pub metadata: Option<JsonValue>,
+    /// RFC 3339.
+    pub created_at: String,
+    pub reason: InboxReason,
+    pub ticket: TicketResponse,
+}
+
+// ============================================================
+// Comments
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct TicketCommentResponse {
+    pub id: String,
+    pub ticket_id: String,
+    pub author_id: String,
+    pub body: String,
+    /// RFC 3339.
+    pub created_at: String,
+    /// RFC 3339; when the author last changed the text, `null` if never.
+    pub edited_at: Option<String>,
+}
+
+/// `POST /work/tickets/:id/comments` and
+/// `PATCH /work/tickets/:id/comments/:comment_id`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct AddTicketCommentRequest {
+    pub body: String,
+}
+
+// ============================================================
+// Links and watchers
+// ============================================================
+
+/// One link on a ticket, with the ticket on the other end already
+/// resolved.
+///
+/// The server writes the symmetric counterpart too, so the other ticket
+/// shows the inverse without a second request. Parent/child hierarchy does
+/// **not** come through here; it lives on `TicketResponse.parent_ticket_id`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export_to = "work/")]
 pub struct TicketLinkResponse {
-    pub from_ticket_id: String,
-    pub to_ticket_id: String,
     pub relation: LinkRelation,
+    pub ticket: TicketResponse,
     pub created_at: String,
     pub created_by: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+/// `POST /work/tickets/:id/links`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
 pub struct CreateTicketLinkRequest {
     pub to_ticket_id: String,
-    pub relation: LinkRelation,
+    #[ts(as = "LinkRelation")]
+    pub relation: String,
 }
 
-pub type TicketLinkListResponse = crate::ListResponse<TicketLinkResponse>;
+/// `DELETE /work/tickets/:id/links/:relation/:to_id`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct TicketLinkDeletedResponse {
+    pub deleted: bool,
+}
 
-// ============================================================
-// Watchers
-// ============================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct WatcherResponse {
-    pub ticket_id: String,
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct TicketWatcherResponse {
     pub user_id: String,
+    /// `null` when the user record is gone; fall back to the id.
+    pub display_name: Option<String>,
+    pub email: Option<String>,
     pub added_at: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
-pub struct AddWatcherRequest {
-    pub user_id: String,
+/// The watcher list plus whether the caller is on it, so the list and the
+/// watch toggle come from one request instead of two.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct TicketWatcherListResponse {
+    pub watchers: Vec<TicketWatcherResponse>,
+    pub watching: bool,
 }
 
-pub type WatcherListResponse = crate::ListResponse<WatcherResponse>;
+/// Response of the watch / unwatch toggle.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct WatchStateResponse {
+    pub watching: bool,
+}
+
+// ============================================================
+// Sprints
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct SprintResponse {
+    pub id: String,
+    pub project_id: String,
+    pub name: String,
+    pub goal: Option<String>,
+    /// `YYYY-MM-DD`
+    pub start_date: String,
+    /// `YYYY-MM-DD`
+    pub end_date: String,
+    pub goal_points: Option<i32>,
+    pub status: SprintStatus,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// `POST /work/projects/:id/sprints`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct CreateSprintRequest {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal: Option<String>,
+    /// `YYYY-MM-DD`
+    pub start_date: NaiveDate,
+    /// `YYYY-MM-DD`
+    pub end_date: NaiveDate,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_points: Option<i32>,
+}
+
+/// Move a sprint's dates: `POST /work/sprints/:id/update`.
+///
+/// Tickets without an own due date follow the end by themselves (their
+/// deadline is the sprint's end, derived, never stored);
+/// `move_due_ticket_ids` names tickets of this sprint whose own due date
+/// moves by as many days as the end does.
+///
+/// The answer is the sprint in `data` and, beside it in the envelope,
+/// `moved_tickets`: how many own due dates moved.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct UpdateSprintRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub start_date: Option<NaiveDate>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub end_date: Option<NaiveDate>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub move_due_ticket_ids: Vec<String>,
+}
+
+/// Where a completed sprint's unfinished tickets go:
+/// `POST /work/sprints/:id/complete`. Another sprint of the same project
+/// that is not completed, or (absent or `null`) the backlog. The body
+/// itself is optional.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct CompleteSprintRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub move_open_to: Option<String>,
+}
+
+/// `POST /work/sprints/:id/assign` and `/unassign`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct AssignTicketsRequest {
+    pub ticket_ids: Vec<String>,
+}
+
+/// `GET /work/sprints/:id/burndown`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export_to = "work/")]
+pub struct SprintBurnDownResponse {
+    pub sprint_id: String,
+    pub total_points: i32,
+    pub done_points: i32,
+    pub total_tickets: usize,
+    pub done_tickets: usize,
+    /// 0..100.
+    pub completion_pct: f32,
+}
+
+// ============================================================
+// Releases (milestones)
+// ============================================================
+
+/// How far a release is along.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct MilestoneProgress {
+    pub tickets: usize,
+    pub done: usize,
+    pub points: i64,
+    pub done_points: i64,
+}
+
+/// A release (Jira's version) with how far along it is.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct MilestoneResponse {
+    pub id: String,
+    pub project_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    /// `YYYY-MM-DD`, or `null` when no date is set.
+    pub due_date: Option<String>,
+    pub status: MilestoneStatus,
+    pub created_at: String,
+    pub updated_at: String,
+    pub progress: MilestoneProgress,
+}
+
+/// `POST /work/projects/:id/milestones`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct CreateMilestoneRequest {
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// `YYYY-MM-DD`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<String>,
+}
+
+/// `PATCH /work/milestones/:id`. An absent key leaves that part as it is;
+/// `null` clears it.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct UpdateMilestoneRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub description: Patch<String>,
+    /// `YYYY-MM-DD`, or `null` to clear.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub due_date: Patch<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, as = "Option<MilestoneStatus>")]
+    pub status: Option<String>,
+}
+
+// ============================================================
+// Labels
+// ============================================================
+
+/// The label routes answer without the `{ "data": … }` envelope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct LabelResponse {
+    pub id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub color: Option<String>,
+    pub created_at: String,
+}
+
+/// `POST /work/workspaces/:id/labels`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct CreateLabelRequest {
+    pub name: String,
+    /// `#RRGGBB`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+}
+
+/// Rename and/or recolour a label: `PATCH /work/labels/:id`. An absent key
+/// leaves that part as it is; `color: null` clears the colour back to the
+/// theme's default.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct UpdateLabelRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub name: Option<String>,
+    /// `#RRGGBB`, or `null` to clear.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub color: Patch<String>,
+}
+
+/// One label on one ticket.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct LabelAssignmentResponse {
+    pub ticket_id: String,
+    pub label_id: String,
+}
+
+/// Replace a ticket's labels: `POST /work/tickets/:id/labels/set`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct SetLabelsRequest {
+    pub label_ids: Vec<String>,
+    /// Ignored: the workspace is the ticket's own. Still accepted, because
+    /// clients sent it while the server trusted it for the activity scope.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+}
+
+// ============================================================
+// Work logs
+// ============================================================
+
+/// Time someone booked on a ticket.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct WorkLogResponse {
+    pub id: String,
+    pub ticket_id: String,
+    pub user_id: String,
+    pub minutes: i32,
+    /// RFC 3339: when the stretch of work began.
+    pub started_at: String,
+    pub note: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct WorkLogListResponse {
+    pub total_minutes: i64,
+    /// Newest first.
+    pub entries: Vec<WorkLogResponse>,
+}
+
+/// `POST /work/tickets/:id/worklogs`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct AddWorkLogRequest {
+    pub minutes: i32,
+    /// RFC 3339; defaults to the stretch that just ended.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub started_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+// ============================================================
+// Reports
+// ============================================================
+
+/// One day of a sprint's burndown.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export_to = "work/")]
+pub struct BurndownPointResponse {
+    /// `YYYY-MM-DD`
+    pub date: String,
+    /// Points still open at the end of the day; `null` for days still ahead.
+    pub remaining: Option<i64>,
+    /// The straight line from the sprint's scope to zero.
+    pub ideal: f64,
+}
+
+/// One completed sprint, for velocity.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct VelocityEntryResponse {
+    pub sprint_id: String,
+    pub name: String,
+    /// Points in the sprint when it closed; `null` if that was never
+    /// recorded.
+    pub committed: Option<i64>,
+    pub completed: i64,
+}
+
+/// One day of the project's flow.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct FlowPointResponse {
+    /// `YYYY-MM-DD`
+    pub date: String,
+    pub created: usize,
+    pub resolved: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct StatusShareResponse {
+    pub status: TicketStatus,
+    pub count: usize,
+    pub points: i64,
+}
+
+/// The sprint a report's burndown is drawn for.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct ReportSprintResponse {
+    pub id: String,
+    pub name: String,
+    /// `YYYY-MM-DD`
+    pub start_date: String,
+    /// `YYYY-MM-DD`
+    pub end_date: String,
+    pub status: SprintStatus,
+}
+
+/// Burndown, velocity and flow for a project.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export_to = "work/")]
+pub struct ProjectReportResponse {
+    /// The sprint the burndown is drawn for, or `null` when there is none.
+    pub sprint: Option<ReportSprintResponse>,
+    pub burndown: Vec<BurndownPointResponse>,
+    pub velocity: Vec<VelocityEntryResponse>,
+    /// The last 28 days, oldest first.
+    pub flow: Vec<FlowPointResponse>,
+    pub statuses: Vec<StatusShareResponse>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn create_ticket_carries_story_points() {
+        let body = json!({
+            "project_id": "p", "title": "t", "description": "", "priority": "low",
+            "story_points": 5
+        });
+        let req: CreateTicketRequest = serde_json::from_value(body.clone()).expect("create");
+        assert_eq!(req.story_points, Some(5));
+        // Forwarded as sent: no `null`s for the fields that were left out.
+        assert_eq!(serde_json::to_value(&req).expect("serialise"), body);
+    }
+
+    #[test]
+    fn requests_refuse_unknown_fields() {
+        assert!(serde_json::from_value::<CreateTicketRequest>(json!({
+            "project_id": "p", "title": "t", "description": "", "priority": "low",
+            "storypoints": 5
+        }))
+        .is_err());
+        assert!(
+            serde_json::from_value::<UpdateTicketRequest>(json!({ "sprint_id": "s" })).is_err()
+        );
+        assert!(serde_json::from_value::<BulkUpdateTicketsRequest>(json!({
+            "ticket_ids": [], "patch": { "titel": "x" }
+        }))
+        .is_err());
+    }
+
+    #[test]
+    fn update_ticket_tells_absent_from_null() {
+        let req: UpdateTicketRequest =
+            serde_json::from_value(json!({ "title": "x", "due_date": null })).expect("patch");
+        assert_eq!(req.due_date, Patch::Null);
+        assert_eq!(req.story_points, Patch::Absent);
+        assert_eq!(
+            serde_json::to_value(&req).expect("serialise"),
+            json!({ "title": "x", "due_date": null })
+        );
+    }
+
+    #[test]
+    fn move_accepts_a_negative_index() {
+        let req: MoveTicketRequest =
+            serde_json::from_value(json!({ "status": "open", "index": -1 })).expect("move");
+        assert_eq!(req.index, -1);
+    }
+
+    #[test]
+    fn enums_use_the_wire_spelling() {
+        assert_eq!(
+            serde_json::to_value(TicketStatus::InProgress).expect("status"),
+            json!("in_progress")
+        );
+        assert_eq!(
+            serde_json::to_value(ProjectHealth::AtRisk).expect("health"),
+            json!("at_risk")
+        );
+        assert_eq!(
+            serde_json::to_value(LinkRelation::DuplicatedBy).expect("relation"),
+            json!("duplicated_by")
+        );
+    }
+}

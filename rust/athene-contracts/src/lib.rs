@@ -9,6 +9,7 @@ pub mod common;
 pub mod dashboard;
 pub mod docs;
 pub mod field_definitions;
+pub mod patch;
 pub mod persistence;
 pub mod teams;
 pub mod ticket_types;
@@ -17,4 +18,5 @@ pub mod work;
 pub mod workspace;
 
 pub use common::{ApiError, ApiErrorCode, ApiErrorEnvelope, ApiResponse, ListMeta, ListResponse};
+pub use patch::Patch;
 pub use persistence::DbEnum;

@@ -11,14 +11,15 @@
 //! Types are listed here explicitly; their dependencies (e.g. the
 //! `RegistrationMode` of the settings) are exported with them. 64-bit
 //! integers become `number`: the counts and ids they carry stay far below
-//! 2^53, and the JSON on the wire is a plain number.
+//! 2^53, and the JSON on the wire is a plain number. A `Patch<T>` field
+//! becomes `key?: T | null` (see `athene_contracts::patch`).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use athene_contracts::admin;
+use athene_contracts::{admin, work};
 use ts_rs::{Config, TS};
 
 const REGENERATE_ENV: &str = "ATHENE_CONTRACTS_REGENERATE";
@@ -53,6 +54,75 @@ fn render(out: &Path) {
         admin::CacheRefreshResponse,
         admin::OverviewCounts,
         admin::OverviewResponse,
+        // work: vocabulary
+        work::TicketStatus,
+        work::TicketPriority,
+        work::ProjectHealth,
+        work::ProjectStatus,
+        work::SprintStatus,
+        work::MilestoneStatus,
+        work::LinkRelation,
+        work::InboxReason,
+        // work: query strings
+        work::ListTicketsQuery,
+        work::ListProjectsQuery,
+        work::PerUserListQuery,
+        work::WorkScopeQuery,
+        work::ProjectReportQuery,
+        // work: projects and tickets
+        work::ProjectResponse,
+        work::CreateProjectRequest,
+        work::UpdateProjectRequest,
+        work::UpdateCustomValuesRequest,
+        work::TicketResponse,
+        work::CreateTicketRequest,
+        work::UpdateTicketRequest,
+        work::BulkUpdateTicketsRequest,
+        work::BulkUpdateFailure,
+        work::BulkUpdateTicketsResponse,
+        work::DeletedTicketResponse,
+        work::UpdateTicketStatusRequest,
+        work::MoveTicketRequest,
+        work::AssignTicketRequest,
+        work::TriageTicketRequest,
+        work::WorkStatsResponse,
+        work::WorkActivityEntryResponse,
+        work::InboxEntryResponse,
+        // work: comments, links, watchers
+        work::TicketCommentResponse,
+        work::AddTicketCommentRequest,
+        work::TicketLinkResponse,
+        work::CreateTicketLinkRequest,
+        work::TicketLinkDeletedResponse,
+        work::TicketWatcherResponse,
+        work::TicketWatcherListResponse,
+        work::WatchStateResponse,
+        // work: sprints and releases
+        work::SprintResponse,
+        work::CreateSprintRequest,
+        work::UpdateSprintRequest,
+        work::CompleteSprintRequest,
+        work::AssignTicketsRequest,
+        work::SprintBurnDownResponse,
+        work::MilestoneProgress,
+        work::MilestoneResponse,
+        work::CreateMilestoneRequest,
+        work::UpdateMilestoneRequest,
+        // work: labels, work logs, reports
+        work::LabelResponse,
+        work::CreateLabelRequest,
+        work::UpdateLabelRequest,
+        work::LabelAssignmentResponse,
+        work::SetLabelsRequest,
+        work::WorkLogResponse,
+        work::WorkLogListResponse,
+        work::AddWorkLogRequest,
+        work::BurndownPointResponse,
+        work::VelocityEntryResponse,
+        work::FlowPointResponse,
+        work::StatusShareResponse,
+        work::ReportSprintResponse,
+        work::ProjectReportResponse,
     );
 }
 

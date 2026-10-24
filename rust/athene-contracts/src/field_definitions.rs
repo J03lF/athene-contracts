@@ -11,6 +11,8 @@ use serde_json::Value as JsonValue;
 use utoipa::ToSchema;
 use validator::Validate;
 
+use crate::Patch;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AppliesTo {
@@ -89,35 +91,34 @@ pub struct CreateFieldDefinitionRequest {
     pub placeholder: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, Validate)]
+/// `PATCH /field-definitions/:id`. An absent key leaves that part as it
+/// is; `null` clears it (for `ticket_type_keys`: back to every type).
+#[derive(Debug, Clone, Default, Deserialize, Serialize, ToSchema, Validate)]
 pub struct UpdateFieldDefinitionRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[validate(length(min = 1, max = 80))]
     pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<JsonValue>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub required: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position: Option<i32>,
-    /// `null` or empty = every type. (`Some(None)` = sent as null.)
-    #[serde(default, deserialize_with = "present")]
+    /// `null` or empty = every type.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<Vec<String>>)]
-    pub ticket_type_keys: Option<Option<Vec<String>>>,
-    #[serde(default, deserialize_with = "present")]
+    pub ticket_type_keys: Patch<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<Object>)]
-    pub default_value: Option<Option<JsonValue>>,
-    #[serde(default, deserialize_with = "present")]
+    pub default_value: Patch<JsonValue>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<String>)]
-    pub help_text: Option<Option<String>>,
+    pub help_text: Patch<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub show_on_card: Option<bool>,
-    #[serde(default, deserialize_with = "present")]
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<String>)]
-    pub placeholder: Option<Option<String>>,
-}
-
-fn present<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    Option::deserialize(deserializer).map(Some)
+    pub placeholder: Patch<String>,
 }
 
 /// Bulk-reorder definitions within a workspace + scope. Server applies the

@@ -1,692 +1,119 @@
-import type { ActivityAction } from './activity';
+/**
+ * Work wire types (`/work/*`): projects, tickets, comments, links,
+ * watchers, the inbox, sprints, releases, labels, work logs and reports.
+ *
+ * Generated from the Rust contracts in `rust/athene-contracts/src/work.rs`
+ * by ts-rs; do not add hand-written wire shapes here. After changing a Rust
+ * type, run `npm run generate` and commit `src/generated/`.
+ *
+ * A field that can be cleared by a PATCH is `key?: T | null`: omit the key
+ * to leave the value alone, send `null` to clear it (`Patch<T>` in Rust).
+ *
+ * Below the re-exports: client helper types (no wire type of their own) and
+ * the deprecated names older code still imports.
+ */
+export type { AddTicketCommentRequest } from '../generated/work/AddTicketCommentRequest';
+export type { AddWorkLogRequest } from '../generated/work/AddWorkLogRequest';
+export type { AssignTicketRequest } from '../generated/work/AssignTicketRequest';
+export type { AssignTicketsRequest } from '../generated/work/AssignTicketsRequest';
+export type { BulkUpdateFailure } from '../generated/work/BulkUpdateFailure';
+export type { BulkUpdateTicketsRequest } from '../generated/work/BulkUpdateTicketsRequest';
+export type { BulkUpdateTicketsResponse } from '../generated/work/BulkUpdateTicketsResponse';
+export type { BurndownPointResponse } from '../generated/work/BurndownPointResponse';
+export type { CompleteSprintRequest } from '../generated/work/CompleteSprintRequest';
+export type { CreateLabelRequest } from '../generated/work/CreateLabelRequest';
+export type { CreateMilestoneRequest } from '../generated/work/CreateMilestoneRequest';
+export type { CreateProjectRequest } from '../generated/work/CreateProjectRequest';
+export type { CreateSprintRequest } from '../generated/work/CreateSprintRequest';
+export type { CreateTicketLinkRequest } from '../generated/work/CreateTicketLinkRequest';
+export type { CreateTicketRequest } from '../generated/work/CreateTicketRequest';
+export type { DeletedTicketResponse } from '../generated/work/DeletedTicketResponse';
+export type { FlowPointResponse } from '../generated/work/FlowPointResponse';
+export type { InboxEntryResponse } from '../generated/work/InboxEntryResponse';
+export type { InboxReason } from '../generated/work/InboxReason';
+export type { LabelAssignmentResponse } from '../generated/work/LabelAssignmentResponse';
+export type { LabelResponse } from '../generated/work/LabelResponse';
+export type { LinkRelation } from '../generated/work/LinkRelation';
+export type { ListProjectsQuery } from '../generated/work/ListProjectsQuery';
+export type { ListTicketsQuery } from '../generated/work/ListTicketsQuery';
+export type { MilestoneProgress } from '../generated/work/MilestoneProgress';
+export type { MilestoneResponse } from '../generated/work/MilestoneResponse';
+export type { MilestoneStatus } from '../generated/work/MilestoneStatus';
+export type { MoveTicketRequest } from '../generated/work/MoveTicketRequest';
+export type { PerUserListQuery } from '../generated/work/PerUserListQuery';
+export type { ProjectHealth } from '../generated/work/ProjectHealth';
+export type { ProjectReportQuery } from '../generated/work/ProjectReportQuery';
+export type { ProjectReportResponse } from '../generated/work/ProjectReportResponse';
+export type { ProjectResponse } from '../generated/work/ProjectResponse';
+export type { ProjectStatus } from '../generated/work/ProjectStatus';
+export type { ReportSprintResponse } from '../generated/work/ReportSprintResponse';
+export type { SetLabelsRequest } from '../generated/work/SetLabelsRequest';
+export type { SprintBurnDownResponse } from '../generated/work/SprintBurnDownResponse';
+export type { SprintResponse } from '../generated/work/SprintResponse';
+export type { SprintStatus } from '../generated/work/SprintStatus';
+export type { StatusShareResponse } from '../generated/work/StatusShareResponse';
+export type { TicketCommentResponse } from '../generated/work/TicketCommentResponse';
+export type { TicketLinkDeletedResponse } from '../generated/work/TicketLinkDeletedResponse';
+export type { TicketLinkResponse } from '../generated/work/TicketLinkResponse';
+export type { TicketPriority } from '../generated/work/TicketPriority';
+export type { TicketResponse } from '../generated/work/TicketResponse';
+export type { TicketStatus } from '../generated/work/TicketStatus';
+export type { TicketWatcherListResponse } from '../generated/work/TicketWatcherListResponse';
+export type { TicketWatcherResponse } from '../generated/work/TicketWatcherResponse';
+export type { TriageTicketRequest } from '../generated/work/TriageTicketRequest';
+export type { UpdateCustomValuesRequest } from '../generated/work/UpdateCustomValuesRequest';
+export type { UpdateLabelRequest } from '../generated/work/UpdateLabelRequest';
+export type { UpdateMilestoneRequest } from '../generated/work/UpdateMilestoneRequest';
+export type { UpdateProjectRequest } from '../generated/work/UpdateProjectRequest';
+export type { UpdateSprintRequest } from '../generated/work/UpdateSprintRequest';
+export type { UpdateTicketRequest } from '../generated/work/UpdateTicketRequest';
+export type { UpdateTicketStatusRequest } from '../generated/work/UpdateTicketStatusRequest';
+export type { VelocityEntryResponse } from '../generated/work/VelocityEntryResponse';
+export type { WatchStateResponse } from '../generated/work/WatchStateResponse';
+export type { WorkActivityEntryResponse } from '../generated/work/WorkActivityEntryResponse';
+export type { WorkLogListResponse } from '../generated/work/WorkLogListResponse';
+export type { WorkLogResponse } from '../generated/work/WorkLogResponse';
+export type { WorkScopeQuery } from '../generated/work/WorkScopeQuery';
+export type { WorkStatsResponse } from '../generated/work/WorkStatsResponse';
 
-export interface WorkspaceStats {
-  open_tickets: number;
-  in_progress_tickets: number;
-  total_projects: number;
-}
+import type { TicketResponse } from '../generated/work/TicketResponse';
+import type { SprintResponse } from '../generated/work/SprintResponse';
+import type { UpdateCustomValuesRequest } from '../generated/work/UpdateCustomValuesRequest';
+import type { WorkActivityEntryResponse } from '../generated/work/WorkActivityEntryResponse';
+import type { WorkStatsResponse } from '../generated/work/WorkStatsResponse';
 
-export interface ActivityEntry {
-  actor_initials: string;
-  actor_name: string | null;
-  action: string;
-  action_label: string;
-  resource_type: string;
-  resource_id: string | null;
-  details: Record<string, unknown> | null;
-  created_at: string;
-}
-
-export interface MyTicketEntry {
-  id: string;
-  project_id: string;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
-  assignee_id: string | null;
-  reporter_id: string;
-  sla_policy_id: string | null;
-  triage_category: string | null;
-  triage_reason: string | null;
-  triaged_at: string | null;
-  first_response_at: string | null;
-  resolved_at: string | null;
-  sla_breached: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-// Full ticket response shape returned by `GET /work/tickets`, `POST /work/tickets`,
-// and the status/assign mutations. Mirrors `athene::transport::http::handlers::work::TicketDto`.
-export type TicketStatus =
-  | 'open'
-  | 'in_progress'
-  | 'in_review'
-  | 'blocked'
-  | 'done'
-  | 'closed';
-
-export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
+// ---------- Client helpers ----------
 
 /** The five types every workspace starts with. */
 export type BuiltInTicketType = 'task' | 'bug' | 'feature' | 'support' | 'epic';
 /**
  * A ticket type key. Workspaces configure their own types (see
  * `TicketTypeResponse`); the built-in keys are listed for convenience, any
- * other key of the workspace is valid too.
+ * other key of the workspace is valid too. On the wire it is a plain
+ * string (`TicketResponse.ticket_type`).
  */
 export type TicketType = BuiltInTicketType | (string & {});
 
-export interface TicketResponse {
-  id: string;
-  project_id: string;
-  /**
-   * Per-project monotonic counter. Combined with the project's `key` it
-   * produces the human-readable ticket key (e.g. `WEB-128`). Backfilled
-   * for legacy tickets by migration 0007.
-   */
-  sequence: number;
-  title: string;
-  description: string;
-  ticket_type: TicketType;
-  status: TicketStatus;
-  priority: TicketPriority;
-  assignee_id: string | null;
-  reporter_id: string;
-  sla_policy_id: string | null;
-  /**
-   * Set when this ticket is a subtask. The subtask tree is built from this
-   * field, not from the link table, so a subtask has exactly one parent by
-   * construction and the server rejects cycles.
-   */
-  parent_ticket_id: string | null;
-  sprint_id: string | null;
-  milestone_id: string | null;
-  /** Planning estimate, 0..1000. */
-  story_points: number | null;
-  triage_category: string | null;
-  triage_reason: string | null;
-  triaged_at: string | null;
-  first_response_at: string | null;
-  resolved_at: string | null;
-  due_date: string | null;
-  sla_breached: boolean;
-  /**
-   * Custom field values keyed by `FieldDefinition.key`. Server-validated
-   * against the workspace's definitions before persistence; unknown keys
-   * are dropped server-side. Always a plain object — `{}` when empty.
-   */
-  custom_values: Record<string, unknown>;
-  /**
-   * Position within the board column, ordered inside (project, status).
-   * `null` for tickets written before ranking existed — sort a column by
-   * this value and place the nulls last, newest first.
-   */
-  board_rank: number | null;
-  created_at: string;
-  updated_at: string;
-}
-
 /**
- * Why an inbox entry reached the reader.
- *
- * Ordered by how directly it concerns them: when several apply the strongest
- * wins, because "assigned to you" explains an entry better than "you watch
- * this" even when both are true.
+ * What `WorkApiClient.updateSprint` returns. The server answers the sprint
+ * in `data` and `moved_tickets` beside it in the envelope; the client folds
+ * both into this.
  */
-export type InboxReason = 'assigned' | 'reported' | 'watching' | 'mentioned';
-
-/**
- * One inbox entry: something that happened, on a ticket the reader is
- * involved in.
- *
- * Shaped like an activity event with the ticket attached, so the same
- * renderer serves both surfaces. The reader's own actions are never
- * included — an inbox full of what you just did buries what somebody else
- * did.
- */
-export interface InboxEntryResponse {
-  /** The activity event's id. */
-  id: string;
-  actor_id: string | null;
-  /**
-   * Display name of the actor, resolved by the server. `null` for system
-   * events and deleted accounts; absent from servers that predate it.
-   */
-  actor_name?: string | null;
-  action: ActivityAction;
-  detail: string | null;
-  metadata: Record<string, unknown> | null;
-  /** RFC3339. */
-  created_at: string;
-  reason: InboxReason;
-  ticket: TicketResponse;
-}
-
-export interface TicketCommentResponse {
-  id: string;
-  ticket_id: string;
-  author_id: string;
-  body: string;
-  /** RFC3339 timestamp. */
-  created_at: string;
-  /** RFC3339; when the author last changed the text, absent if never. */
-  edited_at?: string | null;
-}
-
-export interface AddTicketCommentRequest {
-  body: string;
-}
-
-export interface ListTicketsQuery {
-  project_id?: string;
-  /**
-   * Only this workspace's tickets (403 for a non-member). Project and ticket
-   * keys are unique per workspace only, so a client showing one workspace
-   * should pass it — otherwise two tenants' `WR-1` can sit side by side.
-   */
-  workspace_id?: string;
-}
-
-/**
- * Triage a ticket. Allowed to any member of its workspace except guests
- * (platform operators who are members too).
- */
-export interface TriageTicketRequest {
-  category?: string | null;
-  reason?: string | null;
-  priority?: TicketPriority;
-  sla_policy_id?: string | null;
-}
-
-/** For the per-user lists (inbox, activity). */
-export interface PerUserListQuery {
-  limit?: number;
-  /** Only this workspace (403 for a non-member). */
-  workspace_id?: string;
-}
-
-/** One entry of `GET /work/activity`. */
-export interface WorkActivityEntryResponse {
-  actor_initials: string;
-  actor_name: string | null;
-  action: string;
-  action_label: string;
-  resource_type: string;
-  resource_id: string | null;
-  details: unknown | null;
-  created_at: string;
-}
-
-export interface ListProjectsQuery {
-  /** Only this workspace's projects (403 for a non-member). */
-  workspace_id?: string;
-}
-
-export interface CreateTicketRequest {
-  project_id: string;
-  title: string;
-  description: string;
-  priority: string;
-  /**
-   * A live ticket-type key of the project's workspace. Absent = the
-   * workspace's default type. Required custom fields and defaults follow it.
-   */
-  ticket_type?: TicketType;
-  assignee_id?: string | null;
-  sla_policy_id?: string | null;
-  /** RFC3339 timestamp. */
-  due_date?: string | null;
-  /**
-   * Makes the new ticket a subtask of this one, in the same request — so a
-   * subtask is never briefly a top-level ticket. The parent must exist.
-   */
-  parent_ticket_id?: string | null;
-  /**
-   * Custom field values keyed by `FieldDefinition.key`. Optional — defaults
-   * to `{}`. Server validates against the project's workspace definitions
-   * and returns 400 for type mismatches or missing required fields.
-   */
-  custom_values?: Record<string, unknown>;
-}
-
-export interface UpdateTicketStatusRequest {
-  status: string;
-}
-
-/**
- * Content patch for a ticket: `PATCH /work/tickets/:id`.
- *
- * Only the keys present in the request are touched. For the nullable fields
- * that matters twice over: **omit** a key to leave it alone, send `null` to
- * clear it. Sending `{ title }` alone will not wipe the due date; sending
- * `{ due_date: null }` will.
- *
- * Status and assignee are deliberately absent — they have their own
- * endpoints because they carry workflow side effects (SLA stamps,
- * notifications) that a content edit should not trigger.
- */
-export interface UpdateTicketRequest {
-  title?: string;
-  description?: string;
-  ticket_type?: TicketType;
-  priority?: TicketPriority;
-  /** RFC3339 timestamp, or `null` to clear. */
-  due_date?: string | null;
-  story_points?: number | null;
-  parent_ticket_id?: string | null;
-  /** The release the ticket ships in; `null` takes it out of any. */
-  milestone_id?: string | null;
-}
-
-/**
- * One patch applied to a selection of tickets.
- *
- * The same patch shape as a single edit, so a field the one accepts cannot
- * quietly be ignored by the other.
- */
-export interface BulkUpdateTicketsRequest {
-  ticket_ids: string[];
-  patch: UpdateTicketRequest;
-  /**
-   * Taken apart from the patch, and applied through the status endpoint's
-   * own path: a status change stamps SLA timers and clears a resolution
-   * date, and writing it as a plain field would skip all of that.
-   */
-  status?: TicketStatus;
-}
-
-/** Why one ticket in a bulk edit did not move. */
-export interface BulkUpdateFailure {
-  ticket_id: string;
-  message: string;
-}
-
-/**
- * What a bulk edit did, per ticket.
- *
- * Deliberately not all-or-nothing: a selection of fifty where one has been
- * deleted under the user moves the other forty-nine and names the one that
- * did not. Both halves matter — `updated` replaces what the client holds,
- * `failed` is what to tell the user about.
- */
-export interface BulkUpdateTicketsResponse {
-  updated: TicketResponse[];
-  failed: BulkUpdateFailure[];
-}
-
-export interface MoveTicketRequest {
-  /** Target column. Same vocabulary as `UpdateTicketStatusRequest.status`. */
-  status: string;
-  /**
-   * Zero-based position within the target column, counted after the ticket
-   * has been removed from wherever it was. Clamped server-side, so a stale
-   * view lands the card at an end instead of failing.
-   */
-  index: number;
-}
-
-export interface UpdateTicketCustomValuesRequest {
-  /** Replace the ticket's custom_values bucket wholesale. Server validates
-   *  the shape against the workspace's field definitions before saving. */
-  custom_values: Record<string, unknown>;
-}
-
-export interface UpdateProjectCustomValuesRequest {
-  /** Replace the project's custom_values bucket wholesale. Validated
-   *  against the workspace's `applies_to = project` definitions. */
-  custom_values: Record<string, unknown>;
-}
-
-export interface AssignTicketRequest {
-  assignee_id: string | null;
-}
-
-export type ProjectHealth = 'on_track' | 'at_risk' | 'blocked';
-export type ProjectStatus = 'active' | 'archived';
-
-export interface ProjectResponse {
-  id: string;
-  /**
-   * The workspace the project belongs to. `null` for projects created before
-   * projects carried a workspace — those are invisible to workspace-scoped
-   * features (the activity feed, custom field definitions).
-   */
-  workspace_id: string | null;
-  key: string;
-  name: string;
-  description: string | null;
-  /** Hex color `#RRGGBB`. When null the frontend derives a stable colour from the key. */
-  color: string | null;
-  health: string;
-  /** 0..1 — completion ratio, manually set or derived from tickets. */
-  progress: number;
-  lead_id: string | null;
-  /**
-   * Who created the project. With the lead and the workspace's managers,
-   * the people who may edit its settings and overview. `null` for older
-   * projects whose creator the audit trail no longer records.
-   */
-  created_by: string | null;
-  status: string;
-  /**
-   * Values for the workspace's `applies_to = project` field definitions,
-   * keyed by each definition's stable `key`. Always an object; `{}` when
-   * the workspace defines no project fields.
-   */
-  custom_values: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateProjectRequest {
-  key: string;
-  name: string;
-  /**
-   * Always send this. A project without a workspace records no activity and
-   * gets none of the workspace's custom fields; the field is optional only so
-   * older clients keep compiling.
-   */
-  workspace_id?: string | null;
-  description?: string | null;
-  /** Optional hex color `#RRGGBB` — overrides the deterministic palette. */
-  color?: string | null;
-}
-
-/**
- * A patch for a project.
- *
- * Every field is optional and only the ones present are applied, so a patch
- * that mentions nothing is rejected rather than treated as "clear
- * everything". `key` is not editable: it prefixes every ticket ever raised
- * in the project.
- */
-export interface UpdateProjectRequest {
-  name?: string;
-  /** `null` clears the description. */
-  description?: string | null;
-  /** `#RRGGBB`, or `null` to fall back to the derived palette colour. */
-  color?: string | null;
-  health?: ProjectHealth;
-  status?: ProjectStatus;
-  /** `null` leaves the project without a lead. */
-  lead_id?: string | null;
-}
-
-export interface UpcomingEntry {
-  type: 'ticket' | 'milestone';
-  id: string;
-  title: string;
-  due_date: string;
-  project_key?: string;
-}
-
-export interface DashboardWidgetLayout {
-  widget_id: string;
-  x: number;
-  y: number;
-  cols: number;
-  rows: number;
-  visible: boolean;
-}
-
-// ============================================================
-// Design extensions: Sprints, Labels, TicketLinks, Watchers
-// (synced with rust crate `work.rs`)
-// ============================================================
-
-export type SprintStatus = 'upcoming' | 'active' | 'completed';
-
-export interface SprintResponse {
-  id: string;
-  project_id: string;
-  name: string;
-  goal: string | null;
-  /** ISO date (YYYY-MM-DD) */
-  start_date: string;
-  end_date: string;
-  goal_points: number | null;
-  status: SprintStatus;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateSprintRequest {
-  name: string;
-  goal?: string | null;
-  start_date: string;
-  end_date: string;
-  goal_points?: number | null;
-}
-
-/**
- * Move a sprint's dates. Tickets without an own due date follow the end by
- * themselves (their deadline is the sprint's end, derived, never stored);
- * `move_due_ticket_ids` names tickets of this sprint whose own due date
- * moves by as many days as the end does ("Mitverschieben").
- */
-export interface UpdateSprintRequest {
-  start_date?: string;
-  end_date?: string;
-  move_due_ticket_ids?: string[];
-}
-
 export interface UpdateSprintResponse {
   sprint: SprintResponse;
   /** Tickets whose own due date moved with the end. */
   moved_tickets: number;
 }
 
-/** What a ticket delete took with it. */
-export interface DeletedTicketResponse {
-  id: string;
-  /** Subtasks removed along with the ticket, at any depth. */
-  subtasks: number;
-}
+// ---------- Deprecated names ----------
 
-export interface AssignTicketsRequest {
-  ticket_ids: string[];
-}
-
-/**
- * Where a completed sprint's unfinished tickets go: another sprint of the
- * same project that is not completed, or — absent or `null` — the backlog.
- */
-export interface CompleteSprintRequest {
-  move_open_to?: string | null;
-}
-
-export interface SprintBurnDownResponse {
-  sprint_id: string;
-  total_points: number;
-  done_points: number;
-  total_tickets: number;
-  done_tickets: number;
-  completion_pct: number;
-}
-
-export interface LabelResponse {
-  id: string;
-  workspace_id: string;
-  name: string;
-  color: string | null;
-  created_at: string;
-}
-
-export interface CreateLabelRequest {
-  name: string;
-  /** `#RRGGBB` */
-  color?: string | null;
-}
-
-/**
- * Rename and/or recolour a label. An absent key leaves that part as it is;
- * `color: null` clears the colour back to the theme's default.
- */
-export interface UpdateLabelRequest {
-  name?: string;
-  /** `#RRGGBB`, or `null` to clear. */
-  color?: string | null;
-}
-
-/** One label on one ticket. */
-export interface LabelAssignmentResponse {
-  ticket_id: string;
-  label_id: string;
-}
-
-export interface SetLabelsRequest {
-  label_ids: string[];
-  workspace_id?: string | null;
-}
-
-export type LinkRelation =
-  | 'blocks'
-  | 'blocked_by'
-  | 'related'
-  | 'duplicates'
-  | 'duplicated_by'
-  | 'child_of'
-  | 'parent_of';
-
-/**
- * One link on a ticket, with the ticket on the other end already resolved.
- *
- * `relation` reads from the perspective of the ticket that was asked about:
- * `blocks` means *this* ticket blocks `ticket`. The server writes the
- * symmetric counterpart too, so the other ticket shows the inverse without a
- * second request.
- *
- * Parent/child hierarchy does **not** come through here — it lives on
- * `TicketResponse.parent_ticket_id`.
- */
-export interface TicketLinkResponse {
-  relation: LinkRelation;
-  ticket: TicketResponse;
-  created_at: string;
-  created_by: string | null;
-}
-
-export interface CreateTicketLinkRequest {
-  to_ticket_id: string;
-  relation: LinkRelation;
-}
-
-export interface TicketWatcherResponse {
-  user_id: string;
-  /** `null` when the user record is gone; fall back to the id. */
-  display_name: string | null;
-  email: string | null;
-  added_at: string;
-}
-
-/**
- * The watcher list plus whether the caller is on it, so the list and the
- * watch toggle come from one request instead of two.
- */
-export interface TicketWatcherListResponse {
-  watchers: TicketWatcherResponse[];
-  watching: boolean;
-}
-
-/** Response of the watch / unwatch toggle. */
-export interface WatchStateResponse {
-  watching: boolean;
-}
-
-// ---------- Reports ----------
-
-/** One day of a sprint's burndown. */
-export interface BurndownPointResponse {
-  /** `YYYY-MM-DD` */
-  date: string;
-  /** Points still open at the end of the day; `null` for days still ahead. */
-  remaining: number | null;
-  /** The straight line from the sprint's scope to zero. */
-  ideal: number;
-}
-
-/** One completed sprint, for velocity. */
-export interface VelocityEntryResponse {
-  sprint_id: string;
-  name: string;
-  /** Points in the sprint when it closed; `null` if that was never recorded. */
-  committed: number | null;
-  completed: number;
-}
-
-/** One day of the project's flow. */
-export interface FlowPointResponse {
-  /** `YYYY-MM-DD` */
-  date: string;
-  created: number;
-  resolved: number;
-}
-
-export interface StatusShareResponse {
-  status: TicketStatus;
-  count: number;
-  points: number;
-}
-
-export interface ProjectReportResponse {
-  /** The sprint the burndown is drawn for, or `null` when there is none. */
-  sprint: {
-    id: string;
-    name: string;
-    start_date: string;
-    end_date: string;
-    status: SprintStatus;
-  } | null;
-  burndown: BurndownPointResponse[];
-  velocity: VelocityEntryResponse[];
-  /** The last 28 days, oldest first. */
-  flow: FlowPointResponse[];
-  statuses: StatusShareResponse[];
-}
-
-// ---------- Releases (milestones) ----------
-
-export type MilestoneStatus = 'open' | 'released';
-
-/** A release — Jira's version — with how far along it is. */
-export interface MilestoneResponse {
-  id: string;
-  project_id: string;
-  title: string;
-  description: string | null;
-  /** `YYYY-MM-DD`, or `null` when no date is set. */
-  due_date: string | null;
-  status: MilestoneStatus;
-  created_at: string;
-  updated_at: string;
-  progress: {
-    tickets: number;
-    done: number;
-    points: number;
-    done_points: number;
-  };
-}
-
-export interface CreateMilestoneRequest {
-  title: string;
-  description?: string | null;
-  /** `YYYY-MM-DD` */
-  due_date?: string | null;
-}
-
-/** An absent key leaves that part as it is; `null` clears it. */
-export interface UpdateMilestoneRequest {
-  title?: string;
-  description?: string | null;
-  due_date?: string | null;
-  status?: MilestoneStatus;
-}
-
-// ---------- Work logs ----------
-
-/** Time someone booked on a ticket. */
-export interface WorkLogResponse {
-  id: string;
-  ticket_id: string;
-  user_id: string;
-  minutes: number;
-  /** RFC3339 — when the stretch of work began. */
-  started_at: string;
-  note: string | null;
-  created_at: string;
-}
-
-export interface WorkLogListResponse {
-  total_minutes: number;
-  /** Newest first. */
-  entries: WorkLogResponse[];
-}
-
-export interface AddWorkLogRequest {
-  minutes: number;
-  /** RFC3339; defaults to the stretch that just ended. */
-  started_at?: string;
-  note?: string | null;
-}
+/** @deprecated `GET /work/my-tickets` returns full tickets: use `TicketResponse`. */
+export type MyTicketEntry = TicketResponse;
+/** @deprecated Use `WorkActivityEntryResponse`. */
+export type ActivityEntry = WorkActivityEntryResponse;
+/** @deprecated Use `WorkStatsResponse`. */
+export type WorkspaceStats = WorkStatsResponse;
+/** @deprecated Use `UpdateCustomValuesRequest`. */
+export type UpdateTicketCustomValuesRequest = UpdateCustomValuesRequest;
+/** @deprecated Use `UpdateCustomValuesRequest`. */
+export type UpdateProjectCustomValuesRequest = UpdateCustomValuesRequest;
