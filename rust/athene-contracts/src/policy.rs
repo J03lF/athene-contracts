@@ -39,7 +39,7 @@ use crate::workspace::WorkspaceMemberRole;
 
 /// The rules' revision. Bumped whenever a verdict in the matrix changes
 /// (`tests/policy_matrix.rs` keeps the history).
-pub const POLICY_REVISION: u32 = 1;
+pub const POLICY_REVISION: u32 = 2;
 
 /// The most an open link may grant (J6). Admins and owners are invited by
 /// email only: a forwarded link must not hand out the workspace.
@@ -134,6 +134,10 @@ pub enum Action {
     /// Edit or delete other people's time entries.
     #[serde(rename = "time.moderate")]
     TimeModerate,
+    /// Have a draft checked and record what one did with the suggestions
+    /// (ticket check, revision 2).
+    #[serde(rename = "ticket.check")]
+    TicketCheck,
 }
 
 /// Whether an action changes something. Platform guests do no `Write`
@@ -176,7 +180,7 @@ pub enum Fact {
 
 impl Action {
     /// Every action, in wire order.
-    pub const ALL: [Action; 31] = [
+    pub const ALL: [Action; 32] = [
         Action::AdminAccess,
         Action::WorkspaceCreate,
         Action::SlaRead,
@@ -208,6 +212,7 @@ impl Action {
         Action::TimeLog,
         Action::TimeDelete,
         Action::TimeModerate,
+        Action::TicketCheck,
     ];
 
     /// The wire name (`ticket.edit`), the same string serde writes.
@@ -244,6 +249,7 @@ impl Action {
             Action::TimeLog => "time.log",
             Action::TimeDelete => "time.delete",
             Action::TimeModerate => "time.moderate",
+            Action::TicketCheck => "ticket.check",
         }
     }
 
@@ -480,6 +486,7 @@ fn in_workspace(subject: &Subject, standing: Standing, action: Action, facts: &F
         | Action::ProjectCreate
         | Action::TicketCreate
         | Action::TicketEdit
+        | Action::TicketCheck
         | Action::TimeLog => contributor,
         // Deleting has no undo: managers anything, contributors their own.
         Action::DocDelete | Action::ProjectEdit | Action::TicketDelete | Action::TimeDelete => {
@@ -842,7 +849,7 @@ mod tests {
                 serde_json::from_value(serde_json::json!(action.as_str())).expect("parse");
             assert_eq!(back, action);
         }
-        assert_eq!(seen.len(), 31);
+        assert_eq!(seen.len(), 32);
     }
 
     #[test]

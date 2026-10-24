@@ -117,6 +117,19 @@ pub struct WorkspaceSettings {
     /// Monday to Friday.
     #[serde(default)]
     pub work_days: Option<Vec<u8>>,
+    /// The ticket check for this workspace (`null` = on). Off: nothing is
+    /// computed, learned or stored here (`ticket_check`).
+    #[serde(default)]
+    pub ticket_check_enabled: Option<bool>,
+    /// "Ähnliche Tickets" while writing (`null` = on).
+    #[serde(default)]
+    pub ticket_check_duplicates: Option<bool>,
+    /// Quality hints while writing (`null` = on).
+    #[serde(default)]
+    pub ticket_check_quality: Option<bool>,
+    /// The secret warning before saving (`null` = on).
+    #[serde(default)]
+    pub ticket_check_secrets: Option<bool>,
 }
 
 /// The settings part of a workspace patch, merged key by key: a value sets
@@ -152,6 +165,18 @@ pub struct WorkspaceSettingsPatch {
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<Vec<u8>>)]
     pub work_days: Patch<Vec<u8>>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<bool>)]
+    pub ticket_check_enabled: Patch<bool>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<bool>)]
+    pub ticket_check_duplicates: Patch<bool>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<bool>)]
+    pub ticket_check_quality: Patch<bool>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<bool>)]
+    pub ticket_check_secrets: Patch<bool>,
 }
 
 /// `PATCH /workspaces/:id`: owners and admins (403 otherwise). An absent

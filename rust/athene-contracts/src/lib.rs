@@ -15,6 +15,7 @@ pub mod persistence;
 pub mod policy;
 pub mod search;
 pub mod teams;
+pub mod ticket_check;
 pub mod ticket_types;
 pub mod user;
 pub mod work;

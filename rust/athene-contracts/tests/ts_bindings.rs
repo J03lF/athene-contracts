@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 
 use athene_contracts::{
     activity, admin, auth, common, dashboard, docs, edit, field_definitions, policy, search, teams,
-    ticket_types, user, work, workspace,
+    ticket_check, ticket_types, user, work, workspace,
 };
 use ts_rs::{Config, TS};
 
@@ -243,6 +243,26 @@ fn render(out: &Path) {
         search::FacetCount,
         search::TicketSearchFacets,
         search::TicketSearchResponse,
+        // ticket check (intel R1)
+        ticket_check::TicketCheckFeature,
+        ticket_check::SwitchLevel,
+        ticket_check::QualityRule,
+        ticket_check::HintSeverity,
+        ticket_check::SecretKind,
+        ticket_check::FixAction,
+        ticket_check::CheckField,
+        ticket_check::ReasonCode,
+        ticket_check::Strength,
+        ticket_check::ScoreBand,
+        ticket_check::SuggestionKind,
+        ticket_check::AbstainReason,
+        ticket_check::Verdict,
+        ticket_check::TicketCheckRequest,
+        ticket_check::TicketCheckResponse,
+        ticket_check::RecordDecisionsRequest,
+        ticket_check::RecordDecisionsResponse,
+        ticket_check::DeleteIntelDataResponse,
+        ticket_check::FeatureDisabledDetails,
     );
     // The verdicts the web's local rules are tested against (3.12).
     let matrix = policy::matrix::to_json(&policy::matrix::build()).expect("policy matrix");

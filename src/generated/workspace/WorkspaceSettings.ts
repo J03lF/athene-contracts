@@ -29,4 +29,21 @@ work_day_end: string | null,
  * ISO weekdays 1 (Mon) – 7 (Sun), ascending, non-empty; `null` =
  * Monday to Friday.
  */
-work_days: Array<number> | null, };
+work_days: Array<number> | null, 
+/**
+ * The ticket check for this workspace (`null` = on). Off: nothing is
+ * computed, learned or stored here (`ticket_check`).
+ */
+ticket_check_enabled: boolean | null, 
+/**
+ * "Ähnliche Tickets" while writing (`null` = on).
+ */
+ticket_check_duplicates: boolean | null, 
+/**
+ * Quality hints while writing (`null` = on).
+ */
+ticket_check_quality: boolean | null, 
+/**
+ * The secret warning before saving (`null` = on).
+ */
+ticket_check_secrets: boolean | null, };

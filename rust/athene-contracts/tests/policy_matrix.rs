@@ -17,7 +17,7 @@ use athene_contracts::workspace::WorkspaceMemberRole as R;
 /// Every revision of the rules with the fingerprint of its matrix
 /// (`matrix::digest`). Changing a verdict: append `(POLICY_REVISION + 1,
 /// "<new digest>")` and bump `POLICY_REVISION` in `src/policy.rs`.
-const RECORDED: &[(u32, &str)] = &[(1, "61b199d11696ad0c")];
+const RECORDED: &[(u32, &str)] = &[(1, "61b199d11696ad0c"), (2, "aaa9fb11da7f0950")];
 
 /// Subjects, in the table's column order.
 const COLUMNS: [&str; 10] = ["O", "A", "M", "G", "OpM", "AdM", "AdG", "OpG", "PgM", "X"];
@@ -64,6 +64,7 @@ const TABLE: &[(Action, [Cell; 10])] = &[
     (Action::ProjectCreate,        [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   N]),
     (Action::TicketCreate,         [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   N]),
     (Action::TicketEdit,           [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   N]),
+    (Action::TicketCheck,          [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   N]),
     (Action::TimeLog,              [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   N]),
     (Action::DocWrite,             [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   N]),
     (Action::ProjectEdit,          [Y,   Y,   Own, N,   Y,   Y,   N,   N,   N,   N]),
