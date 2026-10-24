@@ -45,8 +45,9 @@ check_sibling CONTRACTS_SHA ../../athene-contracts
 for gate in "${gates[@]}"; do
   case $gate in
     fmt)    run_gate fmt cargo fmt --all --check ;;
-    clippy) run_gate clippy cargo clippy --all-targets --locked -- -D warnings ;;
-    test)   run_gate test cargo test --all-targets --locked ;;
+    # --all-features: the service kit's axum/otel code is feature-gated.
+    clippy) run_gate clippy cargo clippy --all-targets --all-features --locked -- -D warnings ;;
+    test)   run_gate test cargo test --all-targets --all-features --locked ;;
     deny)
       deny_bin=${CARGO_DENY:-$(command -v cargo-deny || true)}
       if [ -z "$deny_bin" ]; then

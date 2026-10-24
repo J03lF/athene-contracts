@@ -33,8 +33,20 @@ allow = [
     "Apache-2.0",
     "Unicode-3.0",
     "Zlib",
+    # Since the service kit (step 3.6): subtle, encoding_rs and matchit
+    # (BSD-3-Clause), ring/untrusted/rustls-webpki (ISC) — the same
+    # allowances the module repos have carried since step 1.1.
+    "BSD-3-Clause",
+    "ISC",
 ]
 confidence-threshold = 0.93
+
+# webpki-roots 1.x ships Mozilla's root CA list under CDLA-Permissive-2.0, a
+# permissive data license. It arrives with reqwest 0.12 (`rustls-tls`) in the
+# service kit; the exception is scoped to that one crate, as in the modules.
+[[licenses.exceptions]]
+crate = "webpki-roots"
+allow = ["CDLA-Permissive-2.0"]
 
 [licenses.private]
 # Our own crates are not published and carry no license field.

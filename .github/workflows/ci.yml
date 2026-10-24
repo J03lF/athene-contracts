@@ -39,10 +39,11 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Format
         run: cargo fmt --all --check
+      # --all-features: the service kit's axum/otel code is feature-gated.
       - name: Clippy
-        run: cargo clippy --all-targets --locked -- -D warnings
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
       - name: Test
-        run: cargo test --all-targets --locked
+        run: cargo test --all-targets --all-features --locked
 
   deny:
     name: cargo-deny
