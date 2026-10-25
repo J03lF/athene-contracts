@@ -5,6 +5,7 @@
 pub mod activity;
 pub mod admin;
 pub mod auth;
+pub mod calendar;
 pub mod common;
 pub mod dashboard;
 pub mod docs;

@@ -21,6 +21,7 @@ const RECORDED: &[(u32, &str)] = &[
     (1, "61b199d11696ad0c"),
     (2, "aaa9fb11da7f0950"),
     (3, "db757b6523ad1ec2"),
+    (4, "18c7f2144c23bb8d"),
 ];
 
 /// Subjects, in the table's column order.
@@ -77,6 +78,11 @@ const TABLE: &[(Action, [Cell; 10])] = &[
     (Action::TicketDelete,         [Y,   Y,   Own, N,   Y,   Y,   N,   N,   N,   N]),
     (Action::TimeDelete,           [Y,   Y,   Own, N,   Y,   Y,   N,   N,   N,   N]),
     (Action::DocDelete,            [Y,   Y,   Own, N,   Y,   Y,   N,   N,   N,   N]),
+    // UX9: events ("Termine"). Members create and edit, guests read; the
+    // creator or a manager deletes.
+    (Action::EventCreate,          [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   N]),
+    (Action::EventEdit,            [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   N]),
+    (Action::EventDelete,          [Y,   Y,   Own, N,   Y,   Y,   N,   N,   N,   N]),
     (Action::TicketWatch,          [Y,   Y,   Y,   Y,   Y,   Y,   Y,   Y,   N,   N]),
     (Action::CommentCreate,        [Y,   Y,   Y,   Y,   Y,   Y,   Y,   Y,   N,   N]),
     (Action::CommentEdit,          [Own, Own, Own, Own, Own, Own, Own, Own, N,   N]),

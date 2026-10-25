@@ -39,7 +39,7 @@ use crate::workspace::WorkspaceMemberRole;
 
 /// The rules' revision. Bumped whenever a verdict in the matrix changes
 /// (`tests/policy_matrix.rs` keeps the history).
-pub const POLICY_REVISION: u32 = 3;
+pub const POLICY_REVISION: u32 = 4;
 
 /// The most an open link may grant (J6). Admins and owners are invited by
 /// email only: a forwarded link must not hand out the workspace.
@@ -143,6 +143,15 @@ pub enum Action {
     /// (ticket check, revision 2).
     #[serde(rename = "ticket.check")]
     TicketCheck,
+    /// Put an event ("Termin") into the workspace's calendar (UX9).
+    #[serde(rename = "event.create")]
+    EventCreate,
+    /// Change an event: title, time, description, participants, links.
+    #[serde(rename = "event.edit")]
+    EventEdit,
+    /// Facts: `owns` (the creator).
+    #[serde(rename = "event.delete")]
+    EventDelete,
 }
 
 /// Whether an action changes something. Platform guests do no `Write`
@@ -188,7 +197,7 @@ pub enum Fact {
 
 impl Action {
     /// Every action, in wire order.
-    pub const ALL: [Action; 33] = [
+    pub const ALL: [Action; 36] = [
         Action::AdminAccess,
         Action::WorkspaceCreate,
         Action::SlaRead,
@@ -222,6 +231,9 @@ impl Action {
         Action::TimeModerate,
         Action::TicketCheck,
         Action::TicketPlan,
+        Action::EventCreate,
+        Action::EventEdit,
+        Action::EventDelete,
     ];
 
     /// The wire name (`ticket.edit`), the same string serde writes.
@@ -260,6 +272,9 @@ impl Action {
             Action::TimeModerate => "time.moderate",
             Action::TicketCheck => "ticket.check",
             Action::TicketPlan => "ticket.plan",
+            Action::EventCreate => "event.create",
+            Action::EventEdit => "event.edit",
+            Action::EventDelete => "event.delete",
         }
     }
 
@@ -305,7 +320,8 @@ impl Action {
             | Action::TicketDelete
             | Action::CommentEdit
             | Action::CommentDelete
-            | Action::TimeDelete => &[Fact::Owns],
+            | Action::TimeDelete
+            | Action::EventDelete => &[Fact::Owns],
             Action::TicketPlan => &[Fact::EditorsPlan],
             _ => &[],
         }
@@ -512,14 +528,20 @@ fn in_workspace(subject: &Subject, standing: Standing, action: Action, facts: &F
         | Action::TicketCreate
         | Action::TicketEdit
         | Action::TicketCheck
-        | Action::TimeLog => contributor,
+        | Action::TimeLog
+        // Events: every member but a guest creates and edits them (UX9).
+        | Action::EventCreate
+        | Action::EventEdit => contributor,
         // Into a sprint or a release: managers, and editors where the
         // workspace says so (`ticket_planning`, default `editors`).
         Action::TicketPlan => manager || (contributor && facts.editors_plan),
         // Deleting has no undo: managers anything, contributors their own.
-        Action::DocDelete | Action::ProjectEdit | Action::TicketDelete | Action::TimeDelete => {
-            manager || (contributor && facts.owns)
-        }
+        // An event goes with its creator's say or a manager's (UX9).
+        Action::DocDelete
+        | Action::ProjectEdit
+        | Action::TicketDelete
+        | Action::TimeDelete
+        | Action::EventDelete => manager || (contributor && facts.owns),
         // Your words are yours, at every standing.
         Action::CommentEdit => facts.owns,
         Action::CommentDelete => facts.owns || manager,
@@ -885,7 +907,7 @@ mod tests {
                 serde_json::from_value(serde_json::json!(action.as_str())).expect("parse");
             assert_eq!(back, action);
         }
-        assert_eq!(seen.len(), 33);
+        assert_eq!(seen.len(), 36);
     }
 
     #[test]
