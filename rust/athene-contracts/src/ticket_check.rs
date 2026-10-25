@@ -169,6 +169,7 @@ wire_enum! {
         SameType = "same_type",
         ExactError = "exact_error",
         SameComponent = "same_component",
+        SameObservation = "same_observation",
         DifferentComponent = "different_component",
         DifferentSymptom = "different_symptom",
         Recent = "recent",
