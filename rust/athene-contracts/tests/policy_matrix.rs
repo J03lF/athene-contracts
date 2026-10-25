@@ -543,13 +543,14 @@ fn removing_people_is_governing_and_leaving_is_everyones() {
     ));
 }
 
-/// J8: workspace guests may be assigned; platform guests and outsiders
-/// may not.
+/// J8 as UX-021 amends it: members may be assigned; workspace guests,
+/// platform guests and outsiders may not.
 #[test]
-fn work_goes_to_members_including_guests_but_never_to_platform_guests() {
+fn work_goes_to_members_but_never_to_guests() {
     assert!(assignable(&subject("M"), false));
-    assert!(assignable(&subject("G"), false));
-    assert!(assignable(&subject("AdG"), false));
+    // UX-021: a guest is not assignable, whatever their platform role.
+    assert!(!assignable(&subject("G"), false));
+    assert!(!assignable(&subject("AdG"), false));
     assert!(assignable(&subject("Nil"), false));
     assert!(!assignable(&subject("PgM"), false));
     assert!(!assignable(&subject("X"), false));

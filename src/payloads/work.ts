@@ -40,6 +40,8 @@ export type { MilestoneProgress } from '../generated/work/MilestoneProgress';
 export type { MilestoneResponse } from '../generated/work/MilestoneResponse';
 export type { MilestoneStatus } from '../generated/work/MilestoneStatus';
 export type { MoveTicketRequest } from '../generated/work/MoveTicketRequest';
+export type { MoveTicketProjectRequest } from '../generated/work/MoveTicketProjectRequest';
+export type { MoveTicketProjectResponse } from '../generated/work/MoveTicketProjectResponse';
 export type { PerUserListQuery } from '../generated/work/PerUserListQuery';
 export type { ProjectHealth } from '../generated/work/ProjectHealth';
 export type { ProjectReportQuery } from '../generated/work/ProjectReportQuery';
@@ -49,6 +51,7 @@ export type { ProjectStatus } from '../generated/work/ProjectStatus';
 export type { ReportSprintResponse } from '../generated/work/ReportSprintResponse';
 export type { SetLabelsRequest } from '../generated/work/SetLabelsRequest';
 export type { SprintBurnDownResponse } from '../generated/work/SprintBurnDownResponse';
+export type { SprintCompletionStats } from '../generated/work/SprintCompletionStats';
 export type { SprintResponse } from '../generated/work/SprintResponse';
 export type { SprintStatus } from '../generated/work/SprintStatus';
 export type { StatusShareResponse } from '../generated/work/StatusShareResponse';
@@ -69,6 +72,7 @@ export type { UpdateSprintRequest } from '../generated/work/UpdateSprintRequest'
 export type { UpdateTicketRequest } from '../generated/work/UpdateTicketRequest';
 export type { TicketEdit } from '../generated/work/TicketEdit';
 export type { TicketExpected } from '../generated/work/TicketExpected';
+export type { TicketProjectMove } from '../generated/work/TicketProjectMove';
 export type { ProjectExpected } from '../generated/work/ProjectExpected';
 export type { SprintExpected } from '../generated/work/SprintExpected';
 export type { UpdateTicketStatusRequest } from '../generated/work/UpdateTicketStatusRequest';
@@ -104,3 +108,8 @@ export interface UpdateSprintResponse {
   /** Tickets whose own due date moved with the end. */
   moved_tickets: number;
 }
+
+/** The code of the `409` a write into an archived project answers (UX-020). */
+export const PROJECT_ARCHIVED_CODE = 'ATH-RES-004';
+/** The i18n key a client renders for {@link PROJECT_ARCHIVED_CODE}. */
+export const PROJECT_ARCHIVED_MESSAGE_KEY = 'errors.project_archived';

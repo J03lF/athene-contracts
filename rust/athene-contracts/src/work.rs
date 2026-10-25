@@ -67,6 +67,10 @@ pub enum ProjectHealth {
     Blocked,
 }
 
+/// Whether a project takes work. An archived project (UX-020) is left out
+/// of pickers, lists and counts, and it and everything in it is read-only:
+/// a write answers `409` [`PROJECT_ARCHIVED_CODE`]. The one edit it takes
+/// is `status: active` (restore); archiving completes its running sprint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export_to = "work/")]
@@ -74,6 +78,12 @@ pub enum ProjectStatus {
     Active,
     Archived,
 }
+
+/// The code of the `409` a write into an archived project answers.
+pub const PROJECT_ARCHIVED_CODE: &str = "ATH-RES-004";
+
+/// The i18n key a client renders for [`PROJECT_ARCHIVED_CODE`].
+pub const PROJECT_ARCHIVED_MESSAGE_KEY: &str = "errors.project_archived";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -523,6 +533,11 @@ pub struct TicketExpected {
     pub triage_category: Patch<String>,
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub triage_reason: Patch<String>,
+    /// The project the client saw the ticket in: the base of a move to
+    /// another project (`POST /work/tickets/:id/project`, bulk `project_id`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub project_id: Option<String>,
 }
 
 /// A ticket edit: `PATCH /work/tickets/:id` (step 3.7).
@@ -621,6 +636,22 @@ pub struct BulkUpdateTicketsRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub expected: Option<BTreeMap<String, TicketExpected>>,
+    /// The assignee of every ticket; `null` unassigns. Through the assign
+    /// endpoint's own path (a member, never a guest; its base is
+    /// `expected.<id>.assignee_id`).
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub assignee_id: Patch<String>,
+    /// Label operations on every ticket (ids of the tickets' workspace). A
+    /// set: no base, no conflict.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub labels: Option<SetOps<String>>,
+    /// Move every ticket to this project of the same workspace, as
+    /// `POST /work/tickets/:id/project` does (base:
+    /// `expected.<id>.project_id`). Nothing else may change with it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub project_id: Option<String>,
 }
 
 /// Why one ticket in a bulk edit did not move.
@@ -656,6 +687,53 @@ pub struct BulkUpdateTicketsResponse {
     pub updated: Vec<TicketResponse>,
     pub conflicts: Vec<BulkUpdateConflict>,
     pub failed: Vec<BulkUpdateFailure>,
+    /// For a move to another project: per moved ticket its keys and what
+    /// was cleared (the moved tickets are in `updated` too).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(optional, as = "Option<Vec<TicketProjectMove>>")]
+    pub moved: Vec<TicketProjectMove>,
+}
+
+/// `POST /work/tickets/:id/project`: move a ticket to another project of
+/// the same workspace (UX-008).
+///
+/// It needs `ticket.edit` on the ticket and `ticket.create` in the target.
+/// The ticket gets the target's next number; its old key keeps finding it
+/// (a key lookup, the search). Comments, history, watchers, links, labels,
+/// the assignee, the parent and the subtasks stay. Sprint and release
+/// belong to the old project and are cleared (`cleared` names them).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct MoveTicketProjectRequest {
+    pub project_id: String,
+    /// The base: `project_id` as the client saw it. Another move in the
+    /// meantime is a `409` `ATH-RES-003` naming `project_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub expected: Option<TicketExpected>,
+}
+
+/// What a move to another project did.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export_to = "work/")]
+pub struct TicketProjectMove {
+    pub ticket_id: String,
+    /// `WEB-12`: the key before the move; it still finds the ticket.
+    pub previous_key: String,
+    /// `APP-3`: the key now.
+    pub key: String,
+    /// The fields the move cleared because they belong to the old project:
+    /// `sprint_id`, `milestone_id`.
+    pub cleared: Vec<String>,
+}
+
+/// The answer of `POST /work/tickets/:id/project`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export_to = "work/")]
+pub struct MoveTicketProjectResponse {
+    pub ticket: TicketResponse,
+    pub moved: TicketProjectMove,
 }
 
 /// What a ticket delete took with it.
@@ -900,11 +978,31 @@ pub struct SprintResponse {
     pub end_date: String,
     pub goal_points: Option<i32>,
     pub status: SprintStatus,
+    /// What the sprint held when it was completed (UX-005): a completed
+    /// sprint's history reads this, not today's tickets. `null` while it
+    /// runs or is planned, and for sprints completed before it was kept.
+    pub completed_stats: Option<SprintCompletionStats>,
     /// Rises with every write to the sprint; orders answers, decides no
     /// conflict.
     pub version: i64,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// A completed sprint's numbers, frozen at completion.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/")]
+pub struct SprintCompletionStats {
+    pub total_tickets: i64,
+    pub done_tickets: i64,
+    pub total_points: i64,
+    pub done_points: i64,
+    /// Unfinished tickets that left the sprint at completion.
+    pub carried_over: i64,
+    /// The sprint they went to; `null`: the backlog.
+    pub carried_to: Option<String>,
+    /// RFC 3339.
+    pub completed_at: String,
 }
 
 /// `POST /work/projects/:id/sprints`.
@@ -923,7 +1021,8 @@ pub struct CreateSprintRequest {
     pub goal_points: Option<i32>,
 }
 
-/// Move a sprint's dates: `POST /work/sprints/:id/update`.
+/// Rename a sprint, change its goal or move its dates:
+/// `POST /work/sprints/:id/update`.
 ///
 /// Tickets without an own due date follow the end by themselves (their
 /// deadline is the sprint's end, derived, never stored);
@@ -936,6 +1035,13 @@ pub struct CreateSprintRequest {
 #[serde(deny_unknown_fields)]
 #[ts(export_to = "work/")]
 pub struct UpdateSprintRequest {
+    /// A new name (a planned or running sprint; UX-025).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub name: Option<String>,
+    /// A new goal; `null` clears it.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub goal: Patch<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub start_date: Option<NaiveDate>,
@@ -956,6 +1062,11 @@ pub struct UpdateSprintRequest {
 #[serde(deny_unknown_fields)]
 #[ts(export_to = "work/")]
 pub struct SprintExpected {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub goal: Patch<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub start_date: Option<NaiveDate>,

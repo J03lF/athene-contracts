@@ -3,4 +3,4 @@
 /**
  * The dates a sprint edit is based on.
  */
-export type SprintExpected = { start_date?: string, end_date?: string, };
+export type SprintExpected = { name?: string, goal?: string | null, start_date?: string, end_date?: string, };

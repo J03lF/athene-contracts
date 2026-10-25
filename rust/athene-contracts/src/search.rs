@@ -45,6 +45,11 @@ pub struct SearchTicketsQuery {
     /// Label ids.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    /// `true`: archived projects' tickets too. Without it they are left
+    /// out, unless the query is a ticket key (a key always finds its
+    /// ticket) or `project_id` names the archived project.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archived: Option<bool>,
     /// Hits per answer, 1–50 (default 20). Facets and `total` count all.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<usize>,

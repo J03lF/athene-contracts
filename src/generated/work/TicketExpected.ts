@@ -17,4 +17,9 @@ import type { TicketStatus } from "./TicketStatus";
  * longer holds its expected value, nothing is written and the answer is a
  * `409` `ATH-RES-003` naming that field.
  */
-export type TicketExpected = { title?: string, description?: TextHash, ticket_type?: string, priority?: TicketPriority, status?: TicketStatus, assignee_id?: string | null, due_date?: string | null, story_points?: number | null, parent_ticket_id?: string | null, milestone_id?: string | null, sla_policy_id?: string | null, triage_category?: string | null, triage_reason?: string | null, };
+export type TicketExpected = { title?: string, description?: TextHash, ticket_type?: string, priority?: TicketPriority, status?: TicketStatus, assignee_id?: string | null, due_date?: string | null, story_points?: number | null, parent_ticket_id?: string | null, milestone_id?: string | null, sla_policy_id?: string | null, triage_category?: string | null, triage_reason?: string | null, 
+/**
+ * The project the client saw the ticket in: the base of a move to
+ * another project (`POST /work/tickets/:id/project`, bulk `project_id`).
+ */
+project_id?: string, };

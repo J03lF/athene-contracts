@@ -2,7 +2,8 @@
 import type { SprintExpected } from "./SprintExpected";
 
 /**
- * Move a sprint's dates: `POST /work/sprints/:id/update`.
+ * Rename a sprint, change its goal or move its dates:
+ * `POST /work/sprints/:id/update`.
  *
  * Tickets without an own due date follow the end by themselves (their
  * deadline is the sprint's end, derived, never stored);
@@ -12,7 +13,15 @@ import type { SprintExpected } from "./SprintExpected";
  * The answer is the sprint in `data` and, beside it in the envelope,
  * `moved_tickets`: how many own due dates moved.
  */
-export type UpdateSprintRequest = { start_date?: string, end_date?: string, move_due_ticket_ids?: Array<string>, 
+export type UpdateSprintRequest = { 
+/**
+ * A new name (a planned or running sprint; UX-025).
+ */
+name?: string, 
+/**
+ * A new goal; `null` clears it.
+ */
+goal?: string | null, start_date?: string, end_date?: string, move_due_ticket_ids?: Array<string>, 
 /**
  * The base of the dates that change (step 3.7). A date someone else
  * moved in the meantime is a `409` `ATH-RES-003`.

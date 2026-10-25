@@ -33,6 +33,12 @@ assignee?: string,
  */
 label?: string, 
 /**
+ * `true`: archived projects' tickets too. Without it they are left
+ * out, unless the query is a ticket key (a key always finds its
+ * ticket) or `project_id` names the archived project.
+ */
+archived?: boolean, 
+/**
  * Hits per answer, 1–50 (default 20). Facets and `total` count all.
  */
 limit?: number, 

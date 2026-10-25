@@ -1354,12 +1354,17 @@ pub fn link_invite_allows(role: WorkspaceMemberRole) -> bool {
     role.rank() <= LINK_INVITE_MAX_ROLE.rank()
 }
 
-/// Who work may be assigned to (J8, D7): any member of its workspace,
-/// guests included — they read and comment, and may well be the person the
-/// work waits on — but never a platform guest, who changes nothing. Work
-/// outside any workspace has no roster: anyone but a platform guest.
+/// Who work may be assigned to (J8, D7; UX-021): a member of its
+/// workspace who is not a guest — a guest reads, comments and watches, but
+/// cannot move or close what would be theirs — and never a platform guest,
+/// who changes nothing. Work outside any workspace has no roster: anyone
+/// but a platform guest.
 pub fn assignable(assignee: &Subject, unplaced: bool) -> bool {
-    assignee.platform_role != UserRole::Guest && (unplaced || assignee.membership.is_some())
+    assignee.platform_role != UserRole::Guest
+        && (unplaced
+            || assignee
+                .membership
+                .is_some_and(|m| m.tier != WorkspaceMemberRole::Guest))
 }
 
 /// Where a permission in a role's preview comes from ("Vorschau als

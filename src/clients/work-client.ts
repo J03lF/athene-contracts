@@ -42,6 +42,8 @@ import type {
   TicketEdit,
   AddTicketCommentRequest,
   MoveTicketRequest,
+  MoveTicketProjectRequest,
+  MoveTicketProjectResponse,
   TicketCommentResponse,
   UpdateTicketStatusRequest,
   WatchStateResponse,
@@ -251,6 +253,19 @@ export class WorkApiClient {
       .then(() => undefined);
   }
 
+  /**
+   * Move a ticket to another project of its workspace: a new key (the old
+   * one keeps finding it); sprint and release are cleared (`moved.cleared`).
+   * `ticket.edit` here and `ticket.create` there.
+   */
+  moveTicketToProject(
+    id: string,
+    body: MoveTicketProjectRequest,
+  ): Promise<MoveTicketProjectResponse> {
+    return this.http
+      .post<ApiEnvelope<MoveTicketProjectResponse>>(`/work/tickets/${id}/project`, body)
+      .then(unwrap);
+  }
   /** Board drag: target column and position in one request. */
   moveTicket(id: string, body: MoveTicketRequest): Promise<TicketResponse> {
     return this.http

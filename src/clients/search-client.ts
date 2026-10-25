@@ -26,6 +26,7 @@ export class SearchApiClient {
     if (query.type) params.set('type', query.type);
     if (query.assignee) params.set('assignee', query.assignee);
     if (query.label) params.set('label', query.label);
+    if (query.archived) params.set('archived', 'true');
     if (query.limit !== undefined) params.set('limit', String(query.limit));
     if (query.doc_limit !== undefined) params.set('doc_limit', String(query.doc_limit));
     const qs = params.toString();

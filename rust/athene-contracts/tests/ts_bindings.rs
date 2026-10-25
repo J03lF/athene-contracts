@@ -92,6 +92,9 @@ fn render(out: &Path) {
         work::BulkUpdateFailure,
         work::BulkUpdateConflict,
         work::BulkUpdateTicketsResponse,
+        work::MoveTicketProjectRequest,
+        work::MoveTicketProjectResponse,
+        work::TicketProjectMove,
         work::DeletedTicketResponse,
         work::UpdateTicketStatusRequest,
         work::MoveTicketRequest,
@@ -111,6 +114,7 @@ fn render(out: &Path) {
         work::WatchStateResponse,
         // work: sprints and releases
         work::SprintResponse,
+        work::SprintCompletionStats,
         work::CreateSprintRequest,
         work::UpdateSprintRequest,
         work::SprintExpected,
