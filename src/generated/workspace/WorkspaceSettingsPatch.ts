@@ -2,11 +2,10 @@
 import type { TicketPriority } from "../work/TicketPriority";
 import type { ComposerPropertiesSetting } from "./ComposerPropertiesSetting";
 import type { DefaultAssignee } from "./DefaultAssignee";
-import type { TicketPlanning } from "./TicketPlanning";
 import type { WeekStart } from "./WeekStart";
 
 /**
  * The settings part of a workspace patch, merged key by key: a value sets
  * the key, `null` unsets it (back to the default), an absent key stays.
  */
-export type WorkspaceSettingsPatch = { default_project_id?: string | null, default_assignee?: DefaultAssignee | null, default_priority?: TicketPriority | null, require_estimate?: boolean | null, composer_properties?: ComposerPropertiesSetting | null, sprint_week_start?: WeekStart | null, work_day_start?: string | null, work_day_end?: string | null, work_days?: Array<number> | null, ticket_check_enabled?: boolean | null, ticket_check_duplicates?: boolean | null, ticket_check_quality?: boolean | null, ticket_check_secrets?: boolean | null, ticket_planning?: TicketPlanning | null, };
+export type WorkspaceSettingsPatch = { default_project_id?: string | null, default_assignee?: DefaultAssignee | null, default_priority?: TicketPriority | null, require_estimate?: boolean | null, composer_properties?: ComposerPropertiesSetting | null, sprint_week_start?: WeekStart | null, work_day_start?: string | null, work_day_end?: string | null, work_days?: Array<number> | null, ticket_check_enabled?: boolean | null, ticket_check_duplicates?: boolean | null, ticket_check_quality?: boolean | null, ticket_check_secrets?: boolean | null, };

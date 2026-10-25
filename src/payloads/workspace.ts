@@ -20,7 +20,6 @@ export type { InvitationResponse } from '../generated/workspace/InvitationRespon
 export type { InvitationStatus } from '../generated/workspace/InvitationStatus';
 export type { InviteDetailsResponse } from '../generated/workspace/InviteDetailsResponse';
 export type { JoinInviteResponse } from '../generated/workspace/JoinInviteResponse';
-export type { TicketPlanning } from '../generated/workspace/TicketPlanning';
 export type { UpdateMemberRoleRequest } from '../generated/workspace/UpdateMemberRoleRequest';
 export type { UpdateWorkspaceRequest } from '../generated/workspace/UpdateWorkspaceRequest';
 export type { WeekStart } from '../generated/workspace/WeekStart';

@@ -10,4 +10,13 @@ import type { WorkspaceMemberRole } from "./WorkspaceMemberRole";
  * `POST /workspaces/:id/invites/:invite_id/revoke` revokes an invite and
  * `…/rotate` gives it a new link (the old one stops working).
  */
-export type UpdateMemberRoleRequest = { role: WorkspaceMemberRole, };
+export type UpdateMemberRoleRequest = { 
+/**
+ * A tier: the member gets that tier's system role.
+ */
+role?: WorkspaceMemberRole, 
+/**
+ * A workspace role (its tier then applies). One of the two is
+ * required; with both, they must agree (400).
+ */
+role_id?: string, };

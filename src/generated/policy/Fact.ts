@@ -4,4 +4,4 @@
  * A fact about the resource (or the person acted on) an action's rule
  * reads.
  */
-export type Fact = "owns" | "target_is_self" | "target_role" | "granted_role" | "editors_plan";
+export type Fact = "owns" | "target_is_self" | "target_role" | "granted_role" | "granted_grants";

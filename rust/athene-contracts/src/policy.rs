@@ -1,36 +1,40 @@
-//! The permission policy (roadmap step 3.8a, `POLICY_PLAN.md` §2): what a
-//! person may do in Athene, as one table of actions over one standing rule.
+//! The permission policy (roadmap step 3.8a, `POLICY_PLAN.md` §2; custom
+//! roles phase A, `artifacts/roles/CONCEPT.md`): what a person may do in
+//! Athene, as one table of actions over one set of permissions.
 //!
 //! Pure functions, no IO. The core loads the facts — the platform role from
-//! the signed principal, the membership from one row, ownership from the
-//! resource — and asks [`allows`]; `GET /work/workspaces/:id/capabilities`
-//! answers the same question for every action at once ([`capabilities`]);
-//! the web checks its local rules against the generated matrix
+//! the signed principal, the membership (tier and the role's permission
+//! mask) from one row, ownership from the resource — and asks [`allows`];
+//! `GET /work/workspaces/:id/capabilities` answers the same question for
+//! every action at once ([`capabilities`]); the web holds the server's
+//! answer and checks its loading fallback against the generated matrix
 //! (`src/generated/policy/policy-matrix.json`, see [`matrix`]).
 //!
-//! Until 3.8a the rule lived in five copies (`WorkAccessService::standing`,
-//! the teams directory, ticket types, docs, `WorkspaceService::require_
-//! admin`) and the web's `policy.ts`, and they disagreed in places. Now:
-//!
-//! - **Standing** ([`standing`]): a workspace guest reads; an owner or admin
-//!   manages; a member contributes, and manages when they are a platform
-//!   operator or admin. Data that belongs to no workspace is the platform
-//!   admin's alone.
-//! - **Governing** ([`governs`], J1): invitations, roles, removing people,
-//!   the workspace's name and settings are for its *own* owners and admins.
-//!   A platform operator or admin who is a member manages content (teams,
-//!   labels, types, fields) but does not govern.
+//! - **Permissions** ([`Permission`]): the ticks of a role, about thirty,
+//!   some as *own/any* pairs. A workspace's roles are bundles of them
+//!   ([`PermissionSet`], a bit mask the database stores as `BIGINT`).
+//! - **Actions** ([`Action`]): what the server checks and the web asks.
+//!   Each one needs one permission, an own/any pair, or is governance
+//!   ([`requires`], exhaustive: an action without a rule does not compile).
+//! - **Tiers**: the membership's `role` column stays (`owner | admin |
+//!   member | guest`). Owners and admins are fixed: every permission, and
+//!   they alone govern ([`governs`], J1) — roles, role changes, removing
+//!   people, the workspace's settings. A member's or guest's rights are
+//!   their role's mask; a guest's are capped by [`GUEST_CEILING`] after
+//!   everything else.
+//! - A platform operator or admin who is a member keeps the content rights
+//!   of a manager ([`PLATFORM_MEMBER_EXTRA`], E7) but does not govern.
 //! - **Platform guests write nothing** (D3), wherever they are a member.
+//! - **No escalation**: an invitation hands out only a role whose
+//!   permissions are a subset of the inviter's own and whose tier is no
+//!   higher ([`may_grant`]); everything else about roles is governance.
 //!
-//! A new action is a variant of [`Action`] plus its arm in the rule table:
-//! the match is exhaustive, so an action without a rule does not compile.
-//! Changing a rule changes the matrix, and `tests/policy_matrix.rs` then
+//! Changing a verdict changes the matrix, and `tests/policy_matrix.rs` then
 //! asks for [`POLICY_REVISION`] + 1, which the capabilities answer carries
 //! so a client can tell its cached rules are stale.
 
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeMap;
-
-use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;
 
@@ -40,11 +44,534 @@ use crate::workspace::WorkspaceMemberRole;
 
 /// The rules' revision. Bumped whenever a verdict in the matrix changes
 /// (`tests/policy_matrix.rs` keeps the history).
-pub const POLICY_REVISION: u32 = 4;
+pub const POLICY_REVISION: u32 = 5;
 
 /// The most an open link may grant (J6). Admins and owners are invited by
 /// email only: a forwarded link must not hand out the workspace.
 pub const LINK_INVITE_MAX_ROLE: WorkspaceMemberRole = WorkspaceMemberRole::Member;
+
+// ---------------------------------------------------------------------------
+// Permissions
+// ---------------------------------------------------------------------------
+
+/// One tick of a role (`CONCEPT.md` §3). The wire names are what the API
+/// and the web use; the bit ([`Permission::bit`]) is what the database
+/// stores and never changes for a permission once shipped.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, ToSchema, TS,
+)]
+#[ts(export_to = "policy/")]
+pub enum Permission {
+    // Workspace
+    #[serde(rename = "labels.manage")]
+    LabelsManage,
+    #[serde(rename = "ticket_types.manage")]
+    TicketTypesManage,
+    #[serde(rename = "fields.manage")]
+    FieldsManage,
+    #[serde(rename = "teams.manage")]
+    TeamsManage,
+    /// Create and edit events (UX9); delete one's own.
+    #[serde(rename = "event.write")]
+    EventWrite,
+    /// Delete other people's events.
+    #[serde(rename = "event.delete_any")]
+    EventDeleteAny,
+    // Projects
+    #[serde(rename = "project.create")]
+    ProjectCreate,
+    /// Projects one created or leads.
+    #[serde(rename = "project.edit_own")]
+    ProjectEditOwn,
+    #[serde(rename = "project.edit_any")]
+    ProjectEditAny,
+    // Tickets
+    #[serde(rename = "ticket.create")]
+    TicketCreate,
+    /// Fields, status, assignee, links.
+    #[serde(rename = "ticket.edit")]
+    TicketEdit,
+    /// Take a ticket from a queue (queues are phase C).
+    #[serde(rename = "ticket.take")]
+    TicketTake,
+    /// Move a ticket to done or closed.
+    #[serde(rename = "ticket.close")]
+    TicketClose,
+    /// Tickets one reported.
+    #[serde(rename = "ticket.delete_own")]
+    TicketDeleteOwn,
+    #[serde(rename = "ticket.delete_any")]
+    TicketDeleteAny,
+    #[serde(rename = "ticket.check")]
+    TicketCheck,
+    #[serde(rename = "ticket.watch")]
+    TicketWatch,
+    #[serde(rename = "comment.create")]
+    CommentCreate,
+    /// Delete other people's comments.
+    #[serde(rename = "comment.moderate")]
+    CommentModerate,
+    /// Log time; delete one's own entries.
+    #[serde(rename = "time.log")]
+    TimeLog,
+    /// Edit or delete other people's time entries.
+    #[serde(rename = "time.moderate")]
+    TimeModerate,
+    // Sprints & releases
+    /// Put a ticket into a sprint or a release (replaces the workspace
+    /// setting `ticket_planning`, E8).
+    #[serde(rename = "ticket.plan")]
+    TicketPlan,
+    /// Sprints and releases themselves.
+    #[serde(rename = "project.plan")]
+    ProjectPlan,
+    // Docs
+    #[serde(rename = "doc.create")]
+    DocCreate,
+    #[serde(rename = "doc.write")]
+    DocWrite,
+    /// Archive one's own docs and collections.
+    #[serde(rename = "doc.delete_own")]
+    DocDeleteOwn,
+    /// Archive anyone's docs, manage every collection.
+    #[serde(rename = "doc.manage")]
+    DocManage,
+    // Members
+    /// Invite people, into roles within one's own rights only.
+    #[serde(rename = "invite.create")]
+    InviteCreate,
+    /// See, revoke and renew invitations (within one's own rights).
+    #[serde(rename = "invite.manage")]
+    InviteManage,
+}
+
+/// The sections of the role editor, in display order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "policy/")]
+pub enum PermissionGroup {
+    Workspace,
+    Projects,
+    Tickets,
+    Planning,
+    Docs,
+    Members,
+}
+
+impl Permission {
+    /// Every permission, in the editor's order.
+    pub const ALL: [Permission; 29] = [
+        Permission::LabelsManage,
+        Permission::TicketTypesManage,
+        Permission::FieldsManage,
+        Permission::TeamsManage,
+        Permission::EventWrite,
+        Permission::EventDeleteAny,
+        Permission::ProjectCreate,
+        Permission::ProjectEditOwn,
+        Permission::ProjectEditAny,
+        Permission::TicketCreate,
+        Permission::TicketEdit,
+        Permission::TicketTake,
+        Permission::TicketClose,
+        Permission::TicketDeleteOwn,
+        Permission::TicketDeleteAny,
+        Permission::TicketCheck,
+        Permission::TicketWatch,
+        Permission::CommentCreate,
+        Permission::CommentModerate,
+        Permission::TimeLog,
+        Permission::TimeModerate,
+        Permission::TicketPlan,
+        Permission::ProjectPlan,
+        Permission::DocCreate,
+        Permission::DocWrite,
+        Permission::DocDeleteOwn,
+        Permission::DocManage,
+        Permission::InviteCreate,
+        Permission::InviteManage,
+    ];
+
+    /// The stored bit. Fixed forever: the database keeps masks of these,
+    /// so a permission keeps its bit and a removed one leaves a hole.
+    pub const fn bit(self) -> u32 {
+        match self {
+            Permission::LabelsManage => 0,
+            Permission::TicketTypesManage => 1,
+            Permission::FieldsManage => 2,
+            Permission::TeamsManage => 3,
+            Permission::EventWrite => 4,
+            Permission::EventDeleteAny => 5,
+            Permission::ProjectCreate => 6,
+            Permission::ProjectEditOwn => 7,
+            Permission::ProjectEditAny => 8,
+            Permission::TicketCreate => 9,
+            Permission::TicketEdit => 10,
+            Permission::TicketTake => 11,
+            Permission::TicketClose => 12,
+            Permission::TicketDeleteOwn => 13,
+            Permission::TicketDeleteAny => 14,
+            Permission::TicketCheck => 15,
+            Permission::TicketWatch => 16,
+            Permission::CommentCreate => 17,
+            Permission::CommentModerate => 18,
+            Permission::TimeLog => 19,
+            Permission::TimeModerate => 20,
+            Permission::TicketPlan => 21,
+            Permission::ProjectPlan => 22,
+            Permission::DocCreate => 23,
+            Permission::DocWrite => 24,
+            Permission::DocDeleteOwn => 25,
+            Permission::DocManage => 26,
+            Permission::InviteCreate => 27,
+            Permission::InviteManage => 28,
+        }
+    }
+
+    /// The wire name (`ticket.edit`), the same string serde writes.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Permission::LabelsManage => "labels.manage",
+            Permission::TicketTypesManage => "ticket_types.manage",
+            Permission::FieldsManage => "fields.manage",
+            Permission::TeamsManage => "teams.manage",
+            Permission::EventWrite => "event.write",
+            Permission::EventDeleteAny => "event.delete_any",
+            Permission::ProjectCreate => "project.create",
+            Permission::ProjectEditOwn => "project.edit_own",
+            Permission::ProjectEditAny => "project.edit_any",
+            Permission::TicketCreate => "ticket.create",
+            Permission::TicketEdit => "ticket.edit",
+            Permission::TicketTake => "ticket.take",
+            Permission::TicketClose => "ticket.close",
+            Permission::TicketDeleteOwn => "ticket.delete_own",
+            Permission::TicketDeleteAny => "ticket.delete_any",
+            Permission::TicketCheck => "ticket.check",
+            Permission::TicketWatch => "ticket.watch",
+            Permission::CommentCreate => "comment.create",
+            Permission::CommentModerate => "comment.moderate",
+            Permission::TimeLog => "time.log",
+            Permission::TimeModerate => "time.moderate",
+            Permission::TicketPlan => "ticket.plan",
+            Permission::ProjectPlan => "project.plan",
+            Permission::DocCreate => "doc.create",
+            Permission::DocWrite => "doc.write",
+            Permission::DocDeleteOwn => "doc.delete_own",
+            Permission::DocManage => "doc.manage",
+            Permission::InviteCreate => "invite.create",
+            Permission::InviteManage => "invite.manage",
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Permission> {
+        Permission::ALL.into_iter().find(|p| p.as_str() == name)
+    }
+
+    pub const fn group(self) -> PermissionGroup {
+        match self {
+            Permission::LabelsManage
+            | Permission::TicketTypesManage
+            | Permission::FieldsManage
+            | Permission::TeamsManage
+            | Permission::EventWrite
+            | Permission::EventDeleteAny => PermissionGroup::Workspace,
+            Permission::ProjectCreate | Permission::ProjectEditOwn | Permission::ProjectEditAny => {
+                PermissionGroup::Projects
+            }
+            Permission::TicketCreate
+            | Permission::TicketEdit
+            | Permission::TicketTake
+            | Permission::TicketClose
+            | Permission::TicketDeleteOwn
+            | Permission::TicketDeleteAny
+            | Permission::TicketCheck
+            | Permission::TicketWatch
+            | Permission::CommentCreate
+            | Permission::CommentModerate
+            | Permission::TimeLog
+            | Permission::TimeModerate => PermissionGroup::Tickets,
+            Permission::TicketPlan | Permission::ProjectPlan => PermissionGroup::Planning,
+            Permission::DocCreate
+            | Permission::DocWrite
+            | Permission::DocDeleteOwn
+            | Permission::DocManage => PermissionGroup::Docs,
+            Permission::InviteCreate | Permission::InviteManage => PermissionGroup::Members,
+        }
+    }
+
+    /// Whether a guest role may hold it ([`GUEST_CEILING`]).
+    pub const fn guest_allowed(self) -> bool {
+        GUEST_CEILING.contains(self)
+    }
+
+    /// Whether the permission does anything yet. `ticket.take` waits for
+    /// the queues (phase C); the editor shows it as coming.
+    pub const fn effective_yet(self) -> bool {
+        !matches!(self, Permission::TicketTake)
+    }
+}
+
+/// A role's permissions as a bit mask over [`Permission::bit`]. On the wire
+/// it is the list of permission names (in [`Permission::ALL`] order); in
+/// the database a `BIGINT`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, ToSchema)]
+#[schema(value_type = Vec<Permission>)]
+pub struct PermissionSet(u64);
+
+impl PermissionSet {
+    pub const EMPTY: PermissionSet = PermissionSet(0);
+    /// Every permission there is.
+    pub const ALL: PermissionSet = PermissionSet::of(&Permission::ALL);
+
+    pub const fn of(permissions: &[Permission]) -> PermissionSet {
+        let mut bits = 0u64;
+        let mut i = 0;
+        while i < permissions.len() {
+            bits |= 1u64 << permissions[i].bit();
+            i += 1;
+        }
+        PermissionSet(bits)
+    }
+
+    /// From the stored mask; unknown bits (a permission removed since, or
+    /// a newer binary's) are dropped, never granted.
+    pub const fn from_bits(bits: i64) -> PermissionSet {
+        // A mask never uses the sign bit (bits stay below 63).
+        PermissionSet(bits.cast_unsigned() & PermissionSet::ALL.0)
+    }
+
+    /// The stored mask.
+    pub const fn bits(self) -> i64 {
+        self.0.cast_signed()
+    }
+
+    pub const fn contains(self, permission: Permission) -> bool {
+        self.0 & (1u64 << permission.bit()) != 0
+    }
+
+    pub const fn with(self, permission: Permission) -> PermissionSet {
+        PermissionSet(self.0 | (1u64 << permission.bit()))
+    }
+
+    pub const fn without(self, permission: Permission) -> PermissionSet {
+        PermissionSet(self.0 & !(1u64 << permission.bit()))
+    }
+
+    pub const fn union(self, other: PermissionSet) -> PermissionSet {
+        PermissionSet(self.0 | other.0)
+    }
+
+    pub const fn intersection(self, other: PermissionSet) -> PermissionSet {
+        PermissionSet(self.0 & other.0)
+    }
+
+    pub const fn difference(self, other: PermissionSet) -> PermissionSet {
+        PermissionSet(self.0 & !other.0)
+    }
+
+    pub const fn is_subset(self, other: PermissionSet) -> bool {
+        self.0 & !other.0 == 0
+    }
+
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    pub const fn intersects(self, other: PermissionSet) -> bool {
+        self.0 & other.0 != 0
+    }
+
+    /// The permissions in [`Permission::ALL`] order.
+    pub fn iter(self) -> impl Iterator<Item = Permission> {
+        Permission::ALL
+            .into_iter()
+            .filter(move |p| self.contains(*p))
+    }
+
+    pub fn to_vec(self) -> Vec<Permission> {
+        self.iter().collect()
+    }
+
+    pub fn len(self) -> usize {
+        self.iter().count()
+    }
+}
+
+impl FromIterator<Permission> for PermissionSet {
+    fn from_iter<I: IntoIterator<Item = Permission>>(iter: I) -> Self {
+        iter.into_iter()
+            .fold(PermissionSet::EMPTY, PermissionSet::with)
+    }
+}
+
+impl Serialize for PermissionSet {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_seq(self.iter())
+    }
+}
+
+impl<'de> Deserialize<'de> for PermissionSet {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Vec::<Permission>::deserialize(deserializer)?
+            .into_iter()
+            .collect())
+    }
+}
+
+/// What a guest role can ever hold: watching and commenting (reading is
+/// membership). Applied after everything else, overrides included (§2.4).
+pub const GUEST_CEILING: PermissionSet =
+    PermissionSet::of(&[Permission::TicketWatch, Permission::CommentCreate]);
+
+/// The content rights a platform operator or admin keeps as a member of
+/// any role of tier `member` (E7, J1): everything but governance, which is
+/// the workspace's own owners' and admins' — inviting included.
+pub const PLATFORM_MEMBER_EXTRA: PermissionSet = PermissionSet::ALL
+    .without(Permission::InviteCreate)
+    .without(Permission::InviteManage);
+
+/// The permissions that make a role read as "manager" in the derived
+/// [`Standing`] (a display, no rule reads it).
+pub const MANAGEMENT: PermissionSet = PermissionSet::of(&[
+    Permission::LabelsManage,
+    Permission::TicketTypesManage,
+    Permission::FieldsManage,
+    Permission::TeamsManage,
+    Permission::EventDeleteAny,
+    Permission::ProjectEditAny,
+    Permission::TicketDeleteAny,
+    Permission::CommentModerate,
+    Permission::TimeModerate,
+    Permission::ProjectPlan,
+    Permission::DocManage,
+]);
+
+/// The system role "Mitglied" of a new workspace: exactly the contributor
+/// of before, without creating projects (E5). A migrated workspace's
+/// "Mitglied" has `ticket.plan` only if its `ticket_planning` was not
+/// `managers` (E8, migration 0032).
+pub const MEMBER_DEFAULT: PermissionSet = PermissionSet::of(&[
+    Permission::EventWrite,
+    Permission::ProjectEditOwn,
+    Permission::TicketCreate,
+    Permission::TicketEdit,
+    Permission::TicketTake,
+    Permission::TicketClose,
+    Permission::TicketDeleteOwn,
+    Permission::TicketCheck,
+    Permission::TicketWatch,
+    Permission::CommentCreate,
+    Permission::TimeLog,
+    Permission::TicketPlan,
+    Permission::DocCreate,
+    Permission::DocWrite,
+    Permission::DocDeleteOwn,
+]);
+
+/// The system role "Gast": read, watch, comment.
+pub const GUEST_DEFAULT: PermissionSet = GUEST_CEILING;
+
+/// The roles a workspace starts with or can add from a template.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "policy/")]
+pub enum RolePreset {
+    Developer,
+    Tester,
+    ProductOwner,
+}
+
+impl RolePreset {
+    pub const ALL: [RolePreset; 3] = [
+        RolePreset::Developer,
+        RolePreset::Tester,
+        RolePreset::ProductOwner,
+    ];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            RolePreset::Developer => "developer",
+            RolePreset::Tester => "tester",
+            RolePreset::ProductOwner => "product_owner",
+        }
+    }
+
+    pub fn parse(key: &str) -> Option<RolePreset> {
+        RolePreset::ALL.into_iter().find(|p| p.as_str() == key)
+    }
+
+    /// The template's ticks (`CONCEPT.md` §2.2, §3).
+    pub const fn permissions(self) -> PermissionSet {
+        match self {
+            // Tickets: create, edit, take, plan; time; docs. No projects.
+            RolePreset::Developer => PermissionSet::of(&[
+                Permission::EventWrite,
+                Permission::ProjectEditOwn,
+                Permission::TicketCreate,
+                Permission::TicketEdit,
+                Permission::TicketTake,
+                Permission::TicketClose,
+                Permission::TicketDeleteOwn,
+                Permission::TicketCheck,
+                Permission::TicketWatch,
+                Permission::CommentCreate,
+                Permission::TimeLog,
+                Permission::TicketPlan,
+                Permission::DocCreate,
+                Permission::DocWrite,
+                Permission::DocDeleteOwn,
+            ]),
+            // Tickets: create, edit, take, close; comment; docs read. No
+            // projects, no sprints.
+            RolePreset::Tester => PermissionSet::of(&[
+                Permission::EventWrite,
+                Permission::TicketCreate,
+                Permission::TicketEdit,
+                Permission::TicketTake,
+                Permission::TicketClose,
+                Permission::TicketDeleteOwn,
+                Permission::TicketCheck,
+                Permission::TicketWatch,
+                Permission::CommentCreate,
+                Permission::TimeLog,
+            ]),
+            // Developer plus projects, planning, the workspace's labels,
+            // types and fields, and deleting anyone's tickets.
+            RolePreset::ProductOwner => PLATFORM_MEMBER_EXTRA,
+        }
+    }
+
+    /// The template's default name (German, like the system roles).
+    pub const fn default_name(self) -> &'static str {
+        match self {
+            RolePreset::Developer => "Developer",
+            RolePreset::Tester => "Tester",
+            RolePreset::ProductOwner => "Product Owner",
+        }
+    }
+
+    /// A palette token (`TicketTypeColor`).
+    pub const fn default_color(self) -> &'static str {
+        match self {
+            RolePreset::Developer => "blue",
+            RolePreset::Tester => "green",
+            RolePreset::ProductOwner => "purple",
+        }
+    }
+
+    /// A lucide icon name.
+    pub const fn default_icon(self) -> &'static str {
+        match self {
+            RolePreset::Developer => "code",
+            RolePreset::Tester => "flask-conical",
+            RolePreset::ProductOwner => "compass",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------------------
 
 /// Every action the server authorises and the web asks about. The wire
 /// names are the web's (`ticket.edit`).
@@ -64,13 +591,17 @@ pub enum Action {
     #[serde(rename = "sla.manage")]
     SlaManage,
     /// Every read inside a workspace: the workspace, its projects,
-    /// tickets, sprints, releases, reports, docs, labels.
+    /// tickets, sprints, releases, reports, docs, labels, roles.
     #[serde(rename = "workspace.read")]
     WorkspaceRead,
     /// Name, description, colour and settings.
     #[serde(rename = "workspace.settings.edit")]
     WorkspaceSettingsEdit,
-    /// Facts: `granted_role` (none = any the actor may grant).
+    /// Create, edit, reorder and delete the workspace's roles.
+    #[serde(rename = "roles.manage")]
+    RolesManage,
+    /// Facts: `granted_role`, `granted_grants` (none = any the actor may
+    /// grant).
     #[serde(rename = "invite.create")]
     InviteCreate,
     /// List, revoke and renew invitations.
@@ -93,22 +624,28 @@ pub enum Action {
     TicketTypesManage,
     #[serde(rename = "fields.manage")]
     FieldsManage,
+    /// Write a page or file it; also create a collection.
+    #[serde(rename = "doc.create")]
+    DocCreate,
+    /// Edit a page, and the collections' names and order.
     #[serde(rename = "doc.write")]
     DocWrite,
     /// Facts: `owns` (the author).
     #[serde(rename = "doc.delete")]
     DocDelete,
+    /// Delete a collection. Facts: `owns` (its creator).
+    #[serde(rename = "doc.collection.manage")]
+    DocCollectionManage,
     #[serde(rename = "project.create")]
     ProjectCreate,
     /// Facts: `owns` (creator or lead).
     #[serde(rename = "project.edit")]
     ProjectEdit,
     /// Sprints and releases themselves: create, edit, start, complete,
-    /// delete. Managers only, whatever the workspace's `ticket_planning`.
+    /// delete.
     #[serde(rename = "project.plan")]
     ProjectPlan,
-    /// Put a ticket into a sprint or a release, or take it out. Facts:
-    /// `editors_plan` (the workspace's `ticket_planning` is `editors`).
+    /// Put a ticket into a sprint or a release, or take it out.
     #[serde(rename = "ticket.plan")]
     TicketPlan,
     #[serde(rename = "ticket.create")]
@@ -119,6 +656,12 @@ pub enum Action {
     /// Facts: `owns` (the reporter).
     #[serde(rename = "ticket.delete")]
     TicketDelete,
+    /// Take a ticket from a queue (phase C).
+    #[serde(rename = "ticket.take")]
+    TicketTake,
+    /// Move a ticket to done or closed.
+    #[serde(rename = "ticket.close")]
+    TicketClose,
     #[serde(rename = "ticket.watch")]
     TicketWatch,
     #[serde(rename = "comment.create")]
@@ -187,24 +730,24 @@ pub enum Fact {
     Owns,
     /// The person acted on is the actor.
     TargetIsSelf,
-    /// The role the person acted on holds now.
+    /// The tier the person acted on holds now.
     TargetRole,
-    /// The role an invitation or a role change would hand out.
+    /// The tier an invitation or a role change would hand out.
     GrantedRole,
-    /// The workspace lets everyone who edits a ticket plan it
-    /// (`WorkspaceSettings::ticket_planning` = `editors`, the default).
-    EditorsPlan,
+    /// The permissions of the role an invitation would hand out.
+    GrantedGrants,
 }
 
 impl Action {
     /// Every action, in wire order.
-    pub const ALL: [Action; 36] = [
+    pub const ALL: [Action; 41] = [
         Action::AdminAccess,
         Action::WorkspaceCreate,
         Action::SlaRead,
         Action::SlaManage,
         Action::WorkspaceRead,
         Action::WorkspaceSettingsEdit,
+        Action::RolesManage,
         Action::InviteCreate,
         Action::InviteManage,
         Action::MembersRoleChange,
@@ -214,14 +757,18 @@ impl Action {
         Action::LabelsManage,
         Action::TicketTypesManage,
         Action::FieldsManage,
+        Action::DocCreate,
         Action::DocWrite,
         Action::DocDelete,
+        Action::DocCollectionManage,
         Action::ProjectCreate,
         Action::ProjectEdit,
         Action::ProjectPlan,
         Action::TicketCreate,
         Action::TicketEdit,
         Action::TicketDelete,
+        Action::TicketTake,
+        Action::TicketClose,
         Action::TicketWatch,
         Action::CommentCreate,
         Action::CommentEdit,
@@ -246,6 +793,7 @@ impl Action {
             Action::SlaManage => "sla.manage",
             Action::WorkspaceRead => "workspace.read",
             Action::WorkspaceSettingsEdit => "workspace.settings.edit",
+            Action::RolesManage => "roles.manage",
             Action::InviteCreate => "invite.create",
             Action::InviteManage => "invite.manage",
             Action::MembersRoleChange => "members.role.change",
@@ -255,14 +803,18 @@ impl Action {
             Action::LabelsManage => "labels.manage",
             Action::TicketTypesManage => "ticket_types.manage",
             Action::FieldsManage => "fields.manage",
+            Action::DocCreate => "doc.create",
             Action::DocWrite => "doc.write",
             Action::DocDelete => "doc.delete",
+            Action::DocCollectionManage => "doc.collection.manage",
             Action::ProjectCreate => "project.create",
             Action::ProjectEdit => "project.edit",
             Action::ProjectPlan => "project.plan",
             Action::TicketCreate => "ticket.create",
             Action::TicketEdit => "ticket.edit",
             Action::TicketDelete => "ticket.delete",
+            Action::TicketTake => "ticket.take",
+            Action::TicketClose => "ticket.close",
             Action::TicketWatch => "ticket.watch",
             Action::CommentCreate => "comment.create",
             Action::CommentEdit => "comment.edit",
@@ -297,6 +849,8 @@ impl Action {
             Action::TicketEdit
             | Action::TicketPlan
             | Action::TicketDelete
+            | Action::TicketTake
+            | Action::TicketClose
             | Action::TicketWatch
             | Action::CommentCreate
             | Action::CommentEdit
@@ -312,60 +866,241 @@ impl Action {
     /// The facts the action's rule reads; empty for a context-free action.
     pub const fn reads(self) -> &'static [Fact] {
         match self {
-            Action::InviteCreate => &[Fact::GrantedRole],
+            Action::InviteCreate => &[Fact::GrantedRole, Fact::GrantedGrants],
             Action::MembersRoleChange => &[Fact::TargetRole, Fact::GrantedRole, Fact::TargetIsSelf],
             Action::MembersRemove => &[Fact::TargetRole, Fact::TargetIsSelf],
             Action::TeamsMemberRemove => &[Fact::TargetIsSelf],
             Action::DocDelete
+            | Action::DocCollectionManage
             | Action::ProjectEdit
             | Action::TicketDelete
             | Action::CommentEdit
             | Action::CommentDelete
             | Action::TimeDelete
             | Action::EventDelete => &[Fact::Owns],
-            Action::TicketPlan => &[Fact::EditorsPlan],
             _ => &[],
         }
     }
 
     /// Whether the verdict depends on the resource or the person acted on
-    /// (see [`Action::reads`]). A workspace fact (`editors_plan`) is not
-    /// context: the capabilities answer it per workspace.
+    /// (see [`Action::reads`]).
     pub const fn contextual(self) -> bool {
-        !matches!(self.reads(), [] | [Fact::EditorsPlan])
+        !self.reads().is_empty()
     }
 }
 
-/// What someone may do in one workspace, weakest first.
+/// One side of an own/any rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Gate {
+    /// Whoever is a member.
+    Always,
+    Never,
+    Needs(Permission),
+}
+
+/// The governance rules, which stay code, not ticks (§2.3, E4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Governance {
+    /// The workspace's name, description, colour and settings; its roles.
+    Runs,
+    /// Give someone a role: never above one's own tier, owners only by
+    /// owners, one's own only downwards (J7).
+    RoleChange,
+    /// Remove someone (owners only by owners); leaving is everyone's.
+    Remove,
+}
+
+/// What an action needs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Need {
+    /// Decided on the platform role alone.
+    Platform,
+    /// Every member of the workspace.
+    Member,
+    One(Permission),
+    /// On the actor's own resource, on anybody's.
+    OwnOrAny {
+        own: Gate,
+        any: Gate,
+    },
+    /// The actor themselves always, anyone else with the permission.
+    SelfOr(Permission),
+    /// The permission, and only for roles within the actor's own rights
+    /// ([`may_grant`]).
+    Grant(Permission),
+    Governance(Governance),
+}
+
+impl Need {
+    /// The permissions the rule can read (for the editor's "controls" hint
+    /// and the denial log).
+    pub fn permissions(self) -> Vec<Permission> {
+        let gate = |g: Gate| match g {
+            Gate::Needs(p) => Some(p),
+            Gate::Always | Gate::Never => None,
+        };
+        match self {
+            Need::One(p) | Need::SelfOr(p) | Need::Grant(p) => vec![p],
+            Need::OwnOrAny { own, any } => gate(own).into_iter().chain(gate(any)).collect(),
+            Need::Platform | Need::Member | Need::Governance(_) => Vec::new(),
+        }
+    }
+}
+
+/// The rule table: which permission each action needs. Exhaustive, so a
+/// new action without a rule does not compile.
+pub const fn requires(action: Action) -> Need {
+    use Permission as P;
+    match action {
+        Action::AdminAccess | Action::WorkspaceCreate | Action::SlaRead | Action::SlaManage => {
+            Need::Platform
+        }
+        Action::WorkspaceRead => Need::Member,
+        Action::WorkspaceSettingsEdit | Action::RolesManage => Need::Governance(Governance::Runs),
+        Action::MembersRoleChange => Need::Governance(Governance::RoleChange),
+        Action::MembersRemove => Need::Governance(Governance::Remove),
+        Action::InviteCreate => Need::Grant(P::InviteCreate),
+        Action::InviteManage => Need::One(P::InviteManage),
+        Action::TeamsManage => Need::One(P::TeamsManage),
+        Action::TeamsMemberRemove => Need::SelfOr(P::TeamsManage),
+        Action::LabelsManage => Need::One(P::LabelsManage),
+        Action::TicketTypesManage => Need::One(P::TicketTypesManage),
+        Action::FieldsManage => Need::One(P::FieldsManage),
+        Action::DocCreate => Need::One(P::DocCreate),
+        Action::DocWrite => Need::One(P::DocWrite),
+        Action::DocDelete | Action::DocCollectionManage => Need::OwnOrAny {
+            own: Gate::Needs(P::DocDeleteOwn),
+            any: Gate::Needs(P::DocManage),
+        },
+        Action::ProjectCreate => Need::One(P::ProjectCreate),
+        Action::ProjectEdit => Need::OwnOrAny {
+            own: Gate::Needs(P::ProjectEditOwn),
+            any: Gate::Needs(P::ProjectEditAny),
+        },
+        Action::ProjectPlan => Need::One(P::ProjectPlan),
+        Action::TicketPlan => Need::One(P::TicketPlan),
+        Action::TicketCreate => Need::One(P::TicketCreate),
+        Action::TicketEdit => Need::One(P::TicketEdit),
+        Action::TicketDelete => Need::OwnOrAny {
+            own: Gate::Needs(P::TicketDeleteOwn),
+            any: Gate::Needs(P::TicketDeleteAny),
+        },
+        Action::TicketTake => Need::One(P::TicketTake),
+        Action::TicketClose => Need::One(P::TicketClose),
+        Action::TicketWatch => Need::One(P::TicketWatch),
+        Action::CommentCreate => Need::One(P::CommentCreate),
+        // Your words are yours, at every tier.
+        Action::CommentEdit => Need::OwnOrAny {
+            own: Gate::Always,
+            any: Gate::Never,
+        },
+        Action::CommentDelete => Need::OwnOrAny {
+            own: Gate::Always,
+            any: Gate::Needs(P::CommentModerate),
+        },
+        Action::CommentModerate => Need::One(P::CommentModerate),
+        Action::TimeLog => Need::One(P::TimeLog),
+        Action::TimeDelete => Need::OwnOrAny {
+            own: Gate::Needs(P::TimeLog),
+            any: Gate::Needs(P::TimeModerate),
+        },
+        Action::TimeModerate => Need::One(P::TimeModerate),
+        Action::TicketCheck => Need::One(P::TicketCheck),
+        Action::EventCreate | Action::EventEdit => Need::One(P::EventWrite),
+        Action::EventDelete => Need::OwnOrAny {
+            own: Gate::Needs(P::EventWrite),
+            any: Gate::Needs(P::EventDeleteAny),
+        },
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Subjects
+// ---------------------------------------------------------------------------
+
+/// What someone may do in one workspace, weakest first. Derived for display
+/// ([`standing`]); no rule reads it any more.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, ToSchema, TS,
 )]
 #[serde(rename_all = "snake_case")]
 #[ts(export_to = "policy/")]
 pub enum Standing {
-    /// Reads and comments (a workspace guest).
+    /// Reads (and comments).
     Reader,
-    /// Files and changes tickets (a member).
+    /// Files and changes tickets.
     Contributor,
-    /// Plans, moderates and sets the workspace's content up (an owner or
-    /// admin, or a platform operator or admin who is a member).
+    /// Plans, moderates or sets the workspace's content up.
     Manager,
 }
 
+/// A membership as the policy reads it: the tier (`role` column) and the
+/// permissions of the member's role (ignored for owners and admins, who
+/// hold every one).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Membership {
+    pub tier: WorkspaceMemberRole,
+    pub grants: PermissionSet,
+}
+
+impl Membership {
+    pub const fn new(tier: WorkspaceMemberRole, grants: PermissionSet) -> Self {
+        Self { tier, grants }
+    }
+
+    /// An owner's or admin's membership (their mask is irrelevant), or a
+    /// member's or guest's with the system role's defaults.
+    pub const fn of_tier(tier: WorkspaceMemberRole) -> Self {
+        Self {
+            tier,
+            grants: match tier {
+                WorkspaceMemberRole::Owner | WorkspaceMemberRole::Admin => PermissionSet::ALL,
+                WorkspaceMemberRole::Member => MEMBER_DEFAULT,
+                WorkspaceMemberRole::Guest => GUEST_DEFAULT,
+            },
+        }
+    }
+}
+
 /// Who is asking: the platform role (from the signed principal) and the
-/// role in the workspace in question, if any.
+/// membership in the workspace in question, if any.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Subject {
     pub platform_role: UserRole,
     /// `None`: not a member (or the resource belongs to no workspace).
-    pub membership: Option<WorkspaceMemberRole>,
+    pub membership: Option<Membership>,
 }
 
 impl Subject {
-    pub fn new(platform_role: UserRole, membership: Option<WorkspaceMemberRole>) -> Self {
+    pub fn new(platform_role: UserRole, membership: Option<Membership>) -> Self {
         Self {
             platform_role,
             membership,
+        }
+    }
+
+    pub fn tier(&self) -> Option<WorkspaceMemberRole> {
+        self.membership.map(|m| m.tier)
+    }
+
+    /// The permissions in effect in the workspace: everything for owners
+    /// and admins; the role's mask for a member, plus
+    /// [`PLATFORM_MEMBER_EXTRA`] for a platform operator or admin; the
+    /// role's mask capped by [`GUEST_CEILING`] for a guest; nothing for a
+    /// stranger. A platform guest's writes are refused before this is read.
+    pub fn effective(&self) -> PermissionSet {
+        let Some(m) = self.membership else {
+            return PermissionSet::EMPTY;
+        };
+        match m.tier {
+            WorkspaceMemberRole::Owner | WorkspaceMemberRole::Admin => PermissionSet::ALL,
+            WorkspaceMemberRole::Member
+                if matches!(self.platform_role, UserRole::Operator | UserRole::Admin) =>
+            {
+                m.grants.union(PLATFORM_MEMBER_EXTRA)
+            }
+            WorkspaceMemberRole::Member => m.grants,
+            WorkspaceMemberRole::Guest => m.grants.intersection(GUEST_CEILING),
         }
     }
 }
@@ -384,17 +1119,18 @@ pub struct Facts {
     /// The person acted on is the actor.
     #[serde(default, skip_serializing_if = "is_false")]
     pub target_is_self: bool,
-    /// The role the person acted on holds; `None` with `target_is_self`
+    /// The tier the person acted on holds; `None` with `target_is_self`
     /// means the actor's own.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_role: Option<WorkspaceMemberRole>,
-    /// The role being handed out; `None` = any the actor may grant.
+    /// The tier being handed out; `None` = any the actor may grant.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub granted_role: Option<WorkspaceMemberRole>,
-    /// The workspace lets editors plan tickets (`ticket_planning` =
-    /// `editors`). A workspace fact, the same for every resource in it.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub editors_plan: bool,
+    /// The permissions of the role being handed out. Required whenever
+    /// `granted_role` is named for someone who does not govern: without
+    /// it, nothing is handed out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub granted_grants: Option<PermissionSet>,
 }
 
 fn is_false(value: &bool) -> bool {
@@ -409,7 +1145,7 @@ impl Facts {
         target_is_self: false,
         target_role: None,
         granted_role: None,
-        editors_plan: false,
+        granted_grants: None,
     };
 
     pub const fn owned(owns: bool) -> Self {
@@ -423,7 +1159,7 @@ impl Facts {
         }
     }
 
-    /// Acting on a person: their role now and whether it is the actor.
+    /// Acting on a person: their tier now and whether it is the actor.
     pub const fn target(role: Option<WorkspaceMemberRole>, is_self: bool) -> Self {
         Facts {
             target_role: role,
@@ -437,42 +1173,50 @@ impl Facts {
         self
     }
 
-    /// The workspace's `ticket_planning` (true: `editors`).
-    pub const fn planning(mut self, editors_plan: bool) -> Self {
-        self.editors_plan = editors_plan;
+    /// Handing out a role: its tier and its permissions.
+    pub const fn granting_role(mut self, role: WorkspaceMemberRole, grants: PermissionSet) -> Self {
+        self.granted_role = Some(role);
+        self.granted_grants = Some(grants);
         self
     }
 }
 
-/// The standing rule — the only one.
+/// The derived standing, for display (no rule reads it):
 ///
 /// - `unplaced`: nobody can be a member of "no workspace", so only the
 ///   platform admin, the one authority that is not workspace-scoped, gets
-///   `Manager`; everyone else `None` (operators too: adopting such a
-///   project is an admin action).
+///   `Manager`; everyone else `None`.
 /// - not a member: `None` — the caller answers `403`, exactly as for an id
 ///   that does not exist.
+/// - otherwise `Manager` for owners and admins and whoever holds a
+///   management permission, `Contributor` with `ticket.edit`, else
+///   `Reader`.
 pub fn standing(subject: &Subject, unplaced: bool) -> Option<Standing> {
     if unplaced {
         return matches!(subject.platform_role, UserRole::Admin).then_some(Standing::Manager);
     }
-    Some(match subject.membership? {
-        WorkspaceMemberRole::Guest => Standing::Reader,
-        WorkspaceMemberRole::Owner | WorkspaceMemberRole::Admin => Standing::Manager,
-        WorkspaceMemberRole::Member
-            if matches!(subject.platform_role, UserRole::Operator | UserRole::Admin) =>
+    let tier = subject.tier()?;
+    let grants = subject.effective();
+    Some(
+        if matches!(
+            tier,
+            WorkspaceMemberRole::Owner | WorkspaceMemberRole::Admin
+        ) || grants.intersects(MANAGEMENT)
         {
             Standing::Manager
-        }
-        WorkspaceMemberRole::Member => Standing::Contributor,
-    })
+        } else if grants.contains(Permission::TicketEdit) {
+            Standing::Contributor
+        } else {
+            Standing::Reader
+        },
+    )
 }
 
 /// Whether the subject runs the workspace: its own owners and admins, not
 /// platform operators or admins who are members (J1).
 pub fn governs(subject: &Subject) -> bool {
     matches!(
-        subject.membership,
+        subject.tier(),
         Some(WorkspaceMemberRole::Owner | WorkspaceMemberRole::Admin)
     )
 }
@@ -483,84 +1227,74 @@ pub fn allows(subject: &Subject, action: Action, facts: &Facts) -> bool {
     if action.kind() == ActionKind::Write && subject.platform_role == UserRole::Guest {
         return false;
     }
-    match action {
-        Action::AdminAccess => matches!(subject.platform_role, UserRole::Admin),
-        Action::WorkspaceCreate => true,
-        Action::SlaRead | Action::SlaManage => {
-            matches!(subject.platform_role, UserRole::Operator | UserRole::Admin)
-        }
-        _ => match standing(subject, facts.unplaced) {
-            Some(standing) => in_workspace(subject, standing, action, facts),
-            None => false,
-        },
+    let need = requires(action);
+    if need == Need::Platform {
+        return match action {
+            Action::AdminAccess => matches!(subject.platform_role, UserRole::Admin),
+            Action::SlaRead | Action::SlaManage => {
+                matches!(subject.platform_role, UserRole::Operator | UserRole::Admin)
+            }
+            // Everyone but a platform guest (refused above).
+            _ => true,
+        };
     }
-}
-
-/// The rule table for everything inside a workspace.
-fn in_workspace(subject: &Subject, standing: Standing, action: Action, facts: &Facts) -> bool {
-    let manager = standing == Standing::Manager;
-    let contributor = standing >= Standing::Contributor;
-    match action {
-        // Decided on the platform role alone, in `allows`.
-        Action::AdminAccess | Action::WorkspaceCreate | Action::SlaRead | Action::SlaManage => {
-            false
+    // Data of no workspace: the platform admin's alone, as a manager who
+    // does not govern (there is nobody to govern).
+    let (grants, governing) = if facts.unplaced {
+        if subject.platform_role != UserRole::Admin {
+            return false;
         }
-        // Guests read, watch and comment.
-        Action::WorkspaceRead | Action::TicketWatch | Action::CommentCreate => true,
-        Action::WorkspaceSettingsEdit | Action::InviteManage => governs(subject),
-        // Nobody hands out more than they hold (an owner invite only by an
-        // owner).
-        Action::InviteCreate => governs(subject) && within_own(subject, facts.granted_role),
-        Action::MembersRoleChange => changes_role(subject, facts),
+        (PermissionSet::ALL, false)
+    } else {
+        if subject.membership.is_none() {
+            return false;
+        }
+        (subject.effective(), governs(subject))
+    };
+    let gate = |g: Gate| match g {
+        Gate::Always => true,
+        Gate::Never => false,
+        Gate::Needs(p) => grants.contains(p),
+    };
+    match need {
+        Need::Platform => false,
+        Need::Member => true,
+        Need::One(p) => grants.contains(p),
+        Need::OwnOrAny { own, any } => gate(any) || (facts.owns && gate(own)),
+        Need::SelfOr(p) => facts.target_is_self || grants.contains(p),
+        Need::Grant(p) => {
+            grants.contains(p)
+                && within_own(subject, facts.granted_role)
+                && (governing || grant_within(grants, facts))
+        }
+        Need::Governance(Governance::Runs) => governing,
+        Need::Governance(Governance::RoleChange) => governing && changes_role(subject, facts),
         // Leaving is everyone's own call; removing others is governing.
-        Action::MembersRemove => {
-            facts.target_is_self || (governs(subject) && may_touch(subject, facts.target_role))
+        Need::Governance(Governance::Remove) => {
+            facts.target_is_self || (governing && may_touch(subject, facts.target_role))
         }
-        Action::TeamsManage
-        | Action::LabelsManage
-        | Action::TicketTypesManage
-        | Action::FieldsManage
-        | Action::ProjectPlan
-        | Action::CommentModerate
-        | Action::TimeModerate => manager,
-        Action::TeamsMemberRemove => manager || facts.target_is_self,
-        Action::DocWrite
-        | Action::ProjectCreate
-        | Action::TicketCreate
-        | Action::TicketEdit
-        | Action::TicketCheck
-        | Action::TimeLog
-        // Events: every member but a guest creates and edits them (UX9).
-        | Action::EventCreate
-        | Action::EventEdit => contributor,
-        // Into a sprint or a release: managers, and editors where the
-        // workspace says so (`ticket_planning`, default `editors`).
-        Action::TicketPlan => manager || (contributor && facts.editors_plan),
-        // Deleting has no undo: managers anything, contributors their own.
-        // An event goes with its creator's say or a manager's (UX9).
-        Action::DocDelete
-        | Action::ProjectEdit
-        | Action::TicketDelete
-        | Action::TimeDelete
-        | Action::EventDelete => manager || (contributor && facts.owns),
-        // Your words are yours, at every standing.
-        Action::CommentEdit => facts.owns,
-        Action::CommentDelete => facts.owns || manager,
     }
 }
 
-/// `members.role.change`: governing; an owner's role, and the owner role,
-/// only by an owner; never above the actor's own role; one's own role only
-/// downwards (J7). The last owner is the repository's to protect (409).
+/// For someone who does not govern: a role named is handed out only with
+/// its permissions known and within the actor's own.
+fn grant_within(own: PermissionSet, facts: &Facts) -> bool {
+    match (facts.granted_role, facts.granted_grants) {
+        (None, None) => true,
+        (_, Some(grants)) => grants.is_subset(own),
+        (Some(_), None) => false,
+    }
+}
+
+/// `members.role.change`: an owner's role, and the owner role, only by an
+/// owner; never above the actor's own tier; one's own only downwards (J7).
+/// The last owner is the repository's to protect (409).
 fn changes_role(subject: &Subject, facts: &Facts) -> bool {
-    if !governs(subject)
-        || !may_touch(subject, facts.target_role)
-        || !within_own(subject, facts.granted_role)
-    {
+    if !may_touch(subject, facts.target_role) || !within_own(subject, facts.granted_role) {
         return false;
     }
     if facts.target_is_self {
-        let current = facts.target_role.or(subject.membership);
+        let current = facts.target_role.or(subject.tier());
         return match (facts.granted_role, current) {
             (Some(granted), Some(current)) => granted.rank() <= current.rank(),
             (Some(_), None) => false,
@@ -572,25 +1306,40 @@ fn changes_role(subject: &Subject, facts: &Facts) -> bool {
 
 /// An owner is touched only by an owner.
 fn may_touch(subject: &Subject, target: Option<WorkspaceMemberRole>) -> bool {
-    target != Some(WorkspaceMemberRole::Owner)
-        || subject.membership == Some(WorkspaceMemberRole::Owner)
+    target != Some(WorkspaceMemberRole::Owner) || subject.tier() == Some(WorkspaceMemberRole::Owner)
 }
 
-/// The granted role is no more than the subject's own (none named: fine).
+/// The granted tier is no more than the subject's own (none named: fine).
 fn within_own(subject: &Subject, granted: Option<WorkspaceMemberRole>) -> bool {
-    match (granted, subject.membership) {
+    match (granted, subject.tier()) {
         (None, _) => true,
         (Some(granted), Some(own)) => granted.rank() <= own.rank(),
         (Some(_), None) => false,
     }
 }
 
-/// The roles the subject may hand out by invitation or role change, lowest
-/// first; empty for whoever does not govern.
+/// Whether the subject may hand a role of `tier` with `grants` out by
+/// invitation (the escalation rule, §7): at most their own tier, and for
+/// someone who does not govern only permissions they hold themselves.
+pub fn may_grant(subject: &Subject, tier: WorkspaceMemberRole, grants: PermissionSet) -> bool {
+    allows(
+        subject,
+        Action::InviteCreate,
+        &Facts::NONE.granting_role(tier, grants),
+    )
+}
+
+/// The tiers the subject may hand out by invitation or role change, lowest
+/// first; empty for whoever may do neither.
 pub fn grantable_roles(subject: &Subject) -> Vec<WorkspaceMemberRole> {
-    let Some(own) = subject.membership.filter(|_| governs(subject)) else {
+    let Some(own) = subject.tier() else {
         return Vec::new();
     };
+    if !allows(subject, Action::InviteCreate, &Facts::NONE)
+        && !allows(subject, Action::MembersRoleChange, &Facts::NONE)
+    {
+        return Vec::new();
+    }
     let mut roles: Vec<WorkspaceMemberRole> = WorkspaceMemberRole::ALL
         .into_iter()
         .filter(|role| role.rank() <= own.rank())
@@ -613,18 +1362,100 @@ pub fn assignable(assignee: &Subject, unplaced: bool) -> bool {
     assignee.platform_role != UserRole::Guest && (unplaced || assignee.membership.is_some())
 }
 
+/// Where a permission in a role's preview comes from ("Vorschau als
+/// Rolle", §8.2). Phase B adds the overrides.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "policy/")]
+pub enum PermissionSource {
+    /// The role's tick (on or off).
+    Role,
+    /// Owner and admin hold everything; nothing changes that.
+    Fixed,
+    /// Off for every guest, whatever the role says.
+    GuestCeiling,
+}
+
+/// One line of the preview.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "policy/")]
+pub struct EffectivePermission {
+    pub permission: Permission,
+    pub allowed: bool,
+    pub source: PermissionSource,
+}
+
+/// A role's effective permissions with their origin, for an ordinary user
+/// holding it (the platform operator's extra is not a role's, §2.2).
+pub fn effective_permissions(
+    tier: WorkspaceMemberRole,
+    grants: PermissionSet,
+) -> Vec<EffectivePermission> {
+    Permission::ALL
+        .into_iter()
+        .map(|permission| {
+            let (allowed, source) = match tier {
+                WorkspaceMemberRole::Owner | WorkspaceMemberRole::Admin => {
+                    (true, PermissionSource::Fixed)
+                }
+                WorkspaceMemberRole::Guest if !permission.guest_allowed() => {
+                    (false, PermissionSource::GuestCeiling)
+                }
+                WorkspaceMemberRole::Member | WorkspaceMemberRole::Guest => {
+                    (grants.contains(permission), PermissionSource::Role)
+                }
+            };
+            EffectivePermission {
+                permission,
+                allowed,
+                source,
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Capabilities
+// ---------------------------------------------------------------------------
+
+/// The caller's role, as the capabilities name it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "policy/")]
+pub struct CapabilitiesRole {
+    /// `null` only where a membership has no role row (memory mode).
+    pub id: Option<String>,
+    pub name: String,
+    /// A palette token (`TicketTypeColor`); `null` = neutral.
+    pub color: Option<String>,
+    /// `owner`, `admin`, `member`, `guest` for the system roles.
+    pub system_key: Option<WorkspaceMemberRole>,
+}
+
 /// `GET /work/workspaces/:workspace_id/capabilities`: the caller's verdict
 /// on every action in one workspace, in `{ "data": … }`.
 ///
-/// Answered with `Cache-Control: no-store`; a membership change counts from
-/// the next request, a platform role change within the identity cache's
-/// 30 s.
+/// Answered with `Cache-Control: no-store`; a membership or role change
+/// counts from the next request (`roles_epoch` moves with every write to
+/// the workspace's roles), a platform role change within the identity
+/// cache's 30 s.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "policy/")]
 pub struct CapabilitiesResponse {
     pub workspace_id: String,
+    /// Derived for display; no rule reads it.
     pub standing: Standing,
-    pub role: WorkspaceMemberRole,
+    /// The membership's tier.
+    pub tier: WorkspaceMemberRole,
+    /// The caller's role in the workspace.
+    pub role: CapabilitiesRole,
+    /// The permissions in effect for the caller here (guest ceiling and
+    /// the platform operator's extra applied).
+    #[ts(as = "Vec<Permission>")]
+    #[schema(value_type = Vec<Permission>)]
+    pub permissions: PermissionSet,
+    /// Moves with every write to the workspace's roles and their
+    /// assignment; a client holding another epoch reloads.
+    pub roles_epoch: i64,
     /// Every action. A contextual one is `true` when it is allowed on any
     /// resource (somebody else's, no role named); the platform actions are
     /// included.
@@ -634,7 +1465,9 @@ pub struct CapabilitiesResponse {
     /// on themselves). `can(a, ctx) = actions[a] || (on_own[a] && isOwn(ctx))`.
     #[schema(value_type = BTreeMap<String, bool>)]
     pub on_own: BTreeMap<Action, bool>,
-    /// For `invite.create` and `members.role.change`, lowest first.
+    /// The tiers for `invite.create` and `members.role.change`, lowest
+    /// first. Which roles exactly: `grantable` on each role of
+    /// `GET /workspaces/:id/roles`.
     pub grantable_roles: Vec<WorkspaceMemberRole>,
     /// The most an open link may grant (J6).
     pub link_invite_max_role: WorkspaceMemberRole,
@@ -648,25 +1481,23 @@ pub struct CapabilitiesResponse {
 }
 
 /// The capabilities of a member; `None` for a non-member (the endpoint
-/// answers `403`, as for a workspace that does not exist). `editors_plan`
-/// is the workspace's `ticket_planning` (true: `editors`), so `ticket.plan`
-/// is answered for this workspace.
+/// answers `403`, as for a workspace that does not exist).
 pub fn capabilities(
     subject: &Subject,
     workspace_id: String,
-    editors_plan: bool,
+    role: CapabilitiesRole,
+    roles_epoch: i64,
 ) -> Option<CapabilitiesResponse> {
-    let role = subject.membership?;
+    let tier = subject.tier()?;
     let standing = standing(subject, false)?;
-    let workspace = Facts::NONE.planning(editors_plan);
     let actions = Action::ALL
         .into_iter()
-        .map(|action| (action, allows(subject, action, &workspace)))
+        .map(|action| (action, allows(subject, action, &Facts::NONE)))
         .collect();
     let own = Facts {
         owns: true,
         target_is_self: true,
-        ..workspace
+        ..Facts::NONE
     };
     let on_own = Action::ALL
         .into_iter()
@@ -676,7 +1507,10 @@ pub fn capabilities(
     Some(CapabilitiesResponse {
         workspace_id,
         standing,
+        tier,
         role,
+        permissions: subject.effective(),
+        roles_epoch,
         actions,
         on_own,
         grantable_roles: grantable_roles(subject),
@@ -689,7 +1523,7 @@ pub fn capabilities(
 /// The generated matrix: every action for a fixed set of subjects and
 /// fact variants, with its verdict. Written to
 /// `src/generated/policy/policy-matrix.json` by the drift test
-/// (`tests/ts_bindings.rs`); the web tests its local rules against it
+/// (`tests/ts_bindings.rs`); the web tests its loading fallback against it
 /// (3.12), the revision test hashes it.
 pub mod matrix {
     use std::collections::BTreeMap;
@@ -698,37 +1532,92 @@ pub mod matrix {
     use serde::Serialize;
 
     use super::{
-        allows, Action, ActionKind, ActionScope, Fact, Facts, Subject, LINK_INVITE_MAX_ROLE,
+        allows, Action, ActionKind, ActionScope, Fact, Facts, Membership, Permission,
+        PermissionSet, RolePreset, Subject, GUEST_CEILING, LINK_INVITE_MAX_ROLE, MEMBER_DEFAULT,
         POLICY_REVISION,
     };
     use crate::auth::UserRole;
     use crate::workspace::WorkspaceMemberRole;
 
-    /// The subjects of the matrix (`POLICY_PLAN.md` §6.3): workspace
-    /// owner, admin, member and guest as platform users; operators and
-    /// admins as members and guests; a platform guest who is a member; and
-    /// people who are not members at all.
-    pub const SUBJECTS: [(&str, UserRole, Option<WorkspaceMemberRole>); 13] = [
-        ("O", UserRole::User, Some(WorkspaceMemberRole::Owner)),
-        ("A", UserRole::User, Some(WorkspaceMemberRole::Admin)),
-        ("M", UserRole::User, Some(WorkspaceMemberRole::Member)),
-        ("G", UserRole::User, Some(WorkspaceMemberRole::Guest)),
-        ("OpM", UserRole::Operator, Some(WorkspaceMemberRole::Member)),
-        ("AdM", UserRole::Admin, Some(WorkspaceMemberRole::Member)),
-        ("AdG", UserRole::Admin, Some(WorkspaceMemberRole::Guest)),
-        ("OpG", UserRole::Operator, Some(WorkspaceMemberRole::Guest)),
-        ("PgM", UserRole::Guest, Some(WorkspaceMemberRole::Member)),
-        ("X", UserRole::User, None),
-        ("OpX", UserRole::Operator, None),
-        ("AdX", UserRole::Admin, None),
-        ("PgX", UserRole::Guest, None),
-    ];
+    /// A custom role of the matrix: it may invite, edits tickets and
+    /// comments, and nothing else.
+    pub const CUSTOM: PermissionSet = PermissionSet::of(&[
+        Permission::InviteCreate,
+        Permission::InviteManage,
+        Permission::TicketEdit,
+        Permission::TicketWatch,
+        Permission::CommentCreate,
+    ]);
+
+    /// A guest role whose stored mask asks for writing: the ceiling cuts it.
+    pub const GUEST_WITH_WRITES: PermissionSet = GUEST_CEILING
+        .with(Permission::TicketEdit)
+        .with(Permission::TicketCreate)
+        .with(Permission::InviteCreate);
+
+    /// The subjects of the matrix (`POLICY_PLAN.md` §6.3, `CONCEPT.md`
+    /// §5): owner, admin, the system roles "Mitglied" and "Gast" as
+    /// platform users; operators and admins as members and guests; a
+    /// platform guest who is a member; the presets, a custom role, an
+    /// empty role and a guest role asking for writes; and people who are
+    /// not members at all.
+    pub fn subjects() -> Vec<(&'static str, Subject)> {
+        use WorkspaceMemberRole as R;
+        let m = |tier, grants| Some(Membership::new(tier, grants));
+        let fixed = |tier| Some(Membership::of_tier(tier));
+        vec![
+            ("O", Subject::new(UserRole::User, fixed(R::Owner))),
+            ("A", Subject::new(UserRole::User, fixed(R::Admin))),
+            ("M", Subject::new(UserRole::User, fixed(R::Member))),
+            ("G", Subject::new(UserRole::User, fixed(R::Guest))),
+            ("OpM", Subject::new(UserRole::Operator, fixed(R::Member))),
+            ("AdM", Subject::new(UserRole::Admin, fixed(R::Member))),
+            ("AdG", Subject::new(UserRole::Admin, fixed(R::Guest))),
+            ("OpG", Subject::new(UserRole::Operator, fixed(R::Guest))),
+            ("PgM", Subject::new(UserRole::Guest, fixed(R::Member))),
+            (
+                "Dev",
+                Subject::new(
+                    UserRole::User,
+                    m(R::Member, RolePreset::Developer.permissions()),
+                ),
+            ),
+            (
+                "Tst",
+                Subject::new(
+                    UserRole::User,
+                    m(R::Member, RolePreset::Tester.permissions()),
+                ),
+            ),
+            (
+                "PO",
+                Subject::new(
+                    UserRole::User,
+                    m(R::Member, RolePreset::ProductOwner.permissions()),
+                ),
+            ),
+            ("Cus", Subject::new(UserRole::User, m(R::Member, CUSTOM))),
+            (
+                "Nil",
+                Subject::new(UserRole::User, m(R::Member, PermissionSet::EMPTY)),
+            ),
+            (
+                "GsW",
+                Subject::new(UserRole::User, m(R::Guest, GUEST_WITH_WRITES)),
+            ),
+            ("X", Subject::new(UserRole::User, None)),
+            ("OpX", Subject::new(UserRole::Operator, None)),
+            ("AdX", Subject::new(UserRole::Admin, None)),
+            ("PgX", Subject::new(UserRole::Guest, None)),
+        ]
+    }
 
     #[derive(Debug, Clone, Serialize)]
     pub struct ActionInfo {
         pub kind: ActionKind,
         pub scope: ActionScope,
         pub reads: &'static [Fact],
+        pub permissions: Vec<Permission>,
     }
 
     #[derive(Debug, Clone, Serialize)]
@@ -760,6 +1649,22 @@ pub mod matrix {
                 for role in WorkspaceMemberRole::ALL {
                     out.push(Facts::NONE.granting(role));
                 }
+                // Into the presets, a custom role, an empty one and every
+                // permission there is.
+                let masks = [
+                    MEMBER_DEFAULT,
+                    RolePreset::Developer.permissions(),
+                    RolePreset::Tester.permissions(),
+                    RolePreset::ProductOwner.permissions(),
+                    CUSTOM,
+                    PermissionSet::EMPTY,
+                    PermissionSet::ALL,
+                ];
+                for mask in masks {
+                    out.push(Facts::NONE.granting_role(WorkspaceMemberRole::Member, mask));
+                }
+                out.push(Facts::NONE.granting_role(WorkspaceMemberRole::Guest, GUEST_CEILING));
+                out.push(Facts::NONE.granting_role(WorkspaceMemberRole::Admin, PermissionSet::ALL));
             }
             Action::MembersRemove => {
                 for role in WorkspaceMemberRole::ALL {
@@ -778,7 +1683,6 @@ pub mod matrix {
                 }
             }
             Action::TeamsMemberRemove => out.push(Facts::target(None, true)),
-            Action::TicketPlan => out.push(Facts::NONE.planning(true)),
             _ => {}
         }
         if action.scope() != ActionScope::Platform {
@@ -797,26 +1701,21 @@ pub mod matrix {
                         kind: action.kind(),
                         scope: action.scope(),
                         reads: action.reads(),
+                        permissions: super::requires(action).permissions(),
                     },
                 )
             })
             .collect();
-        let subjects = SUBJECTS
-            .iter()
-            .map(|(name, platform, membership)| {
-                (*name, Subject::new(platform.clone(), *membership))
-            })
-            .collect();
+        let all = subjects();
         let mut cases = Vec::new();
-        for (name, platform, membership) in &SUBJECTS {
-            let subject = Subject::new(platform.clone(), *membership);
+        for (name, subject) in &all {
             for action in Action::ALL {
                 for facts in variants(action) {
                     cases.push(Case {
                         subject: name,
                         action,
                         facts,
-                        allowed: allows(&subject, action, &facts),
+                        allowed: allows(subject, action, &facts),
                     });
                 }
             }
@@ -825,7 +1724,7 @@ pub mod matrix {
             revision: POLICY_REVISION,
             link_invite_max_role: LINK_INVITE_MAX_ROLE,
             actions,
-            subjects,
+            subjects: all.into_iter().collect(),
             cases,
         }
     }
@@ -913,42 +1812,129 @@ mod tests {
                 serde_json::from_value(serde_json::json!(action.as_str())).expect("parse");
             assert_eq!(back, action);
         }
-        assert_eq!(seen.len(), 36);
+        assert_eq!(seen.len(), 41);
     }
 
     #[test]
-    fn standing_follows_the_one_rule() {
-        let s = |p: UserRole, m: Option<WorkspaceMemberRole>| Subject::new(p, m);
+    fn every_permission_has_its_own_bit_and_name() {
+        let mut bits = std::collections::BTreeSet::new();
+        let mut names = std::collections::BTreeSet::new();
+        for p in Permission::ALL {
+            assert!(bits.insert(p.bit()), "{p:?}: bit {} twice", p.bit());
+            assert!(names.insert(p.as_str()), "{p:?}: name twice");
+            assert!(p.bit() < 63, "{p:?}: the sign bit stays free");
+            assert_eq!(
+                serde_json::to_value(p).expect("serialise"),
+                serde_json::json!(p.as_str())
+            );
+            assert_eq!(Permission::parse(p.as_str()), Some(p));
+        }
+        assert_eq!(PermissionSet::ALL.len(), Permission::ALL.len());
+    }
+
+    #[test]
+    fn a_set_round_trips_as_names_and_as_bits() {
+        let set = PermissionSet::of(&[Permission::TicketEdit, Permission::LabelsManage]);
+        let json = serde_json::to_value(set).expect("serialise");
+        assert_eq!(json, serde_json::json!(["labels.manage", "ticket.edit"]));
+        let back: PermissionSet = serde_json::from_value(json).expect("parse");
+        assert_eq!(back, set);
+        assert_eq!(PermissionSet::from_bits(set.bits()), set);
+        // Bits nobody knows are dropped, never granted.
+        assert_eq!(
+            PermissionSet::from_bits(set.bits() | (1 << 50)),
+            set,
+            "an unknown bit"
+        );
+        assert_eq!(PermissionSet::from_bits(-1), PermissionSet::ALL);
+        assert!(serde_json::from_value::<PermissionSet>(serde_json::json!(["root"])).is_err());
+    }
+
+    #[test]
+    fn every_permission_is_read_by_some_action() {
+        let read: PermissionSet = Action::ALL
+            .into_iter()
+            .flat_map(|a| requires(a).permissions())
+            .collect();
+        assert_eq!(read, PermissionSet::ALL);
+    }
+
+    #[test]
+    fn the_presets_and_system_roles_stay_inside_their_bounds() {
+        assert!(GUEST_DEFAULT.is_subset(GUEST_CEILING));
+        assert!(!MEMBER_DEFAULT.contains(Permission::ProjectCreate), "E5");
+        for preset in RolePreset::ALL {
+            let p = preset.permissions();
+            assert!(!p.contains(Permission::InviteCreate), "{preset:?} invites");
+            assert_eq!(RolePreset::parse(preset.as_str()), Some(preset));
+        }
+        assert!(!RolePreset::Developer
+            .permissions()
+            .contains(Permission::ProjectCreate));
+        assert!(RolePreset::ProductOwner
+            .permissions()
+            .contains(Permission::ProjectCreate));
+        assert!(!RolePreset::Tester
+            .permissions()
+            .contains(Permission::TicketPlan));
+        assert!(RolePreset::Developer
+            .permissions()
+            .is_subset(RolePreset::ProductOwner.permissions()));
+    }
+
+    #[test]
+    fn standing_is_derived_from_the_permissions() {
+        let s = |p: UserRole, m: Option<Membership>| Subject::new(p, m);
         use WorkspaceMemberRole as R;
+        let of = |r| Some(Membership::of_tier(r));
         assert_eq!(
-            standing(&s(UserRole::User, Some(R::Guest)), false),
+            standing(&s(UserRole::User, of(R::Guest)), false),
             Some(Standing::Reader)
         );
         assert_eq!(
-            standing(&s(UserRole::Admin, Some(R::Guest)), false),
+            standing(&s(UserRole::Admin, of(R::Guest)), false),
             Some(Standing::Reader)
         );
         assert_eq!(
-            standing(&s(UserRole::User, Some(R::Owner)), false),
+            standing(&s(UserRole::User, of(R::Owner)), false),
             Some(Standing::Manager)
         );
         assert_eq!(
-            standing(&s(UserRole::User, Some(R::Admin)), false),
-            Some(Standing::Manager)
-        );
-        assert_eq!(
-            standing(&s(UserRole::User, Some(R::Member)), false),
+            standing(&s(UserRole::User, of(R::Member)), false),
             Some(Standing::Contributor)
         );
         assert_eq!(
-            standing(&s(UserRole::Operator, Some(R::Member)), false),
+            standing(&s(UserRole::Operator, of(R::Member)), false),
             Some(Standing::Manager)
+        );
+        assert_eq!(
+            standing(
+                &s(
+                    UserRole::User,
+                    Some(Membership::new(
+                        R::Member,
+                        RolePreset::ProductOwner.permissions()
+                    ))
+                ),
+                false
+            ),
+            Some(Standing::Manager)
+        );
+        assert_eq!(
+            standing(
+                &s(
+                    UserRole::User,
+                    Some(Membership::new(R::Member, PermissionSet::EMPTY))
+                ),
+                false
+            ),
+            Some(Standing::Reader)
         );
         assert_eq!(standing(&s(UserRole::Admin, None), false), None);
         assert_eq!(
             standing(&s(UserRole::Admin, None), true),
             Some(Standing::Manager)
         );
-        assert_eq!(standing(&s(UserRole::Operator, Some(R::Owner)), true), None);
+        assert_eq!(standing(&s(UserRole::Operator, of(R::Owner)), true), None);
     }
 }

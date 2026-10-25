@@ -2,17 +2,42 @@
 import type { AtheneAiAvailability } from "../ai/AtheneAiAvailability";
 import type { WorkspaceMemberRole } from "../workspace/WorkspaceMemberRole";
 import type { Action } from "./Action";
+import type { CapabilitiesRole } from "./CapabilitiesRole";
+import type { Permission } from "./Permission";
 import type { Standing } from "./Standing";
 
 /**
  * `GET /work/workspaces/:workspace_id/capabilities`: the caller's verdict
  * on every action in one workspace, in `{ "data": … }`.
  *
- * Answered with `Cache-Control: no-store`; a membership change counts from
- * the next request, a platform role change within the identity cache's
- * 30 s.
+ * Answered with `Cache-Control: no-store`; a membership or role change
+ * counts from the next request (`roles_epoch` moves with every write to
+ * the workspace's roles), a platform role change within the identity
+ * cache's 30 s.
  */
-export type CapabilitiesResponse = { workspace_id: string, standing: Standing, role: WorkspaceMemberRole, 
+export type CapabilitiesResponse = { workspace_id: string, 
+/**
+ * Derived for display; no rule reads it.
+ */
+standing: Standing, 
+/**
+ * The membership's tier.
+ */
+tier: WorkspaceMemberRole, 
+/**
+ * The caller's role in the workspace.
+ */
+role: CapabilitiesRole, 
+/**
+ * The permissions in effect for the caller here (guest ceiling and
+ * the platform operator's extra applied).
+ */
+permissions: Array<Permission>, 
+/**
+ * Moves with every write to the workspace's roles and their
+ * assignment; a client holding another epoch reloads.
+ */
+roles_epoch: number, 
 /**
  * Every action. A contextual one is `true` when it is allowed on any
  * resource (somebody else's, no role named); the platform actions are
@@ -25,7 +50,9 @@ actions: { [key in Action]?: boolean },
  */
 on_own: { [key in Action]?: boolean }, 
 /**
- * For `invite.create` and `members.role.change`, lowest first.
+ * The tiers for `invite.create` and `members.role.change`, lowest
+ * first. Which roles exactly: `grantable` on each role of
+ * `GET /workspaces/:id/roles`.
  */
 grantable_roles: Array<WorkspaceMemberRole>, 
 /**

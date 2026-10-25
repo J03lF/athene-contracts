@@ -12,6 +12,12 @@ export type CreateInviteRequest = {
  */
 role?: WorkspaceMemberRole, 
 /**
+ * The workspace role to grant (its tier then applies; `role`, when
+ * also sent, must match it). Someone who does not govern hands out
+ * only roles within their own rights (403 otherwise).
+ */
+role_id?: string, 
+/**
  * Omit or send `null` (or a blank string) for a link anybody may use.
  */
 email?: string | null, max_uses?: number | null, 

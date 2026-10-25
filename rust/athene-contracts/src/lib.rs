@@ -15,6 +15,7 @@ pub mod field_definitions;
 pub mod patch;
 pub mod persistence;
 pub mod policy;
+pub mod roles;
 pub mod search;
 pub mod teams;
 pub mod ticket_check;

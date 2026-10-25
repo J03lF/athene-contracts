@@ -18,7 +18,15 @@ token: string | null,
 /**
  * Addressed to one person, or `null` for a link anybody may use.
  */
-email: string | null, role: WorkspaceMemberRole, invited_by: string, status: InvitationStatus, 
+email: string | null, 
+/**
+ * The tier the invitation grants.
+ */
+role: WorkspaceMemberRole, 
+/**
+ * The workspace role it grants (custom roles, phase A).
+ */
+role_id: string | null, role_name: string | null, invited_by: string, status: InvitationStatus, 
 /**
  * Only meaningful for a link invite; `null` means unlimited.
  */

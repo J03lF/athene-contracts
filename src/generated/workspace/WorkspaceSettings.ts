@@ -2,7 +2,6 @@
 import type { TicketPriority } from "../work/TicketPriority";
 import type { ComposerPropertiesSetting } from "./ComposerPropertiesSetting";
 import type { DefaultAssignee } from "./DefaultAssignee";
-import type { TicketPlanning } from "./TicketPlanning";
 import type { WeekStart } from "./WeekStart";
 
 /**
@@ -47,8 +46,4 @@ ticket_check_quality: boolean | null,
 /**
  * The secret warning before saving (`null` = on).
  */
-ticket_check_secrets: boolean | null, 
-/**
- * Who may put tickets into a sprint or a release (`null` = editors).
- */
-ticket_planning: TicketPlanning | null, };
+ticket_check_secrets: boolean | null, };

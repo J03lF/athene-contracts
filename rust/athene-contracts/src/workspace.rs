@@ -62,31 +62,6 @@ pub enum WeekStart {
     Sunday,
 }
 
-/// Who may put tickets into a sprint or a release (and take them out).
-/// Creating, starting and completing sprints and releases stays with the
-/// workspace's managers either way (`policy::Action::ProjectPlan`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
-#[serde(rename_all = "snake_case")]
-#[ts(export_to = "workspace/")]
-pub enum TicketPlanning {
-    /// Owners and admins (and platform operators or admins who are
-    /// members): the workspace's managers.
-    Managers,
-    /// Everyone who may edit the ticket.
-    Editors,
-}
-
-impl TicketPlanning {
-    /// The product default when a workspace has not chosen.
-    pub const DEFAULT: TicketPlanning = TicketPlanning::Editors;
-
-    /// Whether editors plan too: the `editors_plan` fact of
-    /// `policy::Action::TicketPlan`. Unset is [`Self::DEFAULT`].
-    pub fn editors_plan(setting: Option<TicketPlanning>) -> bool {
-        setting.unwrap_or(Self::DEFAULT) == TicketPlanning::Editors
-    }
-}
-
 /// A property of the ticket composer a workspace may order and hide.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
 #[serde(rename_all = "snake_case")]
@@ -155,9 +130,6 @@ pub struct WorkspaceSettings {
     /// The secret warning before saving (`null` = on).
     #[serde(default)]
     pub ticket_check_secrets: Option<bool>,
-    /// Who may put tickets into a sprint or a release (`null` = editors).
-    #[serde(default)]
-    pub ticket_planning: Option<TicketPlanning>,
 }
 
 /// The settings part of a workspace patch, merged key by key: a value sets
@@ -205,9 +177,6 @@ pub struct WorkspaceSettingsPatch {
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<bool>)]
     pub ticket_check_secrets: Patch<bool>,
-    #[serde(default, skip_serializing_if = "Patch::is_absent")]
-    #[schema(value_type = Option<TicketPlanning>)]
-    pub ticket_planning: Patch<TicketPlanning>,
 }
 
 /// `PATCH /workspaces/:id`: owners and admins (403 otherwise). An absent
@@ -336,7 +305,18 @@ impl DbEnum for WorkspaceMemberRole {
 #[ts(export_to = "workspace/")]
 pub struct WorkspaceMemberResponse {
     pub user_id: String,
+    /// The tier (`owner | admin | member | guest`), from the role.
     pub role: WorkspaceMemberRole,
+    /// The member's workspace role (custom roles, phase A); `null` only
+    /// in memory mode.
+    #[serde(default)]
+    pub role_id: Option<String>,
+    #[serde(default)]
+    pub role_name: Option<String>,
+    /// A palette token; `null` = neutral.
+    #[serde(default)]
+    #[ts(as = "Option<TicketTypeColor>")]
+    pub role_color: Option<String>,
     /// RFC 3339.
     pub joined_at: String,
     /// `null` when the membership outlived the user record. The row is
@@ -372,7 +352,13 @@ pub struct InvitationResponse {
     pub token: Option<String>,
     /// Addressed to one person, or `null` for a link anybody may use.
     pub email: Option<String>,
+    /// The tier the invitation grants.
     pub role: WorkspaceMemberRole,
+    /// The workspace role it grants (custom roles, phase A).
+    #[serde(default)]
+    pub role_id: Option<String>,
+    #[serde(default)]
+    pub role_name: Option<String>,
     pub invited_by: String,
     pub status: InvitationStatus,
     /// Only meaningful for a link invite; `null` means unlimited.
@@ -394,6 +380,12 @@ pub struct CreateInviteRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub role: Option<WorkspaceMemberRole>,
+    /// The workspace role to grant (its tier then applies; `role`, when
+    /// also sent, must match it). Someone who does not govern hands out
+    /// only roles within their own rights (403 otherwise).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub role_id: Option<String>,
     /// Omit or send `null` (or a blank string) for a link anybody may use.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
@@ -421,7 +413,15 @@ pub const INVITE_MAX_DAYS: i64 = 30;
 #[serde(deny_unknown_fields)]
 #[ts(export_to = "workspace/")]
 pub struct UpdateMemberRoleRequest {
-    pub role: WorkspaceMemberRole,
+    /// A tier: the member gets that tier's system role.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub role: Option<WorkspaceMemberRole>,
+    /// A workspace role (its tier then applies). One of the two is
+    /// required; with both, they must agree (400).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub role_id: Option<String>,
 }
 
 pub type WorkspaceListResponse = crate::ListResponse<WorkspaceResponse>;
@@ -462,23 +462,31 @@ mod tests {
     }
 
     #[test]
-    fn ticket_planning_defaults_to_editors() {
-        assert!(TicketPlanning::editors_plan(None));
-        assert!(TicketPlanning::editors_plan(Some(TicketPlanning::Editors)));
-        assert!(!TicketPlanning::editors_plan(Some(
-            TicketPlanning::Managers
-        )));
-        let req: UpdateWorkspaceRequest =
-            serde_json::from_value(json!({ "settings": { "ticket_planning": "managers" } }))
-                .expect("patch");
-        assert_eq!(
-            req.settings.expect("settings").ticket_planning,
-            Patch::Value(TicketPlanning::Managers)
-        );
+    fn ticket_planning_is_a_permission_now_not_a_setting() {
+        // E8: "Tickets einplanen" is a tick of the role (migration 0032).
         assert!(serde_json::from_value::<UpdateWorkspaceRequest>(
-            json!({ "settings": { "ticket_planning": "everyone" } })
+            json!({ "settings": { "ticket_planning": "managers" } })
         )
         .is_err());
+        // A stored blob that still names it reads fine.
+        let settings: WorkspaceSettings =
+            serde_json::from_value(json!({ "ticket_planning": "managers" })).expect("settings");
+        assert_eq!(settings, WorkspaceSettings::default());
+    }
+
+    #[test]
+    fn a_role_change_or_invite_names_a_tier_or_a_role() {
+        let req: UpdateMemberRoleRequest =
+            serde_json::from_value(json!({ "role_id": "8b0c9d4e-0000-4000-8000-000000000000" }))
+                .expect("role id");
+        assert_eq!(req.role, None);
+        let req: UpdateMemberRoleRequest =
+            serde_json::from_value(json!({ "role": "guest" })).expect("tier");
+        assert_eq!(req.role, Some(WorkspaceMemberRole::Guest));
+        assert!(serde_json::from_value::<CreateInviteRequest>(
+            json!({ "role_id": "8b0c9d4e-0000-4000-8000-000000000000" })
+        )
+        .is_ok());
     }
 
     #[test]
