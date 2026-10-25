@@ -33,10 +33,12 @@ pub const TICKET_CHECK_FLAG: &str = "module.ticket_check";
 /// The most decisions one request records.
 pub const MAX_DECISIONS: usize = 50;
 
+// Keep wire names as token trees: utoipa must see the string literal in
+// serde(rename), rather than an opaque forwarded literal fragment.
 macro_rules! wire_enum {
     (
         $(#[$meta:meta])*
-        $name:ident { $( $(#[$vmeta:meta])* $variant:ident = $wire:literal ),+ $(,)? }
+        $name:ident { $( $(#[$vmeta:meta])* $variant:ident = $wire:tt ),+ $(,)? }
     ) => {
         $(#[$meta])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, ToSchema, TS)]
@@ -347,6 +349,7 @@ pub struct QualityReport {
     pub band: ScoreBand,
     /// Complete point ledger, independent of which hints are shown.
     #[serde(default)]
+    #[schema(required = true)]
     pub evidence: Vec<QualityEvidence>,
     /// Shown hints, most important first (≤ 3).
     pub hints: Vec<QualityHint>,
@@ -500,6 +503,50 @@ mod tests {
         }
         assert_eq!(QualityRule::ALL.len(), 10);
         assert_eq!(SecretKind::ALL.len(), 16);
+    }
+
+    #[test]
+    fn every_wire_enum_schema_matches_serialized_values() {
+        fn assert_schema<T: Serialize + utoipa::PartialSchema>(values: &[T]) {
+            let schema = serde_json::to_value(T::schema()).unwrap();
+            let serialized = serde_json::to_value(values).unwrap();
+            assert_eq!(schema["type"], "string", "{}", std::any::type_name::<T>());
+            assert_eq!(schema["enum"], serialized, "{}", std::any::type_name::<T>());
+        }
+
+        assert_schema(TicketCheckFeature::ALL);
+        assert_schema(SwitchLevel::ALL);
+        assert_schema(QualityRule::ALL);
+        assert_schema(HintSeverity::ALL);
+        assert_schema(SecretKind::ALL);
+        assert_schema(FixAction::ALL);
+        assert_schema(CheckField::ALL);
+        assert_schema(ReasonCode::ALL);
+        assert_schema(Strength::ALL);
+        assert_schema(ScoreBand::ALL);
+        assert_schema(SuggestionKind::ALL);
+        assert_schema(AbstainReason::ALL);
+        assert_schema(Verdict::ALL);
+        assert_schema(QualityEvidenceCode::ALL);
+    }
+
+    #[test]
+    fn evidence_is_required_in_output_schema_but_defaults_for_older_input() {
+        use utoipa::PartialSchema;
+
+        let report: QualityReport = serde_json::from_value(serde_json::json!({
+            "score": 10,
+            "band": "thin",
+            "hints": [],
+        }))
+        .unwrap();
+        assert!(report.evidence.is_empty());
+        let serialized = serde_json::to_value(report).unwrap();
+        assert_eq!(serialized["evidence"], serde_json::json!([]));
+
+        let schema = serde_json::to_value(QualityReport::schema()).unwrap();
+        let required = schema["required"].as_array().unwrap();
+        assert!(required.contains(&serde_json::json!("evidence")));
     }
 
     #[test]
