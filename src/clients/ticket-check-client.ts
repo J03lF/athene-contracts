@@ -1,5 +1,9 @@
-import type { AtheneHttpClient } from '../http';
+import type { AtheneHttpClient, RequestOptions } from '../http';
 import type {
+  BacklogReviewPage,
+  BacklogReviewQuery,
+  CompareEditsRequest,
+  CompareEditsResponse,
   DeleteIntelDataResponse,
   RecordDecisionsRequest,
   RecordDecisionsResponse,
@@ -21,6 +25,37 @@ export class TicketCheckApiClient {
   check(workspaceId: string, body: TicketCheckRequest): Promise<TicketCheckResponse> {
     return this.http
       .post<ApiEnvelope<TicketCheckResponse>>(`/work/workspaces/${workspaceId}/ticket-check`, body)
+      .then(unwrap);
+  }
+
+  /** A saved ticket before and after an edit (the writing assistance); stores nothing. */
+  compare(workspaceId: string, body: CompareEditsRequest): Promise<CompareEditsResponse> {
+    return this.http
+      .post<
+        ApiEnvelope<CompareEditsResponse>
+      >(`/work/workspaces/${workspaceId}/ticket-check/compare`, body)
+      .then(unwrap);
+  }
+
+  /**
+   * One page of the backlog review of a project's open tickets: read-only,
+   * nothing is written back. `signal` cancels it (the person left).
+   */
+  reviewBacklog(
+    workspaceId: string,
+    projectId: string,
+    query: BacklogReviewQuery = {},
+    options: RequestOptions = {}
+  ): Promise<BacklogReviewPage> {
+    const params = new URLSearchParams();
+    if (query.offset !== undefined) params.set('offset', String(query.offset));
+    if (query.limit !== undefined) params.set('limit', String(query.limit));
+    if (query.locale !== undefined) params.set('locale', query.locale);
+    const qs = params.toString();
+    return this.http
+      .get<
+        ApiEnvelope<BacklogReviewPage>
+      >(`/work/workspaces/${workspaceId}/projects/${projectId}/quality-review${qs ? `?${qs}` : ''}`, options)
       .then(unwrap);
   }
 

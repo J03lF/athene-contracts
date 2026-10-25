@@ -11,6 +11,16 @@
 //!   the person did with a suggestion (ignore, apply, …) as signed tokens.
 //! - `POST /work/workspaces/:workspace_id/intel/data/delete` deletes what
 //!   the workspace learned (`workspace.settings.edit`).
+//! - `POST /work/workspaces/:workspace_id/ticket-check/compare` compares a
+//!   saved ticket before and after an edit (`ticket.check`; computes,
+//!   writes nothing).
+//! - `GET /work/workspaces/:workspace_id/projects/:project_id/quality-review`
+//!   reviews a page of the project's open tickets (anyone who can read the
+//!   project; computes, writes nothing, notifies nobody).
+//!
+//! Since the assistance (`athene-quality-assistance-v1`), a check also
+//! carries the model package's writing assistance; see
+//! [`WritingAssistance`].
 //!
 //! Every route answers `403 ATH-FEAT-001` with [`FeatureDisabledDetails`]
 //! when a switch is off (platform flag `module.ticket_check`, the
@@ -283,6 +293,11 @@ pub struct TicketCheckRequest {
     #[ts(optional)]
     #[validate(length(max = 64))]
     pub draft_id: Option<String>,
+    /// The language of the writing assistance's questions (`de` when
+    /// absent). Everything else stays keyed for the web's own texts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub locale: Option<AssistLocale>,
 }
 
 /// Versions behind an answer (CONCEPT 5.5): the same draft and versions
@@ -456,6 +471,18 @@ pub struct QualityReport {
     /// `score` when present. `None` from cores before Q020.
     #[serde(default)]
     pub metascore: Option<MetaScore>,
+    /// The writing assistance of the model package (`assistance.py`):
+    /// the model's confident failures as questions, ordered by weight.
+    /// `None` without it; [`Self::assistance_unavailable`] says why.
+    /// Absent from cores before the assistance.
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub assistance: Option<WritingAssistance>,
+    /// Why there is no assistance (`None` when there is one, and from
+    /// cores before the assistance).
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub assistance_unavailable: Option<AssistanceUnavailable>,
 }
 
 /// A secret in the draft. Never the value: a masked preview and a
@@ -588,6 +615,322 @@ pub struct FeatureDisabledDetails {
     pub level: SwitchLevel,
 }
 
+// ---------------------------------------------------------------------
+// Writing assistance (the model package's `quality/assistance.py`,
+// contract `athene-quality-assistance-v1`): fixed derivations of the eight
+// criteria, no generated text. The questions, sections and notice are the
+// package's own texts in German or English, sent as they are (the one
+// place where the core sends sentences: they belong to the model package
+// and its goldens, not to the web).
+// ---------------------------------------------------------------------
+
+/// The only assistance contract this adapter speaks.
+pub const ASSISTANCE_CONTRACT: &str = "athene-quality-assistance-v1";
+/// Tickets one backlog review request evaluates at most.
+pub const MAX_REVIEW_PAGE: u32 = 50;
+/// Tickets one backlog review run covers at most; the web pages on.
+pub const MAX_REVIEW_RUN: u32 = 200;
+
+wire_enum! {
+    /// The language of the assistance's texts.
+    AssistLocale {
+        De = "de",
+        En = "en",
+    }
+}
+
+wire_enum! {
+    /// What the assistance found for one ticket.
+    AssistanceState {
+        /// At least one confident failure: there are questions.
+        NeedsDetails = "needs_details",
+        /// No confident failure, but some criteria are uncertain.
+        Uncertain = "uncertain",
+        /// The text exceeds the evaluation window: no score, no list.
+        Partial = "partial",
+        /// "Keine Mängel erkannt": no defect found, which is no approval.
+        NoFlags = "no_flags",
+    }
+}
+
+wire_enum! {
+    /// How much of the text the evaluation read.
+    AssistanceScope {
+        Complete = "complete",
+        Partial = "partial",
+    }
+}
+
+wire_enum! {
+    /// A criterion's state in the model's own evaluation (the package's
+    /// `scoring.score`, before Athene combines it with the rules).
+    ModelCriterionState {
+        Pass = "pass",
+        Fail = "fail",
+        Uncertain = "uncertain",
+        NotApplicable = "not_applicable",
+    }
+}
+
+wire_enum! {
+    /// Why two evaluations are not compared (`reason`), or why their
+    /// scores are not (`score_delta_unavailable_reason`, which adds the
+    /// last two).
+    ComparisonReason {
+        /// Model, model version, contract or policy differ.
+        EvaluationVersionChanged = "evaluation_version_changed",
+        TicketIdentityChanged = "ticket_identity_changed",
+        TicketTypeChanged = "ticket_type_changed",
+        /// Either text exceeds the evaluation window.
+        PartialInput = "partial_input",
+        /// A score is unknown because a criterion is uncertain.
+        UncertainScore = "uncertain_score",
+        /// Applicability or weights differ: another denominator.
+        DifferentApplicabilityOrWeights = "different_applicability_or_weights",
+    }
+}
+
+wire_enum! {
+    /// Why a check or a review has no model assistance.
+    AssistanceUnavailable {
+        /// The workspace chose "Nur Regeln".
+        RulesOnly = "rules_only",
+        /// No model is active (off, not installed, being checked).
+        NoModel = "no_model",
+        /// The active model has no `athene-quality-assistance-v1`.
+        ModelWithoutAssistance = "model_without_assistance",
+        /// The ticket's type is none of the model's four.
+        TypeNotSupported = "type_not_supported",
+        /// The inference failed or timed out.
+        Failed = "failed",
+    }
+}
+
+wire_enum! {
+    /// Who evaluated a backlog review row.
+    ReviewEngine {
+        /// The model and its assistance contract.
+        Assistance = "assistance",
+        /// The rule logic alone (the workspace chose "Nur Regeln", no
+        /// model with assistance is active, or the type is not one of the
+        /// model's four).
+        Rules = "rules",
+    }
+}
+
+/// One question or request for a criterion.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct AssistImprovement {
+    pub criterion_id: QualityCriterion,
+    /// The part of the ticket it is about ("Ist und Soll").
+    pub section: String,
+    /// The concrete question or request.
+    pub prompt: String,
+    /// The policy weight; the list is ordered by it.
+    pub weight: u8,
+    /// The model's calibrated confidence in the failure; `None` for a
+    /// rule-based backlog row.
+    pub confidence: Option<f64>,
+}
+
+/// `writing_assistance` for one draft, field for field as the package
+/// answers it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct WritingAssistance {
+    /// `athene-quality-assistance-v1`.
+    pub contract_version: String,
+    /// SHA-256 (hex) of the UTF-8 model input text after NFC and secret
+    /// masking, before tokenisation. Binds the answer to the text it is
+    /// about; no security feature.
+    pub input_fingerprint: String,
+    pub model_version: String,
+    pub locale: AssistLocale,
+    pub state: AssistanceState,
+    pub scope: AssistanceScope,
+    /// The package's score (two decimals): `None` when partial or when a
+    /// criterion is uncertain.
+    pub displayed_score: Option<f64>,
+    /// Lowest and highest possible score; `None` when partial.
+    pub displayed_score_range: Option<[Option<f64>; 2]>,
+    /// Confident failures, heaviest first; empty when partial.
+    pub improvements: Vec<AssistImprovement>,
+    /// Criteria the model is not sure about, in policy order.
+    pub uncertain_criteria: Vec<QualityCriterion>,
+    /// Why there is no score and no list (`partial` only).
+    pub notice: Option<String>,
+}
+
+/// One side of an edit: what the model reads of the ticket.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Validate, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "intel/")]
+pub struct EditSide {
+    /// The ticket type's key.
+    #[validate(length(max = 64))]
+    pub ticket_type: String,
+    #[validate(length(max = 500))]
+    pub title: String,
+    #[serde(default)]
+    #[validate(length(max = 65536))]
+    pub description: String,
+}
+
+/// `POST /work/workspaces/:workspace_id/ticket-check/compare`: a saved
+/// ticket before and after an edit (the web keeps the version it had
+/// loaded). Computes, stores nothing.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Validate, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "intel/")]
+pub struct CompareEditsRequest {
+    #[validate(length(min = 1, max = 64))]
+    pub ticket_id: String,
+    #[validate(nested)]
+    pub before: EditSide,
+    #[validate(nested)]
+    pub after: EditSide,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub locale: Option<AssistLocale>,
+}
+
+/// A criterion whose state changed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct CriterionChange {
+    pub criterion_id: QualityCriterion,
+    pub before: ModelCriterionState,
+    pub after: ModelCriterionState,
+}
+
+/// `compare_edits`, field for field as the package answers it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct EditComparison {
+    pub contract_version: String,
+    /// `false`: model, policy, type or ticket changed, or a text is
+    /// partial; then every list is empty.
+    pub comparable: bool,
+    pub reason: Option<ComparisonReason>,
+    pub before_fingerprint: String,
+    pub after_fingerprint: String,
+    /// fail → pass only.
+    pub resolved_criteria: Vec<QualityCriterion>,
+    /// Newly failed (from pass, uncertain or not applicable).
+    pub new_flags: Vec<QualityCriterion>,
+    /// Now not applicable; not counted as resolved.
+    pub no_longer_applicable: Vec<QualityCriterion>,
+    pub changed_criteria: Vec<CriterionChange>,
+    /// After minus before, two decimals; `None` unless both scores are
+    /// certain with the same applicability and weights.
+    pub score_delta: Option<f64>,
+    pub score_delta_unavailable_reason: Option<ComparisonReason>,
+    pub before: WritingAssistance,
+    pub after: WritingAssistance,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct CompareEditsResponse {
+    /// `None` when there is no model assistance; `unavailable` says why.
+    pub comparison: Option<EditComparison>,
+    pub unavailable: Option<AssistanceUnavailable>,
+}
+
+/// `GET /work/workspaces/:workspace_id/projects/:project_id/quality-review`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "intel/")]
+pub struct BacklogReviewQuery {
+    /// Position in the project's open tickets (oldest first), default 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub offset: Option<u32>,
+    /// 1..=50 (default 25).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub limit: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub locale: Option<AssistLocale>,
+}
+
+/// One reviewed ticket.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct BacklogReviewItem {
+    pub ticket_id: String,
+    /// `WEB-12`.
+    pub key: String,
+    /// The title as the backlog shows it.
+    pub title: String,
+    pub ticket_type: String,
+    /// 1-based position in the project's open tickets (the tie-break).
+    pub source_row: u32,
+    pub engine: ReviewEngine,
+    /// The weights of `improvements` together.
+    pub flagged_weight: u32,
+    pub state: AssistanceState,
+    /// `engine = assistance`: the package's score (two decimals, `None`
+    /// when uncertain or partial). `rules`: the rules' metascore.
+    pub displayed_score: Option<f64>,
+    pub displayed_score_range: Option<[Option<f64>; 2]>,
+    pub improvements: Vec<AssistImprovement>,
+    pub uncertain_criteria: Vec<QualityCriterion>,
+    pub notice: Option<String>,
+    /// `engine = assistance` only.
+    pub input_fingerprint: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct BacklogReviewCounts {
+    pub needs_details: u32,
+    pub uncertain: u32,
+    pub partial: u32,
+    pub no_flags: u32,
+}
+
+/// The rows by state. `needs_details` is ordered by the flagged weight,
+/// heaviest first, then by position: quality feedback only, not business
+/// urgency or ticket priority. The others keep the position order.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct BacklogReviewGroups {
+    pub needs_details: Vec<BacklogReviewItem>,
+    pub uncertain: Vec<BacklogReviewItem>,
+    pub partial: Vec<BacklogReviewItem>,
+    pub no_flags: Vec<BacklogReviewItem>,
+}
+
+/// One page of a backlog review: read-only, nothing is written back and
+/// nobody is notified.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct BacklogReviewPage {
+    /// Who evaluated the page: `assistance` (model rows, plus rule rows
+    /// for types the model does not read) or `rules` throughout.
+    pub engine: ReviewEngine,
+    /// Why the page is rules only (`None` with the model).
+    pub unavailable: Option<AssistanceUnavailable>,
+    /// `athene-quality-assistance-v1` with the model, else `None`.
+    pub contract_version: Option<String>,
+    pub model_version: Option<String>,
+    pub policy_version: Option<String>,
+    /// Open tickets of the project the viewer can see.
+    pub total_open: u32,
+    pub offset: u32,
+    pub limit: u32,
+    /// Rows on this page.
+    pub tickets: u32,
+    pub counts: BacklogReviewCounts,
+    /// "quality feedback weight only; not business urgency or ticket
+    /// priority".
+    pub ordering: String,
+    pub groups: BacklogReviewGroups,
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -634,6 +977,13 @@ mod tests {
         assert_schema(QualityCriterion::ALL);
         assert_schema(CriterionState::ALL);
         assert_schema(CriterionSource::ALL);
+        assert_schema(AssistLocale::ALL);
+        assert_schema(AssistanceState::ALL);
+        assert_schema(AssistanceScope::ALL);
+        assert_schema(ModelCriterionState::ALL);
+        assert_schema(ComparisonReason::ALL);
+        assert_schema(AssistanceUnavailable::ALL);
+        assert_schema(ReviewEngine::ALL);
     }
 
     #[test]
@@ -686,5 +1036,59 @@ mod tests {
         assert!(long.validate().is_err());
         let none = RecordDecisionsRequest { decisions: vec![] };
         assert!(none.validate().is_err());
+    }
+    #[test]
+    fn assistance_keeps_the_package_shape() {
+        let wire = serde_json::json!({
+            "contract_version": "athene-quality-assistance-v1",
+            "input_fingerprint": "2fb05a6bf1417b283b79d000da746273968aab8a15f4ebfa008ecb412b929608",
+            "model_version": "0.5.0-beta4", "locale": "de", "state": "needs_details",
+            "scope": "complete", "displayed_score": 66.67, "displayed_score_range": [66.67, 66.67],
+            "improvements": [{"criterion_id": "goal_clear", "section": "Ziel",
+                "prompt": "Beschreibe ein eindeutiges gewünschtes Ergebnis; kläre widersprüchliche Anforderungen.",
+                "weight": 3, "confidence": 0.8217225121019534}],
+            "uncertain_criteria": [], "notice": null
+        });
+        let back: WritingAssistance = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(back.state, AssistanceState::NeedsDetails);
+        assert_eq!(serde_json::to_value(&back).unwrap(), wire);
+        let partial: WritingAssistance = serde_json::from_value(serde_json::json!({
+            "contract_version": ASSISTANCE_CONTRACT, "input_fingerprint": "x",
+            "model_version": "v", "locale": "en", "state": "partial", "scope": "partial",
+            "displayed_score": null, "displayed_score_range": null, "improvements": [],
+            "uncertain_criteria": ["goal_clear"], "notice": "n"
+        }))
+        .unwrap();
+        assert!(partial.displayed_score_range.is_none());
+    }
+
+    #[test]
+    fn compare_requests_validate_both_sides() {
+        let ok: CompareEditsRequest = serde_json::from_value(serde_json::json!({
+            "ticket_id": "t", "before": {"ticket_type": "task", "title": "a", "description": ""},
+            "after": {"ticket_type": "task", "title": "b"}, "locale": "en"
+        }))
+        .unwrap();
+        assert!(ok.validate().is_ok());
+        let long = CompareEditsRequest {
+            after: EditSide {
+                title: "x".repeat(501),
+                ..EditSide::default()
+            },
+            ..ok.clone()
+        };
+        assert!(long.validate().is_err());
+        assert!(
+            serde_json::from_value::<CompareEditsRequest>(serde_json::json!({
+                "ticket_id": "t", "before": {"ticket_type": "task", "title": "a", "x": 1},
+                "after": {"ticket_type": "task", "title": "b"}
+            }))
+            .is_err()
+        );
+        let older: QualityReport = serde_json::from_value(serde_json::json!({
+            "score": 10, "band": "thin", "hints": [], "metascore": null
+        }))
+        .unwrap();
+        assert!(older.assistance.is_none() && older.assistance_unavailable.is_none());
     }
 }
