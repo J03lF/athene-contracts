@@ -34,6 +34,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;
 
+use crate::athene_ai::AtheneAiAvailability;
 use crate::auth::UserRole;
 use crate::workspace::WorkspaceMemberRole;
 
@@ -640,6 +641,10 @@ pub struct CapabilitiesResponse {
     /// The rules' revision (`POLICY_REVISION`); a client holding rules of
     /// another revision reloads them.
     pub policy_revision: u32,
+    /// Whether Athene AI is there for the caller here, as far as the
+    /// platform goes (`athene_ai`). Not a policy rule: the core fills it in
+    /// from the platform's visibility and the workspace's beta enrollment.
+    pub athene_ai: AtheneAiAvailability,
 }
 
 /// The capabilities of a member; `None` for a non-member (the endpoint
@@ -677,6 +682,7 @@ pub fn capabilities(
         grantable_roles: grantable_roles(subject),
         link_invite_max_role: LINK_INVITE_MAX_ROLE,
         policy_revision: POLICY_REVISION,
+        athene_ai: AtheneAiAvailability::HIDDEN,
     })
 }
 

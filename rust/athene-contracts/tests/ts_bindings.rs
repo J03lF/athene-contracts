@@ -25,8 +25,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use athene_contracts::{
-    activity, admin, auth, calendar, common, dashboard, docs, edit, field_definitions, policy,
-    search, teams, ticket_check, ticket_types, user, work, workspace,
+    activity, admin, athene_ai, auth, calendar, common, dashboard, docs, edit, field_definitions,
+    policy, search, teams, ticket_check, ticket_types, user, work, workspace,
 };
 use ts_rs::{Config, TS};
 
@@ -277,6 +277,12 @@ fn render(out: &Path) {
         calendar::CalendarRelease,
         calendar::CalendarResponse,
         edit::EditConflictDetails<calendar::EventResponse>,
+        // Athene AI (AI1)
+        athene_ai::AtheneAiAvailability,
+        athene_ai::AtheneAiWorkspaceResponse,
+        athene_ai::AtheneAiAdminResponse,
+        athene_ai::UpdateAtheneAiRequest,
+        athene_ai::EnrollAiWorkspaceRequest,
     );
     // The verdicts the web's local rules are tested against (3.12).
     let matrix = policy::matrix::to_json(&policy::matrix::build()).expect("policy matrix");
