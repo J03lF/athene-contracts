@@ -17,6 +17,13 @@
 //! - `GET /work/workspaces/:workspace_id/projects/:project_id/quality-review`
 //!   reviews a page of the project's open tickets (anyone who can read the
 //!   project; computes, writes nothing, notifies nobody).
+//! - `POST …/projects/:project_id/quality-review/runs` reviews a page and
+//!   remembers it as part of a run (ids, versions, scores and criterion
+//!   states; no ticket text); `GET …/quality-review/last` answers the
+//!   project's last finished run with the trend against the one before.
+//! - `POST …/projects/:project_id/quality-review/requests` posts the
+//!   confirmed "Reporter um Ergänzung bitten" comments (`comment.create`,
+//!   at most 20 at once).
 //!
 //! Since the assistance (`athene-quality-assistance-v1`), a check also
 //! carries the model package's writing assistance; see
@@ -881,6 +888,67 @@ pub struct BacklogReviewItem {
     pub notice: Option<String>,
     /// `engine = assistance` only.
     pub input_fingerprint: Option<String>,
+    /// The applicable criteria in policy order (pass ✓, fail ✗, uncertain
+    /// ?), with their weights: the row's checklist. Empty when partial.
+    #[serde(default)]
+    #[schema(required = true)]
+    pub criteria: Vec<ReviewCriterion>,
+    /// The ticket's `version` when it was reviewed (3.7).
+    #[serde(default)]
+    #[schema(required = true)]
+    pub ticket_version: i64,
+    #[serde(default)]
+    pub assignee_id: Option<String>,
+    #[serde(default)]
+    #[schema(required = true)]
+    pub reporter_id: String,
+    #[serde(default)]
+    pub sprint_id: Option<String>,
+    /// Stored results only: the ticket was written since it was reviewed
+    /// ("seitdem geändert"); the row is still the old evaluation.
+    #[serde(default)]
+    #[schema(required = true)]
+    pub changed_since: bool,
+    /// Stored results only: when someone asked the reporter for the
+    /// missing details from this review ("Nachgefragt"), RFC 3339.
+    #[serde(default)]
+    pub asked_at: Option<String>,
+    /// Stored results with a comparable previous run only: how the row
+    /// moved since then.
+    #[serde(default)]
+    pub trend: Option<ReviewTrendMark>,
+}
+
+/// One applicable criterion of a review row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct ReviewCriterion {
+    pub criterion: QualityCriterion,
+    /// `pass`, `fail` or `uncertain` (not applicable ones are left out).
+    pub state: ModelCriterionState,
+    /// The policy weight; a pass earns it.
+    pub weight: u8,
+}
+
+wire_enum! {
+    /// How a ticket's review moved against the previous run (same model).
+    ReviewTrendMark {
+        Better = "better",
+        Worse = "worse",
+        Same = "same",
+        /// Not in the previous run.
+        New = "new",
+    }
+}
+
+wire_enum! {
+    /// Why a stored review has no comparison with the run before it.
+    ReviewTrendUnavailable {
+        /// There is no earlier run of this project.
+        NoPrevious = "no_previous",
+        /// The earlier run used another engine, model or policy version.
+        DifferentModel = "different_model",
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
@@ -929,6 +997,159 @@ pub struct BacklogReviewPage {
     /// priority".
     pub ordering: String,
     pub groups: BacklogReviewGroups,
+    /// `POST …/quality-review/runs` only: the stored run this page was
+    /// added to (send it with the next page). `None` from the read-only
+    /// `GET`, or when the page could not be stored.
+    #[serde(default)]
+    pub run_id: Option<String>,
+}
+
+/// `POST /work/workspaces/:workspace_id/projects/:project_id/quality-review/runs`:
+/// one page of a backlog review that is remembered. The first page
+/// (without `run_id`) starts a run; the next ones name it. A run is the
+/// project's last result once its last page (`MAX_REVIEW_RUN` tickets or
+/// the end of the open tickets) arrived. Stored per ticket: ids, version,
+/// score, group and criterion states; no ticket text.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Validate, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "intel/")]
+pub struct BacklogReviewRunRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub offset: Option<u32>,
+    /// 1..=50 (default 25).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub limit: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub locale: Option<AssistLocale>,
+    /// The run of the earlier pages; absent on the first.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    #[validate(length(min = 36, max = 36))]
+    pub run_id: Option<String>,
+}
+
+/// `GET …/quality-review/last?locale`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "intel/")]
+pub struct BacklogReviewLastQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub locale: Option<AssistLocale>,
+}
+
+/// Who ran a stored review, when, with what.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct StoredReviewHead {
+    pub run_id: String,
+    /// When the last page arrived, RFC 3339.
+    pub reviewed_at: String,
+    pub reviewed_by: String,
+    pub engine: ReviewEngine,
+    pub model_version: Option<String>,
+    pub policy_version: Option<String>,
+    pub contract_version: Option<String>,
+    /// Position of the run's first ticket in the open tickets (0, 200, …).
+    pub start: u32,
+    /// Tickets the run reviewed.
+    pub tickets: u32,
+    /// Open tickets of the project when it ran.
+    pub total_open: u32,
+}
+
+/// The comparison with the run before (same engine, model and policy).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct BacklogReviewTrend {
+    pub better: u32,
+    pub worse: u32,
+    pub same: u32,
+    /// Reviewed now, not then.
+    pub new: u32,
+    /// When the earlier run finished, RFC 3339.
+    pub previous_at: String,
+}
+
+/// The project's last remembered review, rebuilt for today's tickets:
+/// titles and keys are read now (no text is stored), the questions come
+/// from the package in `locale`, deleted or closed tickets are left out.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct BacklogReviewLast {
+    /// `None`: the project was never reviewed (or its run is unfinished).
+    pub review: Option<StoredReviewHead>,
+    pub counts: BacklogReviewCounts,
+    pub ordering: String,
+    pub groups: BacklogReviewGroups,
+    pub trend: Option<BacklogReviewTrend>,
+    pub trend_unavailable: Option<ReviewTrendUnavailable>,
+}
+
+/// The most comments one "Reporter um Ergänzung bitten" posts.
+pub const MAX_ASK_REPORTER: usize = 20;
+
+/// One comment of "Reporter um Ergänzung bitten".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Validate, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "intel/")]
+pub struct AskReporterItem {
+    #[validate(length(min = 36, max = 36))]
+    pub ticket_id: String,
+    /// The text the person confirmed (Markdown, mentions as
+    /// `[@Name](mention:<id>)`). The server puts the label line
+    /// "Athene AI · Vorschlag" above it.
+    #[validate(length(min = 1, max = 4000))]
+    pub body: String,
+}
+
+/// `POST /work/workspaces/:workspace_id/projects/:project_id/quality-review/requests`:
+/// posts each confirmed comment as the current person (`comment.create`
+/// on the ticket), at most [`MAX_ASK_REPORTER`] at once; never sent
+/// without the person's confirmation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Validate, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "intel/")]
+pub struct AskReporterRequest {
+    #[validate(length(min = 1, max = 20), nested)]
+    pub items: Vec<AskReporterItem>,
+    /// The label line's language (`de` when absent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub locale: Option<AssistLocale>,
+}
+
+wire_enum! {
+    /// What happened to one comment.
+    AskReporterOutcome {
+        Sent = "sent",
+        /// No `comment.create` on that ticket.
+        Forbidden = "forbidden",
+        /// Not a ticket of this project (or gone).
+        NotFound = "not_found",
+        /// Listed twice in the request: sent once.
+        Duplicate = "duplicate",
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct AskReporterResult {
+    pub ticket_id: String,
+    pub outcome: AskReporterOutcome,
+    /// `sent`: the new comment.
+    pub comment_id: Option<String>,
+    /// `sent`: "Nachgefragt" since, RFC 3339.
+    pub asked_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct AskReporterResponse {
+    pub results: Vec<AskReporterResult>,
 }
 
 #[cfg(test)]
@@ -1090,5 +1311,50 @@ mod tests {
         }))
         .unwrap();
         assert!(older.assistance.is_none() && older.assistance_unavailable.is_none());
+    }
+
+    #[test]
+    fn asking_reporters_is_bounded_and_older_review_rows_still_read() {
+        let id = "0b9f3f3e-8f0e-4a43-9a52-1c0d6e1d2a10";
+        let item = AskReporterItem {
+            ticket_id: id.into(),
+            body: "Kannst du das ergänzen?".into(),
+        };
+        let ok = AskReporterRequest {
+            items: vec![item.clone(); MAX_ASK_REPORTER],
+            locale: None,
+        };
+        assert!(ok.validate().is_ok());
+        let many = AskReporterRequest {
+            items: vec![item.clone(); MAX_ASK_REPORTER + 1],
+            locale: None,
+        };
+        assert!(many.validate().is_err(), "at most 20 per action");
+        let empty_body = AskReporterRequest {
+            items: vec![AskReporterItem {
+                body: String::new(),
+                ..item
+            }],
+            locale: None,
+        };
+        assert!(empty_body.validate().is_err());
+        assert!(serde_json::from_value::<BacklogReviewRunRequest>(
+            serde_json::json!({ "offset": 0, "run_id": id, "x": 1 })
+        )
+        .is_err());
+        let short = BacklogReviewRunRequest {
+            run_id: Some("nope".into()),
+            ..BacklogReviewRunRequest::default()
+        };
+        assert!(short.validate().is_err());
+        // A row from before review2 (no checklist, no version) still reads.
+        let older: BacklogReviewItem = serde_json::from_value(serde_json::json!({
+            "ticket_id": id, "key": "WEB-1", "title": "t", "ticket_type": "bug",
+            "source_row": 1, "engine": "rules", "flagged_weight": 0, "state": "no_flags",
+            "displayed_score": null, "displayed_score_range": null, "improvements": [],
+            "uncertain_criteria": [], "notice": null, "input_fingerprint": null
+        }))
+        .unwrap();
+        assert!(older.criteria.is_empty() && !older.changed_since && older.trend.is_none());
     }
 }

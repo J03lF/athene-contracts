@@ -295,6 +295,12 @@ fn render(out: &Path) {
         ticket_check::CompareEditsResponse,
         ticket_check::BacklogReviewQuery,
         ticket_check::BacklogReviewPage,
+        // remembered review, trend, asking the reporter (review2)
+        ticket_check::BacklogReviewRunRequest,
+        ticket_check::BacklogReviewLastQuery,
+        ticket_check::BacklogReviewLast,
+        ticket_check::AskReporterRequest,
+        ticket_check::AskReporterResponse,
         // calendar: events and bands (UX9)
         calendar::EventWhen,
         calendar::EventResponse,

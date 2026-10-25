@@ -2,7 +2,9 @@
 import type { AssistImprovement } from "./AssistImprovement";
 import type { AssistanceState } from "./AssistanceState";
 import type { QualityCriterion } from "./QualityCriterion";
+import type { ReviewCriterion } from "./ReviewCriterion";
 import type { ReviewEngine } from "./ReviewEngine";
+import type { ReviewTrendMark } from "./ReviewTrendMark";
 
 /**
  * One reviewed ticket.
@@ -32,4 +34,28 @@ displayed_score: number | null, displayed_score_range: [number | null, number | 
 /**
  * `engine = assistance` only.
  */
-input_fingerprint: string | null, };
+input_fingerprint: string | null, 
+/**
+ * The applicable criteria in policy order (pass ✓, fail ✗, uncertain
+ * ?), with their weights: the row's checklist. Empty when partial.
+ */
+criteria: Array<ReviewCriterion>, 
+/**
+ * The ticket's `version` when it was reviewed (3.7).
+ */
+ticket_version: number, assignee_id: string | null, reporter_id: string, sprint_id: string | null, 
+/**
+ * Stored results only: the ticket was written since it was reviewed
+ * ("seitdem geändert"); the row is still the old evaluation.
+ */
+changed_since: boolean, 
+/**
+ * Stored results only: when someone asked the reporter for the
+ * missing details from this review ("Nachgefragt"), RFC 3339.
+ */
+asked_at: string | null, 
+/**
+ * Stored results with a comparable previous run only: how the row
+ * moved since then.
+ */
+trend: ReviewTrendMark | null, };

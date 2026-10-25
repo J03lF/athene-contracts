@@ -34,4 +34,10 @@ tickets: number, counts: BacklogReviewCounts,
  * "quality feedback weight only; not business urgency or ticket
  * priority".
  */
-ordering: string, groups: BacklogReviewGroups, };
+ordering: string, groups: BacklogReviewGroups, 
+/**
+ * `POST …/quality-review/runs` only: the stored run this page was
+ * added to (send it with the next page). `None` from the read-only
+ * `GET`, or when the page could not be stored.
+ */
+run_id: string | null, };
