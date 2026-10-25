@@ -1,7 +1,9 @@
 //! Ticket check (intel layer R1, `artifacts/ticket-check/CONCEPT.md`):
 //! while someone writes a ticket, local algorithms check it and explain
 //! what they found. Quality rules, a secret scanner and the duplicate
-//! radar ("Ähnliche Tickets"); no external service, no model.
+//! radar ("Ähnliche Tickets"); no external service. Since Q020 the
+//! quality score is a metascore over eight criteria, decided per criterion
+//! by Athene's local quality model where it is sure, else by the rules.
 //!
 //! - `POST /work/workspaces/:workspace_id/ticket-check` checks a draft
 //!   (action `ticket.check`; computes, writes nothing).
@@ -330,6 +332,100 @@ pub struct QualityEvidence {
     pub max_points: u8,
 }
 
+wire_enum! {
+    /// The eight criteria of the quality metascore, in the model policy's
+    /// binding order (`quality_policy.json`, `quality-v1`). The web renders
+    /// `ticket_check.criterion.<id>.{title,feedback}`; the German feedback
+    /// is the policy's `feedback_de`.
+    QualityCriterion {
+        /// Weight 3, every type.
+        TitleInformative = "title_informative",
+        /// Weight 4, every type.
+        DescriptionInformative = "description_informative",
+        /// Weight 3, every type.
+        GoalClear = "goal_clear",
+        /// Weight 2, every type.
+        ContextSufficient = "context_sufficient",
+        /// Weight 3, bugs only.
+        ReproductionSufficient = "reproduction_sufficient",
+        /// Weight 3, bugs only.
+        ExpectedActual = "expected_actual",
+        /// Weight 3, features and tasks.
+        CompletionCriteria = "completion_criteria",
+        /// Weight 1, only where the ticket depends on supporting material.
+        EvidenceSufficient = "evidence_sufficient",
+    }
+}
+
+wire_enum! {
+    /// A criterion's verdict in the metascore.
+    CriterionState {
+        Pass = "pass",
+        Fail = "fail",
+        /// Neither the model (confidence < 0.7) nor a rule is sure: left
+        /// out of the denominator and shown as "unsicher".
+        Uncertain = "uncertain",
+    }
+}
+
+wire_enum! {
+    /// Who decided a criterion.
+    CriterionSource {
+        /// Athene's quality model, at a confidence of at least 0.7.
+        Model = "model",
+        /// The rule logic (the R1 evidence ledger).
+        Rule = "rule",
+        /// A formal rule: an empty title or description always fails.
+        Formal = "formal",
+    }
+}
+
+/// One applicable criterion of the metascore. Criteria that do not apply
+/// to the ticket's type (or, for evidence, are not needed) are not listed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct CriterionResult {
+    pub criterion: QualityCriterion,
+    pub state: CriterionState,
+    /// `None` while `uncertain`.
+    pub source: Option<CriterionSource>,
+    /// The policy weight.
+    pub weight: u8,
+    /// `weight` on pass, else 0.
+    pub points: u8,
+    /// The model's calibrated confidence in its top class, when the model
+    /// ran (also when it was not sure and a rule decided).
+    pub confidence: Option<f32>,
+}
+
+/// The quality metascore over the eight criteria (Q020): 100 × earned /
+/// decided weights. Deviation from the model package: uncertain criteria
+/// leave the denominator and are counted in `uncertain`, so there is a
+/// score as long as one criterion is decided.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct MetaScore {
+    /// 0–100, rounded half up; `None` when no criterion is decided.
+    pub score: Option<u8>,
+    pub band: Option<ScoreBand>,
+    /// Weights of passed criteria.
+    pub earned_weight: u8,
+    /// Weights of decided (passed or failed) criteria: the denominator.
+    pub assessed_weight: u8,
+    /// Weights of every applicable criterion, decided or not.
+    pub possible_weight: u8,
+    /// How many applicable criteria are uncertain.
+    pub uncertain: u8,
+    /// Applicable criteria in policy order.
+    pub criteria: Vec<CriterionResult>,
+    /// Who could decide: `rules`, or `rules_model` when the model ran.
+    pub engine: crate::athene_ai::AiQualityEngine,
+    /// The model version that ran (`0.2.0-beta1`), else `None`.
+    pub model_version: Option<String>,
+    /// The model read only the first 256 tokens of the draft.
+    pub input_truncated: bool,
+}
+
 /// One quality hint. Its text is `ticket_check.rule.<rule>.{title,why,fix}`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "intel/")]
@@ -356,6 +452,10 @@ pub struct QualityReport {
     pub evidence: Vec<QualityEvidence>,
     /// Shown hints, most important first (≤ 3).
     pub hints: Vec<QualityHint>,
+    /// The metascore over the eight criteria; the web shows it instead of
+    /// `score` when present. `None` from cores before Q020.
+    #[serde(default)]
+    pub metascore: Option<MetaScore>,
 }
 
 /// A secret in the draft. Never the value: a masked preview and a
@@ -531,6 +631,27 @@ mod tests {
         assert_schema(AbstainReason::ALL);
         assert_schema(Verdict::ALL);
         assert_schema(QualityEvidenceCode::ALL);
+        assert_schema(QualityCriterion::ALL);
+        assert_schema(CriterionState::ALL);
+        assert_schema(CriterionSource::ALL);
+    }
+
+    #[test]
+    fn criteria_keep_the_policy_order() {
+        let ids: Vec<&str> = QualityCriterion::ALL.iter().map(|c| c.as_str()).collect();
+        assert_eq!(
+            ids,
+            [
+                "title_informative",
+                "description_informative",
+                "goal_clear",
+                "context_sufficient",
+                "reproduction_sufficient",
+                "expected_actual",
+                "completion_criteria",
+                "evidence_sufficient",
+            ]
+        );
     }
 
     #[test]
@@ -544,6 +665,7 @@ mod tests {
         }))
         .unwrap();
         assert!(report.evidence.is_empty());
+        assert!(report.metascore.is_none());
         let serialized = serde_json::to_value(report).unwrap();
         assert_eq!(serialized["evidence"], serde_json::json!([]));
 

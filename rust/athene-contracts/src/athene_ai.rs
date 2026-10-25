@@ -1,7 +1,7 @@
 //! Athene AI: one brand and one place to control every intelligence
 //! function of Athene. In R1 that is the ticket check (quality hints,
-//! secret protection, "Ähnliche Tickets", local algorithms only); R2 adds
-//! Athene's own local model.
+//! secret protection, "Ähnliche Tickets", local algorithms); Q020 adds
+//! Athene's own local quality model ("Athene AI Beta 0.2.0").
 //!
 //! Three levels decide whether it runs, the first one here:
 //!
@@ -27,6 +27,8 @@
 //!   /admin/athene-ai/workspaces/:workspace_id` — enrol a workspace
 //!   directly, remove one.
 //! - `POST /admin/athene-ai/requests/:workspace_id/approve|reject`.
+//! - `GET /admin/athene-ai/model/licenses` — the licence files shipped
+//!   with the quality model.
 //!
 //! The admin routes answer the whole [`AtheneAiAdminResponse`] after a
 //! change. A switched-off platform answers the workspace routes with
@@ -105,17 +107,66 @@ ai_enum! {
 }
 
 ai_enum! {
-    /// What answers: R1 runs algorithms only.
+    /// What answers the quality check right now.
     AiEngine {
+        /// The R1 algorithms only.
         AlgorithmsR1 = "algorithms_r1",
+        /// The R1 algorithms plus Athene's own quality model (Q020).
+        AlgorithmsModel = "algorithms_model",
     }
 }
 
 ai_enum! {
-    /// Athene's own model (R2).
+    /// Athene's own quality model, as the core found it.
     AiModelState {
+        /// No package at the configured place (or no place configured).
         NotInstalled = "not_installed",
+        /// The package is there and waits for its check.
         Installed = "installed",
+        /// Checksums, session load and the golden cases are running.
+        Checking = "checking",
+        /// Checked: every golden case matched; the model may answer.
+        Ready = "ready",
+        /// The package failed a check; the rules carry on alone.
+        Error = "error",
+    }
+}
+
+ai_enum! {
+    /// How the quality score is decided (Admin → Athene AI,
+    /// "Qualitätsbewertung").
+    #[derive(Default)]
+    AiQualityEngine {
+        /// The rule logic alone.
+        Rules = "rules",
+        /// Per criterion, whoever is sure decides: the model at a
+        /// confidence of at least 0.7, the rules otherwise. In effect only
+        /// while the model is `ready`; until then the rules answer alone.
+        #[default]
+        RulesModel = "rules_model",
+    }
+}
+
+ai_enum! {
+    /// Why the model is not ready. The web words it; `detail` names the
+    /// file or golden case when there is one.
+    AiModelError {
+        /// Turned off by configuration (`ATHENE_QUALITY_MODEL=off`).
+        Disabled = "disabled",
+        /// No models directory: `ATHENE_MODELS_DIR` unset and no home.
+        NoModelsDir = "no_models_dir",
+        /// `athene_model.json` or `golden.jsonl` is missing.
+        NotFound = "not_found",
+        /// A contract other than `athene-quality-onnx-v1`.
+        ContractUnsupported = "contract_unsupported",
+        /// The metadata or policy does not match what this core reads.
+        InvalidPackage = "invalid_package",
+        /// A file's SHA-256 differs from `athene_model.json`.
+        ChecksumMismatch = "checksum_mismatch",
+        /// The tokenizer or the ONNX graph could not be loaded.
+        LoadFailed = "load_failed",
+        /// A golden case gave other token ids, confidences or decisions.
+        GoldenMismatch = "golden_mismatch",
     }
 }
 
@@ -215,16 +266,77 @@ pub struct AiWorkspaceRef {
     pub name: String,
 }
 
+/// Athene's own quality model: which package, its state and how fast it
+/// answers on this machine.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "ai/")]
+pub struct AiQualityModelStatus {
+    /// `athene-quality`.
+    pub id: String,
+    /// `0.2.0-beta1`: the configured version (a path below the models
+    /// directory), also before the package was read.
+    pub version: String,
+    /// The package's contract once read (`athene-quality-onnx-v1`).
+    pub contract_version: Option<String>,
+    pub state: AiModelState,
+    /// Set in `error` and `not_installed`.
+    pub error: Option<AiModelError>,
+    /// The file or golden case the error is about; never a secret.
+    pub error_detail: Option<String>,
+    pub goldens_passed: u32,
+    pub goldens_total: u32,
+    /// Largest confidence difference over the golden cases.
+    pub max_confidence_diff: Option<f64>,
+    /// Inference (tokenizer and model) over recent checks, else over the
+    /// golden cases; milliseconds.
+    pub latency_p50_ms: Option<f32>,
+    pub latency_p95_ms: Option<f32>,
+    pub latency_samples: u32,
+    /// Checksums, session load and goldens, milliseconds.
+    pub check_ms: Option<u32>,
+    /// RFC 3339, when the check finished.
+    pub checked_at: Option<String>,
+    /// `LICENSES.md` and `BASE_LICENSE.txt` ship with the package
+    /// (`GET /admin/athene-ai/model/licenses`).
+    pub licenses: bool,
+    /// The package's own `training_source` (`assistant_authored_compositional`).
+    pub training_source: Option<String>,
+}
+
 /// What runs and what is installed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "ai/")]
 pub struct AiModelStatus {
+    /// What answers the quality check now.
     pub engine: AiEngine,
     pub own_model: AiModelState,
+    /// The stored choice ("Qualitätsbewertung").
+    pub quality_engine: AiQualityEngine,
+    /// The choice in effect: `rules` while the model is not `ready`.
+    pub quality_engine_effective: AiQualityEngine,
+    pub quality_model: AiQualityModelStatus,
+}
+
+/// One licence file of the model package.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "ai/")]
+pub struct AiLicenseFile {
+    /// `LICENSES.md` or `BASE_LICENSE.txt`.
+    pub name: String,
+    pub text: String,
+}
+
+/// `GET /admin/athene-ai/model/licenses`: the licence files shipped next
+/// to the model, as they are on disk.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "ai/")]
+pub struct AiModelLicensesResponse {
+    pub version: String,
+    pub files: Vec<AiLicenseFile>,
 }
 
 /// `GET /admin/athene-ai`, and the answer of every admin change.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "ai/")]
 pub struct AtheneAiAdminResponse {
     /// The stored mode.
@@ -255,6 +367,8 @@ pub struct UpdateAtheneAiRequest {
     pub visibility: Option<AiVisibility>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub beta_auto_approve: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quality_engine: Option<AiQualityEngine>,
 }
 
 /// `POST /admin/athene-ai/workspaces`: enrol a workspace directly.
@@ -283,6 +397,15 @@ mod tests {
             assert_eq!(AiEnrollmentStatus::parse(s.as_str()), Some(*s));
         }
         assert_eq!(AiVisibility::parse("dev_only"), None);
+        for e in AiQualityEngine::ALL {
+            assert_eq!(AiQualityEngine::parse(e.as_str()), Some(*e));
+        }
+        assert_eq!(AiQualityEngine::default(), AiQualityEngine::RulesModel);
+        assert_eq!(AiModelState::parse("ready"), Some(AiModelState::Ready));
+        assert_eq!(
+            AiModelError::parse("golden_mismatch"),
+            Some(AiModelError::GoldenMismatch)
+        );
     }
 
     #[test]
@@ -302,6 +425,12 @@ mod tests {
         assert!(serde_json::from_str::<UpdateAtheneAiRequest>(r#"{"mode":"on"}"#).is_err());
         assert!(
             serde_json::from_str::<UpdateAtheneAiRequest>(r#"{"visibility":"dev_only"}"#).is_err()
+        );
+        let engine: UpdateAtheneAiRequest =
+            serde_json::from_str(r#"{"quality_engine":"rules"}"#).unwrap();
+        assert_eq!(engine.quality_engine, Some(AiQualityEngine::Rules));
+        assert!(
+            serde_json::from_str::<UpdateAtheneAiRequest>(r#"{"quality_engine":"model"}"#).is_err()
         );
         assert!(
             serde_json::from_str::<EnrollAiWorkspaceRequest>(r#"{"workspace_id":"x"}"#).is_err()

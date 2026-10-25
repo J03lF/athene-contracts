@@ -1,5 +1,6 @@
 import type { AtheneHttpClient } from '../http';
 import type {
+  AiModelLicensesResponse,
   AtheneAiAdminResponse,
   AtheneAiWorkspaceResponse,
   EnrollAiWorkspaceRequest,
@@ -79,6 +80,13 @@ export class AtheneAiApiClient {
       .post<
         ApiEnvelope<AtheneAiAdminResponse>
       >(`/admin/athene-ai/requests/${workspaceId}/reject`, {})
+      .then(unwrap);
+  }
+
+  /** The licence files shipped with the quality model (admins). */
+  modelLicenses(): Promise<AiModelLicensesResponse> {
+    return this.http
+      .get<ApiEnvelope<AiModelLicensesResponse>>('/admin/athene-ai/model/licenses')
       .then(unwrap);
   }
 }
