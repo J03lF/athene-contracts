@@ -303,6 +303,13 @@ fn render(out: &Path) {
         athene_ai::EnrollAiWorkspaceRequest,
         // Athene AI Beta 0.2.0: the quality model's licences (Q020)
         athene_ai::AiModelLicensesResponse,
+        // The quality model's versions and hot swap (models step)
+        athene_ai::AiModelLicensesQuery,
+        athene_ai::AiModelControl,
+        athene_ai::AiModelVersion,
+        athene_ai::AiModelCheck,
+        athene_ai::AiModelSwap,
+        athene_ai::AiWorkspaceModel,
     );
     // The verdicts the web's local rules are tested against (3.12).
     let matrix = policy::matrix::to_json(&policy::matrix::build()).expect("policy matrix");

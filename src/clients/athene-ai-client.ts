@@ -84,9 +84,10 @@ export class AtheneAiApiClient {
   }
 
   /** The licence files shipped with the quality model (admins). */
-  modelLicenses(): Promise<AiModelLicensesResponse> {
+  modelLicenses(version?: string): Promise<AiModelLicensesResponse> {
+    const query = version ? `?version=${encodeURIComponent(version)}` : '';
     return this.http
-      .get<ApiEnvelope<AiModelLicensesResponse>>('/admin/athene-ai/model/licenses')
+      .get<ApiEnvelope<AiModelLicensesResponse>>(`/admin/athene-ai/model/licenses${query}`)
       .then(unwrap);
   }
 }

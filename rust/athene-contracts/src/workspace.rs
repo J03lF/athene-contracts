@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;
 
+use crate::athene_ai::AiQualityEngine;
 use crate::ticket_types::TicketTypeColor;
 use crate::work::TicketPriority;
 use crate::{DbEnum, Patch};
@@ -130,6 +131,10 @@ pub struct WorkspaceSettings {
     /// The secret warning before saving (`null` = on).
     #[serde(default)]
     pub ticket_check_secrets: Option<bool>,
+    /// "Qualitätsbewertung" (models step): `rules` alone, or `rules_model`
+    /// (`null`). The model answers only while the platform has one active.
+    #[serde(default)]
+    pub ticket_check_quality_engine: Option<AiQualityEngine>,
 }
 
 /// The settings part of a workspace patch, merged key by key: a value sets
@@ -177,6 +182,9 @@ pub struct WorkspaceSettingsPatch {
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<bool>)]
     pub ticket_check_secrets: Patch<bool>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<AiQualityEngine>)]
+    pub ticket_check_quality_engine: Patch<AiQualityEngine>,
 }
 
 /// `PATCH /workspaces/:id`: owners and admins (403 otherwise). An absent

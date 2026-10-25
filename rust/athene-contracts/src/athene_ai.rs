@@ -27,8 +27,17 @@
 //!   /admin/athene-ai/workspaces/:workspace_id` — enrol a workspace
 //!   directly, remove one.
 //! - `POST /admin/athene-ai/requests/:workspace_id/approve|reject`.
-//! - `GET /admin/athene-ai/model/licenses` — the licence files shipped
-//!   with the quality model.
+//! - `GET /admin/athene-ai/model/licenses?version=` — the licence files
+//!   shipped with an installed version of the quality model (the active
+//!   one without `version`).
+//!
+//! The quality model (models step): exactly one version is loaded at any
+//! time, platform-wide. The platform admin turns it on or off and picks the
+//! active version among the installed ones ([`AiModelStatus::versions`]);
+//! a new pick is checked in the background and swapped in only once it
+//! passed, the old session is dropped right after. Workspaces never pick a
+//! version: their owners and admins choose "Qualitätsbewertung" (the
+//! workspace setting `ticket_check_quality_engine`, [`AiQualityEngine`]).
 //!
 //! The admin routes answer the whole [`AtheneAiAdminResponse`] after a
 //! change. A switched-off platform answers the workspace routes with
@@ -133,8 +142,9 @@ ai_enum! {
 }
 
 ai_enum! {
-    /// How the quality score is decided (Admin → Athene AI,
-    /// "Qualitätsbewertung").
+    /// How a workspace's quality score is decided (Settings → Athene AI,
+    /// "Qualitätsbewertung"; the workspace setting
+    /// `ticket_check_quality_engine`, unset = `rules_model`).
     #[derive(Default)]
     AiQualityEngine {
         /// The rule logic alone.
@@ -167,6 +177,19 @@ ai_enum! {
         LoadFailed = "load_failed",
         /// A golden case gave other token ids, confidences or decisions.
         GoldenMismatch = "golden_mismatch",
+    }
+}
+
+ai_enum! {
+    /// Who decides which quality model runs.
+    #[derive(Default)]
+    AiModelControl {
+        /// The platform admin (Admin → Athene AI, "Athene-Modell").
+        #[default]
+        Admin = "admin",
+        /// `ATHENE_QUALITY_MODEL=off`, the hard kill switch: never loaded,
+        /// whatever is stored.
+        EnvOff = "env_off",
     }
 }
 
@@ -242,6 +265,9 @@ pub struct AtheneAiWorkspaceResponse {
     pub enrollment: Option<AiEnrollment>,
     /// This week's numbers; `None` while Athene AI is not available here.
     pub stats: Option<AiWeekStats>,
+    /// The platform's quality model, while one is active; `None`: the
+    /// workspace's quality check runs on the rules alone.
+    pub model: Option<AiWorkspaceModel>,
 }
 
 /// A workspace in the beta list or the request queue of the console.
@@ -303,18 +329,107 @@ pub struct AiQualityModelStatus {
     pub training_source: Option<String>,
 }
 
+/// The last check of one installed version (since this core started).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "ai/")]
+pub struct AiModelCheck {
+    /// Checksums, session load and every golden case passed.
+    pub ok: bool,
+    pub error: Option<AiModelError>,
+    /// The file or golden case the error is about; never a secret.
+    pub error_detail: Option<String>,
+    pub goldens_passed: u32,
+    pub goldens_total: u32,
+    /// Milliseconds.
+    pub check_ms: Option<u32>,
+    /// RFC 3339.
+    pub checked_at: String,
+}
+
+/// One installed version below `ATHENE_MODELS_DIR/athene-quality/`, as
+/// its metadata says; the weights are never read for the list.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "ai/")]
+pub struct AiModelVersion {
+    /// The folder's name (`0.2.0-beta1`), what the admin picks.
+    pub version: String,
+    /// `contract_version` of `athene_model.json`, once readable.
+    pub contract_version: Option<String>,
+    /// The contract is `athene-quality-onnx-v1` and the metadata reads:
+    /// the version may be picked.
+    pub supported: bool,
+    /// Why it may not be picked (`contract_unsupported`, `not_found`,
+    /// `invalid_package`).
+    pub problem: Option<AiModelError>,
+    pub problem_detail: Option<String>,
+    /// `release_ready` of the metadata.
+    pub release_ready: Option<bool>,
+    /// The folder's files, bytes.
+    pub size_bytes: u64,
+    /// `LICENSES.md` / `BASE_LICENSE.txt` ship with it.
+    pub licenses: bool,
+    /// Loaded and answering now.
+    pub active: bool,
+    /// The selected version ([`AiModelStatus::selected_version`]).
+    pub selected: bool,
+    pub last_check: Option<AiModelCheck>,
+}
+
+/// A pick of the admin on its way in, or the last one that failed (the
+/// model before it stays active).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "ai/")]
+pub struct AiModelSwap {
+    pub version: String,
+    /// `checking` or `error`.
+    pub state: AiModelState,
+    pub error: Option<AiModelError>,
+    pub error_detail: Option<String>,
+    /// RFC 3339.
+    pub started_at: String,
+    /// RFC 3339; `None` while checking.
+    pub finished_at: Option<String>,
+}
+
 /// What runs and what is installed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "ai/")]
 pub struct AiModelStatus {
-    /// What answers the quality check now.
+    /// What answers the quality check now (where a workspace chose
+    /// "Regeln + Athene-Modell").
     pub engine: AiEngine,
     pub own_model: AiModelState,
-    /// The stored choice ("Qualitätsbewertung").
-    pub quality_engine: AiQualityEngine,
-    /// The choice in effect: `rules` while the model is not `ready`.
-    pub quality_engine_effective: AiQualityEngine,
+    /// "Athene-Modell: an / aus", as stored.
+    pub enabled: bool,
+    /// The admin decides, or the kill switch `ATHENE_QUALITY_MODEL=off`.
+    pub control: AiModelControl,
+    /// "Aktive Version": the version to run. The admin's pick once there
+    /// is one; until then the start value.
+    pub selected_version: String,
+    /// The admin has picked a version (it wins over the start value).
+    pub version_picked: bool,
+    /// "Startwert aus Konfiguration": `ATHENE_QUALITY_MODEL` other than
+    /// `off` (`athene-quality/0.4.1-beta3`), used while nothing is picked;
+    /// `None`: the built-in `0.2.0-beta1`.
+    pub env_default: Option<String>,
+    /// The version loaded now; `None`: no model in memory.
+    pub active_version: Option<String>,
+    /// A pick being checked, or the last one that failed.
+    pub swap: Option<AiModelSwap>,
+    /// Every installed version, newest first.
+    pub versions: Vec<AiModelVersion>,
+    /// The active version (or, while none is, the selected one).
     pub quality_model: AiQualityModelStatus,
+}
+
+/// The platform's model as a workspace page shows it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "ai/")]
+pub struct AiWorkspaceModel {
+    /// `0.2.0-beta1`.
+    pub version: String,
+    /// `release_ready` of the package.
+    pub release_ready: bool,
 }
 
 /// One licence file of the model package.
@@ -367,8 +482,25 @@ pub struct UpdateAtheneAiRequest {
     pub visibility: Option<AiVisibility>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub beta_auto_approve: Option<bool>,
+    /// "Athene-Modell: an / aus". Off unloads the model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quality_engine: Option<AiQualityEngine>,
+    pub model_enabled: Option<bool>,
+    /// "Aktive Version": an installed version's folder name. A new one is
+    /// checked in the background and swapped in once it passed (`409`
+    /// while another pick is being checked, `404` when not installed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[validate(length(min = 1, max = 64))]
+    pub model_version: Option<String>,
+}
+
+/// `GET /admin/athene-ai/model/licenses`: the version (the active one
+/// when absent).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Validate, ToSchema, TS)]
+#[ts(export_to = "ai/", optional_fields = nullable)]
+pub struct AiModelLicensesQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[validate(length(min = 1, max = 64))]
+    pub version: Option<String>,
 }
 
 /// `POST /admin/athene-ai/workspaces`: enrol a workspace directly.
@@ -402,6 +534,11 @@ mod tests {
         }
         assert_eq!(AiQualityEngine::default(), AiQualityEngine::RulesModel);
         assert_eq!(AiModelState::parse("ready"), Some(AiModelState::Ready));
+        assert_eq!(AiModelControl::default(), AiModelControl::Admin);
+        assert_eq!(
+            AiModelControl::parse("env_off"),
+            Some(AiModelControl::EnvOff)
+        );
         assert_eq!(
             AiModelError::parse("golden_mismatch"),
             Some(AiModelError::GoldenMismatch)
@@ -426,11 +563,19 @@ mod tests {
         assert!(
             serde_json::from_str::<UpdateAtheneAiRequest>(r#"{"visibility":"dev_only"}"#).is_err()
         );
-        let engine: UpdateAtheneAiRequest =
-            serde_json::from_str(r#"{"quality_engine":"rules"}"#).unwrap();
-        assert_eq!(engine.quality_engine, Some(AiQualityEngine::Rules));
+        let model: UpdateAtheneAiRequest =
+            serde_json::from_str(r#"{"model_enabled":false,"model_version":"0.4.0"}"#).unwrap();
+        assert_eq!(model.model_enabled, Some(false));
+        assert_eq!(model.model_version.as_deref(), Some("0.4.0"));
+        assert!(model.validate().is_ok());
+        let long = UpdateAtheneAiRequest {
+            model_version: Some("x".repeat(65)),
+            ..UpdateAtheneAiRequest::default()
+        };
+        assert!(long.validate().is_err());
+        // The platform-wide engine of Q020 is gone: workspaces choose it.
         assert!(
-            serde_json::from_str::<UpdateAtheneAiRequest>(r#"{"quality_engine":"model"}"#).is_err()
+            serde_json::from_str::<UpdateAtheneAiRequest>(r#"{"quality_engine":"rules"}"#).is_err()
         );
         assert!(
             serde_json::from_str::<EnrollAiWorkspaceRequest>(r#"{"workspace_id":"x"}"#).is_err()
