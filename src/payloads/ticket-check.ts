@@ -18,6 +18,8 @@ export type { FeatureDisabledDetails } from '../generated/intel/FeatureDisabledD
 export type { FixAction } from '../generated/intel/FixAction';
 export type { HintSeverity } from '../generated/intel/HintSeverity';
 export type { ModelInfo } from '../generated/intel/ModelInfo';
+export type { QualityEvidence } from '../generated/intel/QualityEvidence';
+export type { QualityEvidenceCode } from '../generated/intel/QualityEvidenceCode';
 export type { QualityHint } from '../generated/intel/QualityHint';
 export type { QualityReport } from '../generated/intel/QualityReport';
 export type { QualityRule } from '../generated/intel/QualityRule';

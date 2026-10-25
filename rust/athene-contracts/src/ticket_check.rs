@@ -165,6 +165,9 @@ wire_enum! {
         Mentioned = "mentioned",
         SameProject = "same_project",
         SameType = "same_type",
+        ExactError = "exact_error",
+        SameComponent = "same_component",
+        Recent = "recent",
         Done = "done",
         Old = "old",
     }
@@ -184,9 +187,9 @@ wire_enum! {
     ScoreBand {
         /// ≥ 85
         Strong = "strong",
-        /// 65–84
+        /// 60–84
         Good = "good",
-        /// 40–64
+        /// 40–59
         Fair = "fair",
         /// < 40
         Thin = "thin",
@@ -288,6 +291,40 @@ pub struct ModelInfo {
     pub as_of: String,
 }
 
+wire_enum! {
+    /// Stable keys for the positive quality score ledger. The client
+    /// translates these; no ticket text is stored in the explanation.
+    QualityEvidenceCode {
+        TitleContent = "title_content",
+        TitleSpecificity = "title_specificity",
+        TitleLength = "title_length",
+        DescriptionSubstance = "description_substance",
+        DescriptionStructure = "description_structure",
+        BugSteps = "bug_steps",
+        BugExpected = "bug_expected",
+        BugActual = "bug_actual",
+        BugEnvironment = "bug_environment",
+        FeatureBenefit = "feature_benefit",
+        FeatureAcceptance = "feature_acceptance",
+        TaskOutcome = "task_outcome",
+        SupportAffected = "support_affected",
+        SupportAttempted = "support_attempted",
+        ConcreteDetails = "concrete_details",
+        PriorityUnjustified = "priority_unjustified",
+        DuePast = "due_past",
+    }
+}
+
+/// One scored dimension, including zero-point missing evidence. A small
+/// contradiction has negative points and max_points = 0.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct QualityEvidence {
+    pub code: QualityEvidenceCode,
+    pub points: i16,
+    pub max_points: u8,
+}
+
 /// One quality hint. Its text is `ticket_check.rule.<rule>.{title,why,fix}`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "intel/")]
@@ -305,9 +342,12 @@ pub struct QualityHint {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "intel/")]
 pub struct QualityReport {
-    /// 0–100 (CONCEPT 2.1).
+    /// Positive evidence on a 0–100 scale; empty drafts have a floor of 10.
     pub score: u8,
     pub band: ScoreBand,
+    /// Complete point ledger, independent of which hints are shown.
+    #[serde(default)]
+    pub evidence: Vec<QualityEvidence>,
     /// Shown hints, most important first (≤ 3).
     pub hints: Vec<QualityHint>,
 }

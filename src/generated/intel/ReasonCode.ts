@@ -3,4 +3,4 @@
 /**
  * Why a duplicate candidate came up (CONCEPT 5.7).
  */
-export type ReasonCode = "title_similar" | "title_spelling" | "description_overlap" | "mentioned" | "same_project" | "same_type" | "done" | "old";
+export type ReasonCode = "title_similar" | "title_spelling" | "description_overlap" | "mentioned" | "same_project" | "same_type" | "exact_error" | "same_component" | "recent" | "done" | "old";
