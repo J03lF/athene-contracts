@@ -60,7 +60,7 @@ export const ROLE_PRESETS: Readonly<Record<RolePreset, ReadonlyArray<Permission>
 };
 
 /** The rules' revision (`POLICY_REVISION`): what this package's matrix was made with. */
-export const POLICY_REVISION = 5;
+export const POLICY_REVISION = 6;
 
 /** The longest role name, in characters. */
 export const ROLE_MAX_NAME_CHARS = 40;

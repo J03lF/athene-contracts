@@ -23,6 +23,15 @@ ticket_type: string, status: TicketStatus, priority: TicketPriority, assignee_id
  */
 parent_ticket_id: string | null, sprint_id: string | null, milestone_id: string | null, 
 /**
+ * The team the ticket belongs to (custom fields CF0, E1); a team of
+ * the workspace, across projects. Its fields follow it.
+ */
+team_id: string | null, 
+/**
+ * Fields hung onto this ticket alone ("+ Feld"), by definition id.
+ */
+adhoc_field_ids: Array<string>, 
+/**
  * Planning estimate, 0..1000.
  */
 story_points: number | null, triage_category: string | null, triage_reason: string | null, triaged_at: string | null, first_response_at: string | null, resolved_at: string | null, due_date: string | null, sla_breached: boolean, 

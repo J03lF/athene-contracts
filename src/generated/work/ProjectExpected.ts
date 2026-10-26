@@ -6,4 +6,4 @@ import type { ProjectStatus } from "./ProjectStatus";
  * The base of a project edit: the values the client saw, per field it
  * changes. Same keys as [`UpdateProjectRequest`]; `null` means "was empty".
  */
-export type ProjectExpected = { name?: string, description?: string | null, color?: string | null, health?: ProjectHealth, status?: ProjectStatus, lead_id?: string | null, };
+export type ProjectExpected = { name?: string, description?: string | null, color?: string | null, health?: ProjectHealth, status?: ProjectStatus, lead_id?: string | null, default_team_id?: string | null, };

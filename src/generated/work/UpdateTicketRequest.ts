@@ -23,4 +23,9 @@ due_date?: string | null, story_points?: number | null, parent_ticket_id?: strin
 /**
  * The release the ticket ships in; `null` takes it out of any.
  */
-milestone_id?: string | null, };
+milestone_id?: string | null, 
+/**
+ * A team of the ticket's workspace; `null` takes it out of any. Values
+ * stay; the fields follow the new team (custom fields CF0).
+ */
+team_id?: string | null, };

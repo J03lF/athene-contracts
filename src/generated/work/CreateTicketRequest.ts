@@ -30,7 +30,17 @@ due_date?: string | null,
 parent_ticket_id?: string | null, 
 /**
  * Custom field values keyed by `FieldDefinition.key`; defaults to `{}`.
- * Validated against the project's workspace definitions: 400 for type
- * mismatches or missing required fields.
+ * Validated against the fields that apply to the new ticket (its team,
+ * type, project and `adhoc_field_ids`): 400 for type mismatches or
+ * missing fields required at create.
  */
-custom_values?: Record<string, unknown>, };
+custom_values?: Record<string, unknown>, 
+/**
+ * A team of the workspace. Absent: the project's default team, else
+ * the creator's only team; `null`: no team.
+ */
+team_id?: string | null, 
+/**
+ * Active ticket fields to hang onto the new ticket alone.
+ */
+adhoc_field_ids?: Array<string>, };

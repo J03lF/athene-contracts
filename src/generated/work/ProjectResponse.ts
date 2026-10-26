@@ -23,6 +23,12 @@ color: string | null, health: ProjectHealth,
  */
 progress: number, lead_id: string | null, 
 /**
+ * The team a new ticket of this project gets when the composer names
+ * none (custom fields CF0, E1). `null`: the creator's only team, if
+ * they are in exactly one.
+ */
+default_team_id: string | null, 
+/**
  * Who created the project. With the lead and the workspace's managers,
  * the people who may edit its settings and overview. `null` for older
  * projects whose creator the audit trail no longer records.

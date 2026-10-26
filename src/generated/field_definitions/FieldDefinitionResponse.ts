@@ -14,21 +14,27 @@ key: string, label: string, field_type: FieldType,
  */
 options: FieldOptions, 
 /**
- * Required only for tickets of the types it applies to.
+ * Project fields only: the project must carry a value. Always `false`
+ * for ticket fields, whose requirement is per rule
+ * ([`crate::field_assignments::FieldAssignmentResponse::required`]).
  */
-required: boolean, position: number, 
+required: boolean, 
 /**
- * Ticket-type keys the field applies to; `null` = every type (ticket
- * fields only; always `null` for project fields). A ticket of another
- * type does not show or require the field, and keeps any value it
- * already has, so changing a ticket's type loses nothing.
+ * One global order for every ticket view (CONCEPT §2.2 rule 4).
  */
-ticket_type_keys: Array<string> | null, 
+position: number, 
 /**
- * Filled in on create when the field applies and no value is sent.
- * Same shape as a value of this field (validated like one).
+ * The base default: filled in on create when the field applies, no
+ * value is sent and no rule names a default of its own. Same shape as
+ * a value of this field, or one of the tokens `"$me"` (user), `"$today"`
+ * (date), `"$now"` (datetime), `"$latest"` (version), resolved on
+ * create.
  */
 default_value: unknown, 
+/**
+ * One line for the settings list. ≤ 200 chars.
+ */
+description: string | null, 
 /**
  * Shown under the field. ≤ 200 chars.
  */
@@ -40,4 +46,18 @@ show_on_card: boolean,
 /**
  * Input placeholder. ≤ 80 chars.
  */
-placeholder: string | null, created_at: string, updated_at: string, };
+placeholder: string | null, 
+/**
+ * Set while the field is archived (§2.6): not offered anywhere new,
+ * its rules rest, its values stay readable. RFC 3339.
+ */
+archived_at: string | null, 
+/**
+ * Rises with every write to the definition (3.7); orders answers.
+ */
+version: number, 
+/**
+ * Tickets (projects, for a project field) that hold a value. Only for
+ * whoever may manage fields, and only when asked for (`with_usage`).
+ */
+usage_count?: number, created_at: string, updated_at: string, };

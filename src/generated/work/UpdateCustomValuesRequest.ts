@@ -2,9 +2,15 @@
 
 /**
  * `PATCH /work/projects/:id/custom-values` and
- * `PATCH /work/tickets/:id/custom-values`: replace the bucket wholesale.
- * The core validates it against the workspace's field definitions (for a
- * ticket: those of its type) and stores the cleaned result.
+ * `PATCH /work/tickets/:id/custom-values`.
+ *
+ * With `expected` the write is **partial** (custom fields CF1): only the
+ * keys `expected` names are validated and written; a key absent from
+ * `custom_values` or `null` there is emptied. A required field cannot be
+ * emptied (for a ticket: required at create, or at close once closed),
+ * every other field stays writable whatever else is missing, so an
+ * existing ticket is never blocked. Without `expected` (stage A) the
+ * object is the whole bucket, checked against the fields that apply.
  */
 export type UpdateCustomValuesRequest = { 
 /**
@@ -13,7 +19,7 @@ export type UpdateCustomValuesRequest = {
 custom_values: Record<string, unknown>, 
 /**
  * Per key the client changes, the value it saw (`null`: the key was
- * empty). With `expected`, only these keys are written: a key whose
+ * empty). With `expected`, only these keys are read and written: a key whose
  * stored value moved is a `409` `ATH-RES-003` (`field` =
  * `custom_values.<key>`), and every other key of `custom_values` is
  * read as context, not as a change, so another person's edit of it

@@ -44,7 +44,7 @@ use crate::workspace::WorkspaceMemberRole;
 
 /// The rules' revision. Bumped whenever a verdict in the matrix changes
 /// (`tests/policy_matrix.rs` keeps the history).
-pub const POLICY_REVISION: u32 = 5;
+pub const POLICY_REVISION: u32 = 6;
 
 /// The most an open link may grant (J6). Admins and owners are invited by
 /// email only: a forwarded link must not hand out the workspace.
@@ -654,6 +654,14 @@ pub enum Action {
     /// Edit, move, assign, triage, label, link.
     #[serde(rename = "ticket.edit")]
     TicketEdit,
+    /// Hang an existing field onto one ticket, or take it off (custom
+    /// fields CF1, E3). The tick "Tickets bearbeiten".
+    #[serde(rename = "field.attach")]
+    FieldAttach,
+    /// Suggest a field for the ticket's team, type or project (E3). The
+    /// tick "Tickets bearbeiten".
+    #[serde(rename = "field.suggest")]
+    FieldSuggest,
     /// Facts: `owns` (the reporter).
     #[serde(rename = "ticket.delete")]
     TicketDelete,
@@ -741,7 +749,7 @@ pub enum Fact {
 
 impl Action {
     /// Every action, in wire order.
-    pub const ALL: [Action; 41] = [
+    pub const ALL: [Action; 43] = [
         Action::AdminAccess,
         Action::WorkspaceCreate,
         Action::SlaRead,
@@ -783,6 +791,8 @@ impl Action {
         Action::EventCreate,
         Action::EventEdit,
         Action::EventDelete,
+        Action::FieldAttach,
+        Action::FieldSuggest,
     ];
 
     /// The wire name (`ticket.edit`), the same string serde writes.
@@ -829,6 +839,8 @@ impl Action {
             Action::EventCreate => "event.create",
             Action::EventEdit => "event.edit",
             Action::EventDelete => "event.delete",
+            Action::FieldAttach => "field.attach",
+            Action::FieldSuggest => "field.suggest",
         }
     }
 
@@ -848,6 +860,8 @@ impl Action {
                 ActionScope::Project
             }
             Action::TicketEdit
+            | Action::FieldAttach
+            | Action::FieldSuggest
             | Action::TicketPlan
             | Action::TicketDelete
             | Action::TicketTake
@@ -981,7 +995,7 @@ pub const fn requires(action: Action) -> Need {
         Action::ProjectPlan => Need::One(P::ProjectPlan),
         Action::TicketPlan => Need::One(P::TicketPlan),
         Action::TicketCreate => Need::One(P::TicketCreate),
-        Action::TicketEdit => Need::One(P::TicketEdit),
+        Action::TicketEdit | Action::FieldAttach | Action::FieldSuggest => Need::One(P::TicketEdit),
         Action::TicketDelete => Need::OwnOrAny {
             own: Gate::Needs(P::TicketDeleteOwn),
             any: Gate::Needs(P::TicketDeleteAny),
@@ -1848,7 +1862,7 @@ mod tests {
                 serde_json::from_value(serde_json::json!(action.as_str())).expect("parse");
             assert_eq!(back, action);
         }
-        assert_eq!(seen.len(), 41);
+        assert_eq!(seen.len(), 43);
     }
 
     #[test]

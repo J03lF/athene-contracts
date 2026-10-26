@@ -24,6 +24,10 @@ color?: string | null, health?: ProjectHealth, status?: ProjectStatus,
  */
 lead_id?: string | null, 
 /**
+ * A team of the project's workspace; `null`: none.
+ */
+default_team_id?: string | null, 
+/**
  * Per changed field, the value the change is based on (step 3.7). A
  * field whose stored value differs is a `409` `ATH-RES-003`; the other
  * fields of the project are not touched either way.

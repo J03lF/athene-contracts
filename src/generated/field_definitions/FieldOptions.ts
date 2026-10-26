@@ -2,12 +2,14 @@
 import type { NumberFieldOptions } from "./NumberFieldOptions";
 import type { SelectFieldOptions } from "./SelectFieldOptions";
 import type { TextFieldOptions } from "./TextFieldOptions";
+import type { UserFieldOptions } from "./UserFieldOptions";
+import type { VersionFieldOptions } from "./VersionFieldOptions";
 
 /**
  * The type-specific options object, by field type. Describes the JSON the
  * core validates before accepting a definition, so renderers can trust
  * it; on the Rust side the field stays a JSON value (the core checks it
- * against the field type). The user, date, boolean and url types take an
- * empty object.
+ * against the field type). The date, datetime, boolean and url types take
+ * an empty object.
  */
-export type FieldOptions = SelectFieldOptions | NumberFieldOptions | TextFieldOptions | Record<string, never>;
+export type FieldOptions = VersionFieldOptions | SelectFieldOptions | NumberFieldOptions | TextFieldOptions | UserFieldOptions | Record<string, never>;

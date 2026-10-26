@@ -3,4 +3,8 @@
 /**
  * Options of a `number` field.
  */
-export type NumberFieldOptions = { min?: number, max?: number, step?: number, };
+export type NumberFieldOptions = { min?: number, max?: number, step?: number, 
+/**
+ * Shown after the value ("ms", "€"); display only.
+ */
+unit?: string, };

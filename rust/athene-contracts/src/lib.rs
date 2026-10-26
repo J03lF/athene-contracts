@@ -11,6 +11,7 @@ pub mod common;
 pub mod dashboard;
 pub mod docs;
 pub mod edit;
+pub mod field_assignments;
 pub mod field_definitions;
 pub mod limits;
 pub mod overrides;

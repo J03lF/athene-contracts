@@ -2,6 +2,7 @@ import type {
   AppliesTo,
   CreateFieldDefinitionRequest,
   FieldDefinitionResponse,
+  ListFieldDefinitionsQuery,
   ReorderFieldDefinitionsRequest,
   UpdateFieldDefinitionRequest,
 } from '../payloads/field-definitions';
@@ -20,17 +21,29 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
  *
  * Definitions decorate either tickets or projects (`AppliesTo`). The server
  * enforces immutability of `key`, `field_type`, `applies_to`, and
- * `workspace_id` after creation; updates may only change `label`,
- * `options`, `required`, and `position`.
+ * `workspace_id` after creation. Where a ticket field applies is its rules
+ * (`FieldAssignmentsApiClient`). Archiving replaces deleting: a definition
+ * is deleted only from the archive.
  */
 export class FieldDefinitionsApiClient {
   constructor(private readonly http: AtheneHttpClient) {}
 
-  /** All definitions for a workspace, ordered by (applies_to, position, key). */
-  listForWorkspace(workspaceId: string): Promise<FieldDefinitionResponse[]> {
+  /**
+   * All definitions for a workspace, ordered by (applies_to, position, key);
+   * archived ones only with `include_archived`, value counts only with
+   * `with_usage` (for managers).
+   */
+  listForWorkspace(
+    workspaceId: string,
+    query: ListFieldDefinitionsQuery = {},
+  ): Promise<FieldDefinitionResponse[]> {
+    const params = new URLSearchParams();
+    if (query.include_archived) params.set('include_archived', 'true');
+    if (query.with_usage) params.set('with_usage', 'true');
+    const qs = params.toString();
     return this.http
       .get<ApiEnvelope<FieldDefinitionResponse[]>>(
-        `/work/workspaces/${workspaceId}/field-definitions`,
+        `/work/workspaces/${workspaceId}/field-definitions${qs ? `?${qs}` : ''}`,
       )
       .then(unwrap);
   }
@@ -71,7 +84,24 @@ export class FieldDefinitionsApiClient {
       .then(unwrap);
   }
 
-  /** POST-delete (mirrors the labels pattern — no body, no envelope). */
+  /** Not offered anywhere new; its rules rest, its values stay. */
+  archive(id: string): Promise<FieldDefinitionResponse> {
+    return this.http
+      .post<ApiEnvelope<FieldDefinitionResponse>>(`/work/field-definitions/${id}/archive`, {})
+      .then(unwrap);
+  }
+
+  restore(id: string): Promise<FieldDefinitionResponse> {
+    return this.http
+      .post<ApiEnvelope<FieldDefinitionResponse>>(`/work/field-definitions/${id}/restore`, {})
+      .then(unwrap);
+  }
+
+  /**
+   * POST-delete (mirrors the labels pattern — no body, no envelope). Only an
+   * archived definition (else `409`); its rules, ticket attachments,
+   * suggestions and values go with it.
+   */
   delete(id: string): Promise<void> {
     return this.http
       .post<void>(`/work/field-definitions/${id}/delete`, {})

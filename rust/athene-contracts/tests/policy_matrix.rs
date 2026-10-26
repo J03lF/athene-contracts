@@ -28,12 +28,16 @@ use athene_contracts::workspace::WorkspaceMemberRole as R;
 /// "Mitglied" no longer creates projects (E5); `ticket.plan` is a tick
 /// (E8); the matrix gains the presets, a custom, an empty and a capped
 /// guest role.
+///
+/// 6: custom fields (wave 3, CF1) — `field.attach` and `field.suggest`,
+/// both on the tick "Tickets bearbeiten"; no other verdict moved.
 const RECORDED: &[(u32, &str)] = &[
     (1, "61b199d11696ad0c"),
     (2, "aaa9fb11da7f0950"),
     (3, "db757b6523ad1ec2"),
     (4, "18c7f2144c23bb8d"),
     (5, "d6c7fa24109644bd"),
+    (6, "43b4ecf917bba111"),
 ];
 
 /// Subjects, in the table's column order.
@@ -89,6 +93,10 @@ const TABLE: &[(Action, [Cell; 16])] = &[
     (Action::ProjectCreate,        [Y,   Y,   N,   N,   Y,   Y,   N,   N,   N,   N,   N,   Y,   N,   N,   N,   N]),
     (Action::TicketCreate,         [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   N,   N,   N,   N]),
     (Action::TicketEdit,           [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   Y,   N,   N,   N]),
+    // Custom fields CF1 (E3): hanging a field onto a ticket and suggesting
+    // one are ticket edits.
+    (Action::FieldAttach,          [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   Y,   N,   N,   N]),
+    (Action::FieldSuggest,         [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   Y,   N,   N,   N]),
     (Action::TicketTake,           [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   N,   N,   N,   N]),
     (Action::TicketClose,          [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   N,   N,   N,   N]),
     (Action::TicketCheck,          [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   N,   N,   N,   N]),

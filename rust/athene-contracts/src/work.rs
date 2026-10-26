@@ -218,6 +218,10 @@ pub struct ProjectResponse {
     /// 0..1: completion ratio, manually set or derived from tickets.
     pub progress: f32,
     pub lead_id: Option<String>,
+    /// The team a new ticket of this project gets when the composer names
+    /// none (custom fields CF0, E1). `null`: the creator's only team, if
+    /// they are in exactly one.
+    pub default_team_id: Option<String>,
     /// Who created the project. With the lead and the workspace's managers,
     /// the people who may edit its settings and overview. `null` for older
     /// projects whose creator the audit trail no longer records.
@@ -281,6 +285,9 @@ pub struct UpdateProjectRequest {
     /// `null` leaves the project without a lead.
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub lead_id: Patch<String>,
+    /// A team of the project's workspace; `null`: none.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub default_team_id: Patch<String>,
     /// Per changed field, the value the change is based on (step 3.7). A
     /// field whose stored value differs is a `409` `ATH-RES-003`; the other
     /// fields of the project are not touched either way.
@@ -310,12 +317,20 @@ pub struct ProjectExpected {
     pub status: Option<String>,
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub lead_id: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub default_team_id: Patch<String>,
 }
 
 /// `PATCH /work/projects/:id/custom-values` and
-/// `PATCH /work/tickets/:id/custom-values`: replace the bucket wholesale.
-/// The core validates it against the workspace's field definitions (for a
-/// ticket: those of its type) and stores the cleaned result.
+/// `PATCH /work/tickets/:id/custom-values`.
+///
+/// With `expected` the write is **partial** (custom fields CF1): only the
+/// keys `expected` names are validated and written; a key absent from
+/// `custom_values` or `null` there is emptied. A required field cannot be
+/// emptied (for a ticket: required at create, or at close once closed),
+/// every other field stays writable whatever else is missing, so an
+/// existing ticket is never blocked. Without `expected` (stage A) the
+/// object is the whole bucket, checked against the fields that apply.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[serde(deny_unknown_fields)]
 #[ts(export_to = "work/")]
@@ -325,7 +340,7 @@ pub struct UpdateCustomValuesRequest {
     #[ts(optional = false, type = "Record<string, unknown>")]
     pub custom_values: Option<JsonValue>,
     /// Per key the client changes, the value it saw (`null`: the key was
-    /// empty). With `expected`, only these keys are written: a key whose
+    /// empty). With `expected`, only these keys are read and written: a key whose
     /// stored value moved is a `409` `ATH-RES-003` (`field` =
     /// `custom_values.<key>`), and every other key of `custom_values` is
     /// read as context, not as a change, so another person's edit of it
@@ -366,6 +381,11 @@ pub struct TicketResponse {
     pub parent_ticket_id: Option<String>,
     pub sprint_id: Option<String>,
     pub milestone_id: Option<String>,
+    /// The team the ticket belongs to (custom fields CF0, E1); a team of
+    /// the workspace, across projects. Its fields follow it.
+    pub team_id: Option<String>,
+    /// Fields hung onto this ticket alone ("+ Feld"), by definition id.
+    pub adhoc_field_ids: Vec<String>,
     /// Planning estimate, 0..1000.
     pub story_points: Option<i32>,
     pub triage_category: Option<String>,
@@ -430,11 +450,20 @@ pub struct CreateTicketRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_ticket_id: Option<String>,
     /// Custom field values keyed by `FieldDefinition.key`; defaults to `{}`.
-    /// Validated against the project's workspace definitions: 400 for type
-    /// mismatches or missing required fields.
+    /// Validated against the fields that apply to the new ticket (its team,
+    /// type, project and `adhoc_field_ids`): 400 for type mismatches or
+    /// missing fields required at create.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional, type = "Record<string, unknown>")]
     pub custom_values: Option<JsonValue>,
+    /// A team of the workspace. Absent: the project's default team, else
+    /// the creator's only team; `null`: no team.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub team_id: Patch<String>,
+    /// Active ticket fields to hang onto the new ticket alone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub adhoc_field_ids: Option<Vec<String>>,
 }
 
 /// Content patch for a ticket: `PATCH /work/tickets/:id`, and the `patch`
@@ -475,6 +504,10 @@ pub struct UpdateTicketRequest {
     /// The release the ticket ships in; `null` takes it out of any.
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub milestone_id: Patch<String>,
+    /// A team of the ticket's workspace; `null` takes it out of any. Values
+    /// stay; the fields follow the new team (custom fields CF0).
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub team_id: Patch<String>,
     /// Not editable here: the core answers 400 and names the custom-values
     /// endpoint. Declared so the refusal can say so; not part of the
     /// TypeScript.
@@ -537,6 +570,8 @@ pub struct TicketExpected {
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub milestone_id: Patch<String>,
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub team_id: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub sla_policy_id: Patch<String>,
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub triage_category: Patch<String>,
@@ -592,7 +627,7 @@ const TICKET_EDIT_KEYS: [&str; 4] = ["patch", "expected", "labels", "watchers"];
 #[serde(untagged)]
 pub enum UpdateTicketBody {
     Edit(Box<TicketEdit>),
-    Legacy(UpdateTicketRequest),
+    Legacy(Box<UpdateTicketRequest>),
 }
 
 impl UpdateTicketBody {
@@ -601,7 +636,7 @@ impl UpdateTicketBody {
         match self {
             Self::Edit(edit) => *edit,
             Self::Legacy(patch) => TicketEdit {
-                patch,
+                patch: *patch,
                 ..TicketEdit::default()
             },
         }
@@ -616,7 +651,7 @@ impl<'de> Deserialize<'de> for UpdateTicketBody {
         if edit {
             TicketEdit::deserialize(value).map(|edit| Self::Edit(Box::new(edit)))
         } else {
-            UpdateTicketRequest::deserialize(value).map(Self::Legacy)
+            UpdateTicketRequest::deserialize(value).map(|patch| Self::Legacy(Box::new(patch)))
         }
         .map_err(D::Error::custom)
     }
