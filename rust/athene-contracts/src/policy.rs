@@ -304,10 +304,11 @@ impl Permission {
         GUEST_CEILING.contains(self)
     }
 
-    /// Whether the permission does anything yet. `ticket.take` waits for
-    /// the queues (phase C); the editor shows it as coming.
+    /// Whether the permission does anything yet. Every one does since the
+    /// queues (phase C1) made `ticket.take` count; kept so a later
+    /// permission can again be shown as coming.
     pub const fn effective_yet(self) -> bool {
-        !matches!(self, Permission::TicketTake)
+        true
     }
 }
 

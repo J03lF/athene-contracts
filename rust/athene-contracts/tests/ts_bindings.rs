@@ -26,7 +26,8 @@ use std::path::{Path, PathBuf};
 
 use athene_contracts::{
     activity, admin, athene_ai, auth, calendar, common, dashboard, docs, edit, field_definitions,
-    overrides, policy, roles, search, teams, ticket_check, ticket_types, user, work, workspace,
+    overrides, policy, queues, roles, search, teams, ticket_check, ticket_types, user, work,
+    workspace,
 };
 use ts_rs::{Config, TS};
 
@@ -175,6 +176,7 @@ fn render(out: &Path) {
         workspace::WorkspaceResponse,
         workspace::WorkspaceSettings,
         workspace::WorkspaceSettingsPatch,
+        workspace::StatusLabels,
         workspace::ComposerProperty,
         workspace::ComposerPropertiesSetting,
         workspace::DefaultAssignee,
@@ -271,6 +273,19 @@ fn render(out: &Path) {
         roles::DeleteRoleResponse,
         roles::EffectiveRoleResponse,
         roles::AnswerRolesNoticeRequest,
+        // custom roles C1: queues and hand-offs
+        queues::QueueTargetKind,
+        queues::QueueResponse,
+        queues::WorkspaceQueuesResponse,
+        queues::CreateQueueRequest,
+        queues::QueueExpected,
+        queues::UpdateQueueRequest,
+        queues::DeleteQueueResponse,
+        queues::QueueTickets,
+        queues::MyQueuesResponse,
+        queues::HandBackTicketRequest,
+        queues::TakenBy,
+        queues::QueueActivity,
         // search (3.9)
         search::SearchTicketsQuery,
         search::TextPart,

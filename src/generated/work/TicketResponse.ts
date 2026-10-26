@@ -39,6 +39,12 @@ custom_values: Record<string, unknown>,
  */
 board_rank: number | null, 
 /**
+ * Who had the ticket when it last entered a queue (custom roles C1):
+ * "Zurückschicken" returns it to them. `null` when it never entered
+ * one, or entered unassigned.
+ */
+handoff_from?: string | null, 
+/**
  * Rises with every write to the ticket (also a background job's).
  * Orders answers: a client drops one older than what it holds. It
  * decides no conflict; `expected` does.

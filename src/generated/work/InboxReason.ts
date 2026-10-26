@@ -7,4 +7,4 @@
  * strongest wins, because "assigned to you" explains an entry better than
  * "you watch this" even when both are true.
  */
-export type InboxReason = "assigned" | "reported" | "watching" | "mentioned";
+export type InboxReason = "assigned" | "reported" | "watching" | "mentioned" | "queue";

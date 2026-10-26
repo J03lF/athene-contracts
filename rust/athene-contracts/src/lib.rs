@@ -17,6 +17,7 @@ pub mod overrides;
 pub mod patch;
 pub mod persistence;
 pub mod policy;
+pub mod queues;
 pub mod roles;
 pub mod search;
 pub mod teams;

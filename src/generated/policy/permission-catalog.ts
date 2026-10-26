@@ -16,7 +16,7 @@ export const PERMISSIONS: ReadonlyArray<{ permission: Permission; group: Permiss
   { permission: 'project.edit_any', group: 'projects', guest: false, effective: true },
   { permission: 'ticket.create', group: 'tickets', guest: false, effective: true },
   { permission: 'ticket.edit', group: 'tickets', guest: false, effective: true },
-  { permission: 'ticket.take', group: 'tickets', guest: false, effective: false },
+  { permission: 'ticket.take', group: 'tickets', guest: false, effective: true },
   { permission: 'ticket.close', group: 'tickets', guest: false, effective: true },
   { permission: 'ticket.delete_own', group: 'tickets', guest: false, effective: true },
   { permission: 'ticket.delete_any', group: 'tickets', guest: false, effective: true },

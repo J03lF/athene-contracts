@@ -131,6 +131,9 @@ pub enum InboxReason {
     Reported,
     Watching,
     Mentioned,
+    /// The ticket entered a queue whose target role the reader holds
+    /// (custom roles C1, [`crate::queues`]).
+    Queue,
 }
 
 // ============================================================
@@ -381,6 +384,12 @@ pub struct TicketResponse {
     /// `null` for tickets written before ranking existed: sort a column by
     /// this value and place the nulls last, newest first.
     pub board_rank: Option<i64>,
+    /// Who had the ticket when it last entered a queue (custom roles C1):
+    /// "Zurückschicken" returns it to them. `null` when it never entered
+    /// one, or entered unassigned.
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub handoff_from: Option<String>,
     /// Rises with every write to the ticket (also a background job's).
     /// Orders answers: a client drops one older than what it holds. It
     /// decides no conflict; `expected` does.

@@ -135,6 +135,25 @@ pub struct WorkspaceSettings {
     /// (`null`). The model answers only while the platform has one active.
     #[serde(default)]
     pub ticket_check_quality_engine: Option<AiQualityEngine>,
+    /// Display names of statuses in this workspace (custom roles C1, E6):
+    /// "Bereit zum Test" for `in_review`. `null` = the product's names.
+    #[serde(default)]
+    pub status_labels: Option<StatusLabels>,
+}
+
+/// The longest status display name, in characters.
+pub const STATUS_LABEL_MAX_CHARS: usize = 40;
+
+/// A workspace's own names for statuses (custom roles C1). Only
+/// `in_review` can be renamed for now; real custom statuses follow (C2).
+/// A name is trimmed, 1–40 characters; `null` or blank = the product's
+/// name.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "workspace/")]
+pub struct StatusLabels {
+    #[serde(default)]
+    pub in_review: Option<String>,
 }
 
 /// The settings part of a workspace patch, merged key by key: a value sets
@@ -185,6 +204,10 @@ pub struct WorkspaceSettingsPatch {
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<AiQualityEngine>)]
     pub ticket_check_quality_engine: Patch<AiQualityEngine>,
+    /// Replaces the whole set of names; `null` = the product's names.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<StatusLabels>)]
+    pub status_labels: Patch<StatusLabels>,
 }
 
 /// `PATCH /workspaces/:id`: owners and admins (403 otherwise). An absent

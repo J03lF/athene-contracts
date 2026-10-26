@@ -27,6 +27,7 @@ export type { WorkspaceMemberResponse } from '../generated/workspace/WorkspaceMe
 export type { WorkspaceMemberRole } from '../generated/workspace/WorkspaceMemberRole';
 export type { WorkspaceResponse } from '../generated/workspace/WorkspaceResponse';
 export type { WorkspaceSettings } from '../generated/workspace/WorkspaceSettings';
+export type { StatusLabels } from '../generated/workspace/StatusLabels';
 export type { WorkspaceSettingsPatch } from '../generated/workspace/WorkspaceSettingsPatch';
 export {
   INVITE_DEFAULT_DAYS,

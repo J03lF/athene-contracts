@@ -3,6 +3,7 @@ import type { AiQualityEngine } from "../ai/AiQualityEngine";
 import type { TicketPriority } from "../work/TicketPriority";
 import type { ComposerPropertiesSetting } from "./ComposerPropertiesSetting";
 import type { DefaultAssignee } from "./DefaultAssignee";
+import type { StatusLabels } from "./StatusLabels";
 import type { WeekStart } from "./WeekStart";
 
 /**
@@ -52,4 +53,9 @@ ticket_check_secrets: boolean | null,
  * "Qualitätsbewertung" (models step): `rules` alone, or `rules_model`
  * (`null`). The model answers only while the platform has one active.
  */
-ticket_check_quality_engine: AiQualityEngine | null, };
+ticket_check_quality_engine: AiQualityEngine | null, 
+/**
+ * Display names of statuses in this workspace (custom roles C1, E6):
+ * "Bereit zum Test" for `in_review`. `null` = the product's names.
+ */
+status_labels: StatusLabels | null, };
