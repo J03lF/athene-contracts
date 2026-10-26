@@ -15,6 +15,7 @@ import type {
   RegisterRequest,
   RegistrationPolicyResponse,
   SessionListResponse,
+  StreamTicketResponse,
 } from '../payloads/auth';
 import type { AtheneHttpClient } from '../http';
 
@@ -80,5 +81,10 @@ export class AuthApiClient {
 
   featureFlags(): Promise<FeatureFlagListResponse> {
     return this.http.get('/auth/features');
+  }
+
+  /** A one-time ticket for opening an event stream as this user (3.6d). */
+  streamTicket(): Promise<StreamTicketResponse> {
+    return this.http.post('/auth/stream-ticket', {});
   }
 }

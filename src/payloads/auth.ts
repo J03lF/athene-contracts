@@ -1,14 +1,16 @@
 import type { ApiResponse, ListResponse } from './common';
 import type { FeatureFlagState } from '../generated/auth/FeatureFlagState';
 import type { RegistrationMode } from '../generated/auth/RegistrationMode';
+import type { StreamTicket } from '../generated/auth/StreamTicket';
 
 /**
- * Auth wire types. `RegistrationMode` and `FeatureFlagState` are generated
+ * Auth wire types. `RegistrationMode`, `FeatureFlagState` and `StreamTicket` are generated
  * from `rust/athene-contracts/src/auth.rs` (ts-rs); the rest is still
  * hand-written and mirrors that file.
  */
 export type { FeatureFlagState } from '../generated/auth/FeatureFlagState';
 export type { RegistrationMode } from '../generated/auth/RegistrationMode';
+export type { StreamTicket } from '../generated/auth/StreamTicket';
 
 export interface LoginRequest {
   email: string;
@@ -108,6 +110,12 @@ export type AuthUserResponse = ApiResponse<AuthUser>;
 export type RegistrationPolicyResponse = ApiResponse<RegistrationPolicy>;
 export type SessionListResponse = ListResponse<SessionInfo>;
 export type FeatureFlagListResponse = ListResponse<FeatureFlagState>;
+
+/** `POST /auth/stream-ticket` (3.6d). */
+export type StreamTicketResponse = ApiResponse<StreamTicket>;
+
+/** The query parameter an event stream takes its ticket in (`STREAM_TICKET_PARAM`). */
+export const STREAM_TICKET_PARAM = 'token';
 
 export interface LogoutResponseData {
   revoked: boolean;

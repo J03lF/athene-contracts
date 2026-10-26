@@ -15,9 +15,9 @@ export type ActivityEventResponse = { id: string, workspace_id: string,
 actor_id: string | null, 
 /**
  * Verb (e.g., `ticket_created`, `ticket_status_changed`,
- * `sprint_started`). An open vocabulary: render an unknown verb as a
- * generic entry (`ActivityAction` in the TypeScript names the known
- * ones).
+ * `sprint_started`): an [`ActivityAction`] for everything this server
+ * writes. A string on the wire, because the feed holds history: render
+ * a verb the reader's build does not know as a generic entry.
  */
 action: string, 
 /**

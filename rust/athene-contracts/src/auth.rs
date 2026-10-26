@@ -249,6 +249,25 @@ pub struct PasswordConfirmResponseData {
 
 pub type PasswordConfirmResponse = ApiResponse<PasswordConfirmResponseData>;
 
+/// A one-time ticket for opening an event stream (`POST /auth/stream-ticket`,
+/// 3.6d). `EventSource` cannot send the bearer, so a signed-in client asks
+/// for a ticket first and opens the stream with `?token=<ticket>`; the
+/// stream then counts against the user's own stream slots instead of the
+/// address every local tab shares. Redeemed on the first use; expires after
+/// `expires_in_seconds` if unused.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, ts_rs::TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "auth/")]
+pub struct StreamTicket {
+    pub ticket: String,
+    pub expires_in_seconds: u32,
+}
+
+/// The query parameter that carries a [`StreamTicket`]. It is `token` on
+/// purpose: the host masks that parameter in every log line that prints a
+/// request target (`fenrir/src/utils/redact.rs`, `SECRET_PARAMS`).
+pub const STREAM_TICKET_PARAM: &str = "token";
+
 /// One feature flag as every signed-in client sees it
 /// (`GET /auth/features`): just the key and whether it is on. The
 /// admin view with description and audit fields is

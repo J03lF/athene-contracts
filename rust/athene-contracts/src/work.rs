@@ -833,9 +833,10 @@ pub struct WorkStatsResponse {
 pub struct WorkActivityEntryResponse {
     pub actor_initials: String,
     pub actor_name: Option<String>,
+    /// The audit verb (`work.ticket.created`, …). No server prose beside
+    /// it any more (BE-17, 3.10): the client names it in the reader's
+    /// language.
     pub action: String,
-    /// English description of `action`.
-    pub action_label: String,
     pub resource_type: String,
     pub resource_id: Option<String>,
     #[ts(type = "Record<string, unknown> | null")]

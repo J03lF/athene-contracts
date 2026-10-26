@@ -3,8 +3,10 @@
 /**
  * One entry of `GET /work/activity`: a recent change from the audit trail.
  */
-export type WorkActivityEntryResponse = { actor_initials: string, actor_name: string | null, action: string, 
+export type WorkActivityEntryResponse = { actor_initials: string, actor_name: string | null, 
 /**
- * English description of `action`.
+ * The audit verb (`work.ticket.created`, …). No server prose beside
+ * it any more (BE-17, 3.10): the client names it in the reader's
+ * language.
  */
-action_label: string, resource_type: string, resource_id: string | null, details: Record<string, unknown> | null, created_at: string, };
+action: string, resource_type: string, resource_id: string | null, details: Record<string, unknown> | null, created_at: string, };
