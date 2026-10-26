@@ -373,6 +373,12 @@ fn render(out: &Path) {
         ticket_check::BacklogReviewLast,
         ticket_check::AskReporterRequest,
         ticket_check::AskReporterResponse,
+        // triage suggestions (W3-E)
+        ticket_check::TriageField,
+        ticket_check::TriageReasonCode,
+        ticket_check::TriageTicketRef,
+        ticket_check::TriageReason,
+        ticket_check::TriageSuggestion,
         // calendar: events and bands (UX9)
         calendar::EventWhen,
         calendar::EventResponse,

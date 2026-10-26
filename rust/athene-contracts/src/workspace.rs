@@ -135,6 +135,10 @@ pub struct WorkspaceSettings {
     /// (`null`). The model answers only while the platform has one active.
     #[serde(default)]
     pub ticket_check_quality_engine: Option<AiQualityEngine>,
+    /// Triage suggestions while writing: type, priority, assignee
+    /// (`null` = on).
+    #[serde(default)]
+    pub ticket_check_triage: Option<bool>,
     /// Display names of statuses in this workspace (custom roles C1, E6):
     /// "Bereit zum Test" for `in_review`. `null` = the product's names.
     #[serde(default)]
@@ -204,6 +208,9 @@ pub struct WorkspaceSettingsPatch {
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<AiQualityEngine>)]
     pub ticket_check_quality_engine: Patch<AiQualityEngine>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<bool>)]
+    pub ticket_check_triage: Patch<bool>,
     /// Replaces the whole set of names; `null` = the product's names.
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<StatusLabels>)]

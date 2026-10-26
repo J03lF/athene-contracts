@@ -37,4 +37,12 @@ draft_id?: string,
  * The language of the writing assistance's questions (`de` when
  * absent). Everything else stays keyed for the web's own texts.
  */
-locale?: AssistLocale, };
+locale?: AssistLocale, 
+/**
+ * How many files the composer holds for this draft (pending uploads),
+ * for the quality model's evidence criterion ("Belege"). Absent:
+ * unknown. A check of a saved ticket (`ticket_id`) uses the ticket's
+ * stored attachments instead. Only the number travels; no file's
+ * contents are read anywhere.
+ */
+attachment_count?: number, };

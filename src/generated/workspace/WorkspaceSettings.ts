@@ -55,6 +55,11 @@ ticket_check_secrets: boolean | null,
  */
 ticket_check_quality_engine: AiQualityEngine | null, 
 /**
+ * Triage suggestions while writing: type, priority, assignee
+ * (`null` = on).
+ */
+ticket_check_triage: boolean | null, 
+/**
  * Display names of statuses in this workspace (custom roles C1, E6):
  * "Bereit zum Test" for `in_review`. `null` = the product's names.
  */

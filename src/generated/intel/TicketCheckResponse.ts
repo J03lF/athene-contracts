@@ -5,6 +5,7 @@ import type { ModelInfo } from "./ModelInfo";
 import type { QualityReport } from "./QualityReport";
 import type { RelatedDoc } from "./RelatedDoc";
 import type { SecretFinding } from "./SecretFinding";
+import type { TriageSuggestion } from "./TriageSuggestion";
 
 export type TicketCheckResponse = { 
 /**
@@ -18,4 +19,11 @@ quality: QualityReport | null, secrets: Array<SecretFinding>, duplicates: Array<
 /**
  * Related docs, at most two; empty when duplicates are switched off.
  */
-docs: Array<RelatedDoc>, abstained: Array<Abstention>, };
+docs: Array<RelatedDoc>, abstained: Array<Abstention>, 
+/**
+ * Triage suggestions, at most one per field, in field order. Empty
+ * when the workspace switched them off, the caller may not set the
+ * fields here, or nothing is sure enough. Absent from cores before
+ * triage.
+ */
+triage: Array<TriageSuggestion>, };

@@ -29,6 +29,12 @@
 //! carries the model package's writing assistance; see
 //! [`WritingAssistance`].
 //!
+//! Since W3-E a check also carries triage suggestions ([`TriageSuggestion`]):
+//! a type, a priority and an assignee, each only above its confidence
+//! threshold, each with its reasons. They are suggestions: the server never
+//! sets a field, the person accepts one with a click (workspace switch
+//! `ticket_check_triage`).
+//!
 //! Every route answers `403 ATH-FEAT-001` with [`FeatureDisabledDetails`]
 //! when a switch is off (platform flag `module.ticket_check`, the
 //! workspace's `ticket_check_*` settings, the user's `ticket_check_*`
@@ -305,6 +311,15 @@ pub struct TicketCheckRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub locale: Option<AssistLocale>,
+    /// How many files the composer holds for this draft (pending uploads),
+    /// for the quality model's evidence criterion ("Belege"). Absent:
+    /// unknown. A check of a saved ticket (`ticket_id`) uses the ticket's
+    /// stored attachments instead. Only the number travels; no file's
+    /// contents are read anywhere.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    #[validate(range(max = 1000))]
+    pub attachment_count: Option<u32>,
 }
 
 /// Versions behind an answer (CONCEPT 5.5): the same draft and versions
@@ -559,6 +574,73 @@ pub struct Abstention {
     pub count: u32,
 }
 
+wire_enum! {
+    /// A field Athene AI suggests a value for (triage).
+    TriageField {
+        /// The ticket type's key (`bug`, `feature`, a workspace's own key).
+        TicketType = "ticket_type",
+        /// `low` | `medium` | `high` | `critical`.
+        Priority = "priority",
+        /// A user id, assignable at the draft's place.
+        Assignee = "assignee",
+    }
+}
+
+wire_enum! {
+    /// Why a triage value is suggested.
+    TriageReasonCode {
+        /// Similar tickets have this value (`tickets`: "ähnlich wie WEB-12").
+        SimilarTickets = "similar_tickets",
+        /// Words of the draft that point to this type (`terms`).
+        Keywords = "keywords",
+        /// Words that signal urgency: outage, data loss, security, a
+        /// crash (`terms`).
+        SignalWords = "signal_words",
+        /// The person handled similar tickets of this project recently
+        /// (`tickets`).
+        RecentWork = "recent_work",
+    }
+}
+
+/// A ticket a triage reason points to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct TriageTicketRef {
+    pub ticket_id: String,
+    /// `WEB-12`.
+    pub key: String,
+}
+
+/// One reason of a triage suggestion. The web renders
+/// `ticket_check.triage.reason.<code>` with the terms or keys.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct TriageReason {
+    pub code: TriageReasonCode,
+    /// Words of the person's own draft that matched (at most three).
+    #[serde(default)]
+    #[schema(required = true)]
+    pub terms: Vec<String>,
+    /// The tickets behind the reason, most similar first (at most three).
+    #[serde(default)]
+    #[schema(required = true)]
+    pub tickets: Vec<TriageTicketRef>,
+}
+
+/// A suggested value for one field ("Vorschlag: Bug · ähnlich wie
+/// WEB-12, WEB-40"). Never applied by the server.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "intel/")]
+pub struct TriageSuggestion {
+    pub field: TriageField,
+    /// The value in the field's own wire form (type key, priority, user id).
+    pub value: String,
+    /// How sure, 0–1. Shown only above the field's threshold.
+    pub confidence: f32,
+    /// Strongest first, at least one.
+    pub reasons: Vec<TriageReason>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "intel/")]
 pub struct TicketCheckResponse {
@@ -572,6 +654,13 @@ pub struct TicketCheckResponse {
     /// Related docs, at most two; empty when duplicates are switched off.
     pub docs: Vec<RelatedDoc>,
     pub abstained: Vec<Abstention>,
+    /// Triage suggestions, at most one per field, in field order. Empty
+    /// when the workspace switched them off, the caller may not set the
+    /// fields here, or nothing is sure enough. Absent from cores before
+    /// triage.
+    #[serde(default)]
+    #[schema(required = true)]
+    pub triage: Vec<TriageSuggestion>,
 }
 
 /// One decision on a suggestion the server signed.
@@ -1205,6 +1294,37 @@ mod tests {
         assert_schema(ComparisonReason::ALL);
         assert_schema(AssistanceUnavailable::ALL);
         assert_schema(ReviewEngine::ALL);
+        assert_schema(TriageField::ALL);
+        assert_schema(TriageReasonCode::ALL);
+    }
+
+    #[test]
+    fn triage_and_the_attachment_count_are_additive() {
+        // An older core's answer has no triage; an older web sends no count.
+        let answer: TicketCheckResponse = serde_json::from_value(serde_json::json!({
+            "draft_hash": "h",
+            "model": { "version": 3, "revision": 0, "pipeline_version": 3, "as_of": "x" },
+            "quality": null,
+            "secrets": [],
+            "duplicates": [],
+            "docs": [],
+            "abstained": [],
+        }))
+        .unwrap();
+        assert!(answer.triage.is_empty());
+        let req: TicketCheckRequest =
+            serde_json::from_value(serde_json::json!({ "title": "t" })).unwrap();
+        assert_eq!(req.attachment_count, None);
+        let counted: TicketCheckRequest =
+            serde_json::from_value(serde_json::json!({ "title": "t", "attachment_count": 2 }))
+                .unwrap();
+        assert!(counted.validate().is_ok());
+        let many = TicketCheckRequest {
+            attachment_count: Some(1001),
+            ..counted
+        };
+        assert!(many.validate().is_err());
+        assert_eq!(TriageField::Assignee.as_str(), "assignee");
     }
 
     #[test]
