@@ -1,5 +1,12 @@
 import type { AtheneHttpClient } from '../http';
 import type {
+  PlaceQuery,
+  SetOverrideRequest,
+  SetOverrideResponse,
+  WorkspaceOverridesResponse,
+} from '../payloads/overrides';
+import { placeQuery } from './policy-client';
+import type {
   AnswerRolesNoticeRequest,
   CreatePresetRolesRequest,
   CreateRoleRequest,
@@ -81,12 +88,36 @@ export class RolesApiClient {
       .then(unwrap);
   }
 
-  /** "Vorschau als Rolle": each permission with its verdict and origin. */
-  effective(workspaceId: string, roleId: string): Promise<EffectiveRoleResponse> {
+  /**
+   * "Vorschau als Rolle": each permission with its verdict, origin and
+   * chain — at a place and as a member of a team when named (phase B).
+   */
+  effective(
+    workspaceId: string,
+    roleId: string,
+    place: PlaceQuery = {},
+  ): Promise<EffectiveRoleResponse> {
     return this.http
       .get<ApiEnvelope<EffectiveRoleResponse>>(
-        `/workspaces/${workspaceId}/roles/${roleId}/effective`,
+        `/workspaces/${workspaceId}/roles/${roleId}/effective${placeQuery(place)}`,
       )
+      .then(unwrap);
+  }
+
+  /** Every permission override of the workspace (phase B; every member reads them). */
+  overrides(workspaceId: string): Promise<WorkspaceOverridesResponse> {
+    return this.http
+      .get<ApiEnvelope<WorkspaceOverridesResponse>>(`/workspaces/${workspaceId}/overrides`)
+      .then(unwrap);
+  }
+
+  /**
+   * Set one target's override at one place; both lists empty clears it
+   * (`roles.manage`). 409 with what is stored now when `version` is stale.
+   */
+  setOverride(workspaceId: string, body: SetOverrideRequest): Promise<SetOverrideResponse> {
+    return this.http
+      .put<ApiEnvelope<SetOverrideResponse>>(`/workspaces/${workspaceId}/overrides`, body)
       .then(unwrap);
   }
 

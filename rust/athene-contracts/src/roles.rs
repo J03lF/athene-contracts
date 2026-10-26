@@ -18,7 +18,10 @@
 //!   (and open invitations) move to `replacement_role_id` in the same
 //!   statement.
 //! - `GET /workspaces/:workspace_id/roles/:role_id/effective` — the
-//!   preview: each permission with its verdict and origin.
+//!   preview: each permission with its verdict and origin, at a place
+//!   (`?project_id=` / `?doc_collection_id=`) and optionally as a member
+//!   of a team (`?team_id=`), through the overrides there (phase B,
+//!   [`crate::overrides`]).
 //! - `POST /workspaces/:workspace_id/roles/notice` — the owner's answer to
 //!   the notice after migration 0032 (`restore`: members may create
 //!   projects again).
@@ -32,6 +35,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;
 
+use crate::overrides::OverridePlace;
 use crate::policy::{EffectivePermission, Permission, PermissionSet, RolePreset};
 use crate::ticket_types::TicketTypeColor;
 use crate::workspace::WorkspaceMemberRole;
@@ -227,6 +231,13 @@ pub struct DeleteRoleResponse {
 pub struct EffectiveRoleResponse {
     pub role_id: String,
     pub tier: WorkspaceMemberRole,
+    /// The place resolved for (`?project_id=` / `?doc_collection_id=`;
+    /// the workspace without either).
+    pub place: OverridePlace,
+    pub place_id: String,
+    /// The team resolved as a member of (`?team_id=`), if any.
+    pub team_id: Option<String>,
+    /// Each permission with its verdict, the deciding step and the chain.
     pub entries: Vec<EffectivePermission>,
 }
 

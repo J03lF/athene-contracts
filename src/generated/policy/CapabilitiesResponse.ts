@@ -3,6 +3,7 @@ import type { AtheneAiAvailability } from "../ai/AtheneAiAvailability";
 import type { WorkspaceMemberRole } from "../workspace/WorkspaceMemberRole";
 import type { Action } from "./Action";
 import type { CapabilitiesRole } from "./CapabilitiesRole";
+import type { OverridePlace } from "./OverridePlace";
 import type { Permission } from "./Permission";
 import type { Standing } from "./Standing";
 
@@ -16,6 +17,16 @@ import type { Standing } from "./Standing";
  * cache's 30 s.
  */
 export type CapabilitiesResponse = { workspace_id: string, 
+/**
+ * The place the verdicts are for (`?project_id=` /
+ * `?doc_collection_id=`; the workspace without either): the
+ * overrides there are applied (phase B).
+ */
+place: OverridePlace, 
+/**
+ * The project's or docs area's id; the workspace's for `workspace`.
+ */
+place_id: string, 
 /**
  * Derived for display; no rule reads it.
  */

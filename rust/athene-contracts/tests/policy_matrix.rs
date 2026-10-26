@@ -673,3 +673,98 @@ fn the_policy_revision_matches_the_recorded_matrix() {
         next = revision + 1
     );
 }
+
+// ---------------------------------------------------------------------------
+// Overrides (custom roles, phase B)
+// ---------------------------------------------------------------------------
+
+mod overrides {
+    use athene_contracts::overrides::{
+        resolve, resolve_traced, LevelMasks, OverrideLevel, OverrideMasks, OverridePlace,
+        OverrideTarget, TeamOverrideMasks,
+    };
+    use athene_contracts::policy::{
+        Permission, PermissionSet, PermissionSource, RolePreset, GUEST_CEILING, MEMBER_DEFAULT,
+    };
+    use athene_contracts::workspace::WorkspaceMemberRole as R;
+
+    fn everything(allow: bool) -> Vec<LevelMasks> {
+        let masks = if allow {
+            OverrideMasks::new(PermissionSet::ALL, PermissionSet::EMPTY)
+        } else {
+            OverrideMasks::new(PermissionSet::EMPTY, PermissionSet::ALL)
+        }
+        .expect("disjoint");
+        vec![
+            LevelMasks {
+                role: masks,
+                teams: masks,
+            };
+            3
+        ]
+    }
+
+    #[test]
+    fn escalation_no_override_reaches_an_owner_or_an_admin() {
+        for tier in [R::Owner, R::Admin] {
+            for base in [PermissionSet::EMPTY, PermissionSet::ALL] {
+                assert_eq!(resolve(tier, base, &everything(false)), PermissionSet::ALL);
+            }
+            let traced = resolve_traced(
+                tier,
+                PermissionSet::EMPTY,
+                &[OverrideLevel {
+                    place: OverridePlace::Project,
+                    place_id: "p".into(),
+                    role_allow: PermissionSet::EMPTY,
+                    role_deny: PermissionSet::ALL,
+                    teams: vec![TeamOverrideMasks {
+                        team_id: "t".into(),
+                        allow: PermissionSet::EMPTY,
+                        deny: PermissionSet::ALL,
+                    }],
+                }],
+            );
+            assert!(traced
+                .iter()
+                .all(|e| e.allowed && e.source == PermissionSource::Fixed));
+        }
+    }
+
+    #[test]
+    fn escalation_a_guest_stays_under_the_ceiling_whatever_is_allowed() {
+        for base in [PermissionSet::EMPTY, GUEST_CEILING, PermissionSet::ALL] {
+            let got = resolve(R::Guest, base, &everything(true));
+            assert!(got.is_subset(GUEST_CEILING), "{got:?}");
+        }
+    }
+
+    #[test]
+    fn escalation_an_override_grants_nothing_it_does_not_name() {
+        // Whatever the levels deny, a member ends with at most the role's
+        // ticks and what some level allows.
+        let dev = RolePreset::Developer.permissions();
+        let allow = PermissionSet::EMPTY.with(Permission::ProjectPlan);
+        let levels = [LevelMasks {
+            role: OverrideMasks::NONE,
+            teams: OverrideMasks::new(allow, PermissionSet::EMPTY.with(Permission::TicketEdit))
+                .expect("disjoint"),
+        }];
+        let got = resolve(R::Member, dev, &levels);
+        assert!(got.is_subset(dev.union(allow)));
+        assert!(got.contains(Permission::ProjectPlan));
+        assert!(!got.contains(Permission::TicketEdit));
+        assert!(!got.contains(Permission::ProjectCreate));
+        assert_eq!(resolve(R::Member, MEMBER_DEFAULT, &[]), MEMBER_DEFAULT);
+    }
+
+    #[test]
+    fn escalation_inviting_is_never_overridable_and_roles_have_no_workspace_override() {
+        for place in OverridePlace::ALL {
+            for p in [Permission::InviteCreate, Permission::InviteManage] {
+                assert!(!p.overridable_at(place), "{p:?} at {place:?}");
+            }
+        }
+        assert!(!OverridePlace::Workspace.takes(OverrideTarget::Role));
+    }
+}

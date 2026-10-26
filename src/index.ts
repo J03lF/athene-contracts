@@ -13,6 +13,7 @@ export * from './payloads/teams';
 export * from './payloads/ticket-types';
 export * from './payloads/policy';
 export * from './payloads/roles';
+export * from './payloads/overrides';
 export * from './payloads/search';
 export * from './payloads/ticket-check';
 export * from './payloads/calendar';

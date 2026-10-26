@@ -12,6 +12,7 @@ pub mod dashboard;
 pub mod docs;
 pub mod edit;
 pub mod field_definitions;
+pub mod overrides;
 pub mod patch;
 pub mod persistence;
 pub mod policy;

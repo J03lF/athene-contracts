@@ -2,6 +2,6 @@
 
 /**
  * Where a permission in a role's preview comes from ("Vorschau als
- * Rolle", §8.2). Phase B adds the overrides.
+ * Rolle", §8.2), and each step of its chain (phase B, §2.4).
  */
-export type PermissionSource = "role" | "fixed" | "guest_ceiling";
+export type PermissionSource = "role" | "fixed" | "guest_ceiling" | "role_override" | "team_override";

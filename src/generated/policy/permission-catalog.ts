@@ -45,6 +45,13 @@ export const MEMBER_DEFAULT: ReadonlyArray<Permission> = ['event.write', 'projec
 /** What a platform operator or admin who is a member keeps (`PLATFORM_MEMBER_EXTRA`, E7). */
 export const PLATFORM_MEMBER_EXTRA: ReadonlyArray<Permission> = ['labels.manage', 'ticket_types.manage', 'fields.manage', 'teams.manage', 'event.write', 'event.delete_any', 'project.create', 'project.edit_own', 'project.edit_any', 'ticket.create', 'ticket.edit', 'ticket.take', 'ticket.close', 'ticket.delete_own', 'ticket.delete_any', 'ticket.check', 'ticket.watch', 'comment.create', 'comment.moderate', 'time.log', 'time.moderate', 'ticket.plan', 'project.plan', 'doc.create', 'doc.write', 'doc.delete_own', 'doc.manage'];
 
+/** What an override may name at each place (phase B, CONCEPT §3). */
+export const OVERRIDABLE: Readonly<Record<'workspace' | 'project' | 'doc_collection', ReadonlyArray<Permission>>> = {
+  workspace: ['labels.manage', 'ticket_types.manage', 'fields.manage', 'teams.manage', 'event.write', 'event.delete_any', 'project.create', 'project.edit_own', 'project.edit_any', 'ticket.create', 'ticket.edit', 'ticket.take', 'ticket.close', 'ticket.delete_own', 'ticket.delete_any', 'ticket.check', 'comment.moderate', 'time.log', 'time.moderate', 'ticket.plan', 'project.plan', 'doc.create', 'doc.write', 'doc.delete_own', 'doc.manage'],
+  project: ['project.edit_own', 'project.edit_any', 'ticket.create', 'ticket.edit', 'ticket.take', 'ticket.close', 'ticket.delete_own', 'ticket.delete_any', 'ticket.check', 'ticket.watch', 'comment.create', 'comment.moderate', 'time.log', 'time.moderate', 'ticket.plan', 'project.plan'],
+  doc_collection: ['doc.create', 'doc.write', 'doc.delete_own', 'doc.manage'],
+};
+
 /** The role templates' ticks. */
 export const ROLE_PRESETS: Readonly<Record<RolePreset, ReadonlyArray<Permission>>> = {
   developer: ['event.write', 'project.edit_own', 'ticket.create', 'ticket.edit', 'ticket.take', 'ticket.close', 'ticket.delete_own', 'ticket.check', 'ticket.watch', 'comment.create', 'time.log', 'ticket.plan', 'doc.create', 'doc.write', 'doc.delete_own'],

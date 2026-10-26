@@ -1363,7 +1363,7 @@ pub fn assignable(assignee: &Subject, unplaced: bool) -> bool {
 }
 
 /// Where a permission in a role's preview comes from ("Vorschau als
-/// Rolle", §8.2). Phase B adds the overrides.
+/// Rolle", §8.2), and each step of its chain (phase B, §2.4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export_to = "policy/")]
@@ -1372,46 +1372,68 @@ pub enum PermissionSource {
     Role,
     /// Owner and admin hold everything; nothing changes that.
     Fixed,
-    /// Off for every guest, whatever the role says.
+    /// Off for every guest, whatever the role or an override says.
     GuestCeiling,
+    /// An override for the role at a place (a project or a docs area).
+    RoleOverride,
+    /// An override for one of the member's teams at a place (the
+    /// workspace, a project or a docs area).
+    TeamOverride,
 }
 
-/// One line of the preview.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+/// One step of a permission's chain: who said what, where.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "policy/")]
+pub struct PermissionStep {
+    pub source: PermissionSource,
+    /// What this step says (allow or deny).
+    pub allowed: bool,
+    /// Where (overrides only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub place: Option<crate::overrides::OverridePlace>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub place_id: Option<String>,
+    /// The team (team overrides only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub team_id: Option<String>,
+}
+
+/// One line of the preview: the verdict, the step that decided it, and
+/// every step on the way (the role's tick first).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "policy/")]
 pub struct EffectivePermission {
     pub permission: Permission,
     pub allowed: bool,
+    /// The deciding step's source.
     pub source: PermissionSource,
+    /// The deciding step's place, if an override decided.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub place: Option<crate::overrides::OverridePlace>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub place_id: Option<String>,
+    /// The deciding team, if a team override decided.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub team_id: Option<String>,
+    /// Every step that said something, in the order of the resolution.
+    #[serde(default)]
+    pub chain: Vec<PermissionStep>,
 }
 
 /// A role's effective permissions with their origin, for an ordinary user
-/// holding it (the platform operator's extra is not a role's, §2.2).
+/// holding it, without overrides (the platform operator's extra is not a
+/// role's, §2.2). With overrides: [`crate::overrides::resolve_traced`].
 pub fn effective_permissions(
     tier: WorkspaceMemberRole,
     grants: PermissionSet,
 ) -> Vec<EffectivePermission> {
-    Permission::ALL
-        .into_iter()
-        .map(|permission| {
-            let (allowed, source) = match tier {
-                WorkspaceMemberRole::Owner | WorkspaceMemberRole::Admin => {
-                    (true, PermissionSource::Fixed)
-                }
-                WorkspaceMemberRole::Guest if !permission.guest_allowed() => {
-                    (false, PermissionSource::GuestCeiling)
-                }
-                WorkspaceMemberRole::Member | WorkspaceMemberRole::Guest => {
-                    (grants.contains(permission), PermissionSource::Role)
-                }
-            };
-            EffectivePermission {
-                permission,
-                allowed,
-                source,
-            }
-        })
-        .collect()
+    crate::overrides::resolve_traced(tier, grants, &[])
 }
 
 // ---------------------------------------------------------------------------
@@ -1442,6 +1464,12 @@ pub struct CapabilitiesRole {
 #[ts(export_to = "policy/")]
 pub struct CapabilitiesResponse {
     pub workspace_id: String,
+    /// The place the verdicts are for (`?project_id=` /
+    /// `?doc_collection_id=`; the workspace without either): the
+    /// overrides there are applied (phase B).
+    pub place: crate::overrides::OverridePlace,
+    /// The project's or docs area's id; the workspace's for `workspace`.
+    pub place_id: String,
     /// Derived for display; no rule reads it.
     pub standing: Standing,
     /// The membership's tier.
@@ -1505,6 +1533,8 @@ pub fn capabilities(
         .map(|action| (action, allows(subject, action, &own)))
         .collect();
     Some(CapabilitiesResponse {
+        place: crate::overrides::OverridePlace::Workspace,
+        place_id: workspace_id.clone(),
         workspace_id,
         standing,
         tier,
