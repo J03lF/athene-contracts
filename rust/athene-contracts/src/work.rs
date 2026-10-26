@@ -152,6 +152,86 @@ pub struct ListTicketsQuery {
     /// by side.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace_id: Option<String>,
+    // The list parameters below (step 3.9) make the answer a
+    // `listing::Page`; see `crate::listing`. Lists are comma-separated.
+    /// Statuses (`open,in_progress,…`; `done` does not include `closed`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// `me`, `none` (unassigned) or user ids.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<String>,
+    /// Priorities (`low,medium,high,critical`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub priority: Option<String>,
+    /// Ticket-type keys.
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+    pub ticket_type: Option<String>,
+    /// Label ids: tickets carrying any of them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Only the direct subtasks of this ticket (an epic's children).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    /// A sprint id, or `none` (in no sprint).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sprint: Option<String>,
+    /// Effective due date before this instant (RFC 3339, exclusive).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_before: Option<String>,
+    /// Effective due date at or after this instant (RFC 3339).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_after: Option<String>,
+    /// `true`: only tickets without an effective due date.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub no_due: Option<bool>,
+    /// Changed at or after this instant (RFC 3339).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_since: Option<String>,
+    /// Text in the key (`WEB-12`), title or description, as a substring;
+    /// umlauts and case folded. At most 100 characters.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub q: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort: Option<crate::listing::TicketSort>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub order: Option<crate::listing::SortOrder>,
+    /// `summary` (default) or `full`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fields: Option<crate::listing::TicketFields>,
+    /// Tickets per page, 1–200 (default 50).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    /// `meta.next_cursor` of the page before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    /// `true`: `meta.total` counts every match (one more statement).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub count: Option<bool>,
+}
+
+impl ListTicketsQuery {
+    /// Whether the query asks for a page: any parameter beyond the scope.
+    /// Without one, the answer is the whole list (the old call).
+    pub fn is_paged(&self) -> bool {
+        self.status.is_some()
+            || self.assignee.is_some()
+            || self.priority.is_some()
+            || self.ticket_type.is_some()
+            || self.label.is_some()
+            || self.parent.is_some()
+            || self.sprint.is_some()
+            || self.due_before.is_some()
+            || self.due_after.is_some()
+            || self.no_due.is_some()
+            || self.updated_since.is_some()
+            || self.q.is_some()
+            || self.sort.is_some()
+            || self.order.is_some()
+            || self.fields.is_some()
+            || self.limit.is_some()
+            || self.cursor.is_some()
+            || self.count.is_some()
+    }
 }
 
 /// `GET /work/projects`.
@@ -410,6 +490,12 @@ pub struct TicketResponse {
     #[serde(default)]
     #[ts(optional = nullable)]
     pub handoff_from: Option<String>,
+    /// The deadline the ticket has: its own due date, else its running or
+    /// planned sprint's end (`listing::EffectiveDue`). Computed by the
+    /// server in every read; `null` without either.
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub effective_due: Option<crate::listing::EffectiveDue>,
     /// Rises with every write to the ticket (also a background job's).
     /// Orders answers: a client drops one older than what it holds. It
     /// decides no conflict; `expected` does.

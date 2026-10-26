@@ -26,8 +26,8 @@ use std::path::{Path, PathBuf};
 
 use athene_contracts::{
     activity, admin, athene_ai, auth, calendar, common, dashboard, docs, edit, field_assignments,
-    field_definitions, overrides, policy, queues, roles, search, teams, ticket_check, ticket_types,
-    user, work, workspace,
+    field_definitions, listing, overrides, policy, queues, roles, search, teams, ticket_check,
+    ticket_types, user, work, workspace,
 };
 use ts_rs::{Config, TS};
 
@@ -78,6 +78,17 @@ fn render(out: &Path) {
         work::PerUserListQuery,
         work::WorkScopeQuery,
         work::ProjectReportQuery,
+        // paged ticket lists (3.9)
+        listing::Page<work::TicketResponse>,
+        listing::Page<listing::TicketSummary>,
+        listing::PageMeta,
+        listing::TicketSort,
+        listing::SortOrder,
+        listing::TicketFields,
+        listing::DueSource,
+        listing::EffectiveDue,
+        listing::TicketSummary,
+        listing::WorkspaceSprintsQuery,
         // work: projects and tickets
         work::ProjectResponse,
         work::CreateProjectRequest,
@@ -565,6 +576,21 @@ fn limits_ts() -> String {
             "LABEL_NAME_MAX_CHARS",
             "A label's name.",
             LABEL_NAME_MAX_CHARS,
+        ),
+        (
+            "TICKET_LIST_QUERY_MAX_CHARS",
+            "The search of a paged ticket list (`q`).",
+            athene_contracts::listing::TICKET_LIST_QUERY_MAX_CHARS,
+        ),
+        (
+            "TICKET_PAGE_DEFAULT_LIMIT",
+            "Tickets per page when a paged list names no `limit`.",
+            athene_contracts::listing::TICKET_PAGE_DEFAULT_LIMIT as usize,
+        ),
+        (
+            "TICKET_PAGE_MAX_LIMIT",
+            "The most tickets one page holds.",
+            athene_contracts::listing::TICKET_PAGE_MAX_LIMIT as usize,
         ),
     ];
     let mut out = String::from(

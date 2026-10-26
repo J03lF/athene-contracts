@@ -30,3 +30,12 @@ export const RELEASE_NAME_MAX_CHARS = 80;
 
 /** A label's name. */
 export const LABEL_NAME_MAX_CHARS = 32;
+
+/** The search of a paged ticket list (`q`). */
+export const TICKET_LIST_QUERY_MAX_CHARS = 100;
+
+/** Tickets per page when a paged list names no `limit`. */
+export const TICKET_PAGE_DEFAULT_LIMIT = 50;
+
+/** The most tickets one page holds. */
+export const TICKET_PAGE_MAX_LIMIT = 200;

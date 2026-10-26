@@ -49,6 +49,7 @@ import type {
   WatchStateResponse,
   WorkStatsResponse,
 } from '../payloads/work';
+import type { Page, TicketSummary, WorkspaceSprintsQuery } from '../payloads/ticket-list';
 import type { AtheneHttpClient, RequestOptions } from '../http';
 
 interface ApiEnvelope<T> {
@@ -167,6 +168,32 @@ export class WorkApiClient {
     return this.http
       .get<ApiEnvelope<TicketResponse[]>>(`/work/tickets${qs}`)
       .then(unwrap);
+  }
+  /**
+   * One page of tickets (step 3.9): the server's filters and sort, `limit`
+   * per page and the `meta.next_cursor` of the page before as `cursor`.
+   * `fields: 'full'` answers whole tickets, else summaries (no description,
+   * custom values or triage reason).
+   */
+  listTicketPage(
+    query: ListTicketsQuery & { fields: 'full' },
+    init?: RequestOptions,
+  ): Promise<Page<TicketResponse>>;
+  listTicketPage(query: ListTicketsQuery, init?: RequestOptions): Promise<Page<TicketSummary>>;
+  listTicketPage(
+    query: ListTicketsQuery,
+    init: RequestOptions = {},
+  ): Promise<Page<TicketResponse> | Page<TicketSummary>> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== null && value !== '') params.set(key, String(value));
+    }
+    // A page is asked for by naming its size: without any list parameter
+    // the server answers the old whole list.
+    if (!params.has('limit') && !params.has('cursor')) params.set('limit', '50');
+    return this.http.get<Page<TicketResponse>>(`/work/tickets?${params.toString()}`, {
+      signal: init.signal,
+    });
   }
   createTicket(body: CreateTicketRequest): Promise<TicketResponse> {
     return this.http
@@ -318,6 +345,23 @@ export class WorkApiClient {
   listSprintsForProject(projectId: string): Promise<SprintResponse[]> {
     return this.http
       .get<ApiEnvelope<SprintResponse[]>>(`/work/projects/${projectId}/sprints`)
+      .then(unwrap);
+  }
+  /**
+   * Every sprint of the workspace's projects in one answer (Q-029); `403`
+   * for a non-member. `status` narrows (`upcoming,active,completed`).
+   */
+  listWorkspaceSprints(
+    workspaceId: string,
+    query: WorkspaceSprintsQuery = {},
+    init: RequestOptions = {},
+  ): Promise<SprintResponse[]> {
+    const qs = query.status ? `?status=${encodeURIComponent(query.status)}` : '';
+    return this.http
+      .get<ApiEnvelope<SprintResponse[]>>(
+        `/work/workspaces/${encodeURIComponent(workspaceId)}/sprints${qs}`,
+        { signal: init.signal },
+      )
       .then(unwrap);
   }
   /** The sprint running today, or `null` when none is. */
