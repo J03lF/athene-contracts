@@ -16,6 +16,7 @@
 //! | [`request_id`] | accept or mint `x-request-id`, `http` span, response header, [`request_id::current`] |
 //! | [`service_auth`] | `x-fenrir-service-token`, report or enforce, fail-closed, constant time, open probes |
 //! | [`principal`] | the gateway signs `x-athene-principal`, the core verifies it (identity once at the edge) |
+//! | [`retry`] | when a failed call may be sent again: never sent, or a read that timed out (3.6c) |
 //! | [`upstream`] | the client to the host gateway: budget, breaker per target with half-open, idempotent retries only |
 //! | [`outbound`] | the client for user-supplied URLs (webhooks): SSRF guard after DNS, scheme/port allowlist, size cap |
 //! | [`observability`] | tracing init (text or JSON, env filter, optional OTLP), [`observability::redact`] |
@@ -37,6 +38,7 @@ pub mod outbound;
 pub mod principal;
 pub mod rate_limit;
 pub mod request_id;
+pub mod retry;
 pub mod service_auth;
 pub mod shutdown;
 pub mod upstream;
@@ -48,7 +50,7 @@ pub use config::{ConfigError, Secret};
 pub use error_class::ErrorClass;
 pub use rate_limit::{
     ConcurrencyLimitLayer, ConcurrencyLimiter, RateClass, RateLimitLayer, RateLimiter, RateRule,
-    VerifiedCallers,
+    SlotHolder, SlotRefusal, VerifiedCallers,
 };
 pub use request_id::RequestIdLayer;
 pub use service_auth::{

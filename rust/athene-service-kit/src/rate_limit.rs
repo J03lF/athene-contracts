@@ -642,21 +642,62 @@ fn millis(duration: Duration) -> u64 {
 
 /// How many responses each caller holds open: a count per key, bounded in
 /// keys. A key exists only while it holds a slot, so the map is as large as
-/// the number of distinct callers with an open stream.
+/// the number of distinct callers with an open stream. Optionally a cap on
+/// all slots together ([`Self::with_global_limit`], 3.6d), so that many
+/// callers within their own limits cannot exhaust the process.
 pub struct ConcurrencyLimiter {
-    open: Mutex<HashMap<String, u32>>,
+    open: Mutex<OpenSlots>,
     max_keys: usize,
+    global_limit: u32,
+}
+
+#[derive(Default)]
+struct OpenSlots {
+    held: HashMap<String, u32>,
+    total: u32,
+}
+
+/// Why [`ConcurrencyLimiter::acquire`] refused a slot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SlotRefusal {
+    /// The caller holds its limit already (or `max_keys` other callers
+    /// hold slots).
+    Caller,
+    /// All callers together hold the global limit.
+    Global,
+}
+
+impl SlotRefusal {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Caller => "caller",
+            Self::Global => "global",
+        }
+    }
 }
 
 impl ConcurrencyLimiter {
     pub fn new(max_keys: usize) -> Self {
         Self {
-            open: Mutex::new(HashMap::new()),
+            open: Mutex::new(OpenSlots::default()),
             max_keys: max_keys.max(1),
+            global_limit: u32::MAX,
         }
     }
 
-    fn lock(&self) -> MutexGuard<'_, HashMap<String, u32>> {
+    /// At most `limit` slots held by everyone together.
+    #[must_use]
+    pub fn with_global_limit(mut self, limit: u32) -> Self {
+        self.global_limit = limit;
+        self
+    }
+
+    /// The cap on all slots together (`u32::MAX`: none).
+    pub fn global_limit(&self) -> u32 {
+        self.global_limit
+    }
+
+    fn lock(&self) -> MutexGuard<'_, OpenSlots> {
         match self.open.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
@@ -664,21 +705,31 @@ impl ConcurrencyLimiter {
     }
 
     /// A slot for `key` while it holds fewer than `limit`; `None` when it
-    /// holds `limit` already, or when `max_keys` other callers hold slots
-    /// (an open slot cannot be evicted, so the cap refuses new callers
-    /// instead: memory stays bounded). The slot is released when dropped.
+    /// holds `limit` already, when `max_keys` other callers hold slots (an
+    /// open slot cannot be evicted, so the cap refuses new callers instead:
+    /// memory stays bounded), or when the global limit is reached. The slot
+    /// is released when dropped.
     pub fn try_acquire(self: &Arc<Self>, key: &str, limit: u32) -> Option<Slot> {
+        self.acquire(key, limit).ok()
+    }
+
+    /// [`Self::try_acquire`], saying why a refusal happened.
+    pub fn acquire(self: &Arc<Self>, key: &str, limit: u32) -> Result<Slot, SlotRefusal> {
         let mut open = self.lock();
-        let held = open.get(key).copied();
-        if held.is_none() && open.len() >= self.max_keys {
-            return None;
+        let held = open.held.get(key).copied();
+        if held.is_none() && open.held.len() >= self.max_keys {
+            return Err(SlotRefusal::Caller);
         }
         let held = held.unwrap_or(0);
         if held >= limit {
-            return None;
+            return Err(SlotRefusal::Caller);
         }
-        open.insert(key.to_string(), held.saturating_add(1));
-        Some(Slot {
+        if open.total >= self.global_limit {
+            return Err(SlotRefusal::Global);
+        }
+        open.held.insert(key.to_string(), held.saturating_add(1));
+        open.total = open.total.saturating_add(1);
+        Ok(Slot {
             limiter: Arc::clone(self),
             key: key.to_string(),
         })
@@ -686,28 +737,35 @@ impl ConcurrencyLimiter {
 
     fn release(&self, key: &str) {
         let mut open = self.lock();
-        match open.get_mut(key) {
-            Some(held) if *held > 1 => *held -= 1,
-            Some(_) => {
-                open.remove(key);
+        let released = match open.held.get_mut(key) {
+            Some(held) if *held > 1 => {
+                *held -= 1;
+                true
             }
-            None => {}
+            Some(_) => {
+                open.held.remove(key);
+                true
+            }
+            None => false,
+        };
+        if released {
+            open.total = open.total.saturating_sub(1);
         }
     }
 
     /// Slots `key` holds now.
     pub fn open(&self, key: &str) -> u32 {
-        self.lock().get(key).copied().unwrap_or(0)
+        self.lock().held.get(key).copied().unwrap_or(0)
     }
 
     /// Slots held by everyone.
     pub fn total(&self) -> u64 {
-        self.lock().values().map(|held| u64::from(*held)).sum()
+        u64::from(self.lock().total)
     }
 
     /// Callers holding slots.
     pub fn len(&self) -> usize {
-        self.lock().len()
+        self.lock().held.len()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -788,10 +846,25 @@ where
     }
 }
 
+/// Who holds a response's slot, when the service knows it better than the
+/// layer's key function (3.6d): a stream opened with a stream ticket counts
+/// against its user, with the per-user limit, instead of against its
+/// address. A layer in front of the [`ConcurrencyLimitLayer`] puts it into
+/// the request's extensions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SlotHolder {
+    /// The caller key, e.g. `user:<id>` (the class is prefixed).
+    pub caller: String,
+    /// Responses this caller may hold open at once.
+    pub limit: u32,
+}
+
 /// What a [`ConcurrencyLimitLayer`] refused.
 #[derive(Debug, Clone)]
 pub struct ConcurrencyLimited {
     pub class: RateClass,
+    /// Whether the caller's own limit or the global one was reached.
+    pub reason: SlotRefusal,
     /// Responses the caller may hold open at once.
     pub limit: u32,
     /// The caller key, e.g. `ip:203.0.113.9`.
@@ -917,27 +990,37 @@ where
         let mut inner = std::mem::replace(&mut self.inner, clone);
         let layer = self.layer.clone();
         Box::pin(async move {
-            let client = ClientIp::from_extensions(request.extensions());
-            let caller = (layer.key)(request.headers(), &client);
+            let (caller, limit) = match request.extensions().get::<SlotHolder>() {
+                Some(holder) => (holder.caller.clone(), holder.limit),
+                None => {
+                    let client = ClientIp::from_extensions(request.extensions());
+                    ((layer.key)(request.headers(), &client), layer.limit)
+                }
+            };
             let key = format!("{}:{caller}", layer.class.as_str());
-            let Some(slot) = layer.limiter.try_acquire(&key, layer.limit) else {
-                let refused = ConcurrencyLimited {
-                    class: layer.class,
-                    limit: layer.limit,
-                    caller,
-                    path: request.uri().path().to_string(),
-                    retry_after: layer.retry_after,
-                };
-                tracing::warn!(
-                    event = "security.concurrency_limited",
-                    class = refused.class.as_str(),
-                    limit = refused.limit,
-                    open = layer.limiter.open(&key),
-                    retry_after_ms = millis(refused.retry_after),
-                    caller = %refused.caller,
-                    path = %crate::observability::redact::path(&refused.path),
-                );
-                return Ok((layer.reject)(&refused).map(|body| SlotBody::new(body, None)));
+            let slot = match layer.limiter.acquire(&key, limit) {
+                Ok(slot) => slot,
+                Err(reason) => {
+                    let refused = ConcurrencyLimited {
+                        class: layer.class,
+                        reason,
+                        limit,
+                        caller,
+                        path: request.uri().path().to_string(),
+                        retry_after: layer.retry_after,
+                    };
+                    tracing::warn!(
+                        event = "security.concurrency_limited",
+                        class = refused.class.as_str(),
+                        reason = refused.reason.as_str(),
+                        limit = refused.limit,
+                        open = layer.limiter.open(&key),
+                        retry_after_ms = millis(refused.retry_after),
+                        caller = %refused.caller,
+                        path = %crate::observability::redact::path(&refused.path),
+                    );
+                    return Ok((layer.reject)(&refused).map(|body| SlotBody::new(body, None)));
+                }
             };
             // An error or a response that is not sent drops the slot with it.
             let response = inner.call(request).await?;
@@ -1284,6 +1367,23 @@ mod tests {
         assert!(limiter.try_acquire("caller-new", 4).is_some());
     }
 
+    #[test]
+    fn the_global_limit_caps_all_callers_together() {
+        let limiter = Arc::new(ConcurrencyLimiter::new(100).with_global_limit(3));
+        let a = limiter.acquire("a", 2).unwrap();
+        let b = limiter.acquire("b", 2).unwrap();
+        let a2 = limiter.acquire("a", 2).unwrap();
+        assert_eq!(limiter.acquire("c", 2).unwrap_err(), SlotRefusal::Global);
+        assert_eq!(limiter.acquire("a", 2).unwrap_err(), SlotRefusal::Caller);
+        assert_eq!(limiter.total(), 3);
+        drop(b);
+        assert_eq!(limiter.total(), 2);
+        let c = limiter.acquire("c", 2).unwrap();
+        drop((a, a2, c));
+        assert_eq!(limiter.total(), 0);
+        assert!(limiter.is_empty());
+    }
+
     fn streaming(
         limiter: &Arc<ConcurrencyLimiter>,
         limit: u32,
@@ -1357,6 +1457,40 @@ mod tests {
         let again = open(&service, "203.0.113.1").await;
         assert_eq!(again.status(), http::StatusCode::OK);
         drop((again, elsewhere, body));
+        assert!(limiter.is_empty());
+    }
+
+    /// 3.6d: a [`SlotHolder`] in the extensions decides the key and the
+    /// limit; without one the key function (here the address) does.
+    #[tokio::test]
+    async fn a_slot_holder_counts_against_its_own_key_and_limit() {
+        let limiter = Arc::new(ConcurrencyLimiter::new(100));
+        let service = streaming(&limiter, 1);
+        let holder = SlotHolder {
+            caller: "user:u1".to_string(),
+            limit: 3,
+        };
+        let mut tabs = Vec::new();
+        for _ in 0..3 {
+            let mut request = Request::new(());
+            request
+                .extensions_mut()
+                .insert(ClientIp(Some("127.0.0.1".parse().unwrap())));
+            request.extensions_mut().insert(holder.clone());
+            let response = service.clone().oneshot(request).await.unwrap();
+            assert_eq!(response.status(), http::StatusCode::OK);
+            tabs.push(response);
+        }
+        assert_eq!(limiter.open("stream:user:u1"), 3);
+        let mut request = Request::new(());
+        request.extensions_mut().insert(holder);
+        let refused = service.clone().oneshot(request).await.unwrap();
+        assert_eq!(refused.status(), http::StatusCode::TOO_MANY_REQUESTS);
+        // The address the tabs share is untouched.
+        let anonymous = open(&service, "127.0.0.1").await;
+        assert_eq!(anonymous.status(), http::StatusCode::OK);
+        assert_eq!(limiter.open("stream:ip:127.0.0.1"), 1);
+        drop((tabs, anonymous));
         assert!(limiter.is_empty());
     }
 }
