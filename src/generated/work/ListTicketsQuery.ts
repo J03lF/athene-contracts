@@ -15,9 +15,15 @@ export type ListTicketsQuery = { project_id?: string,
  */
 workspace_id?: string, 
 /**
- * Statuses (`open,in_progress,…`; `done` does not include `closed`).
+ * Status keys (`open,in_progress,qa,…`; `done` includes the legacy
+ * `closed`). A key no workspace has matches nothing.
  */
 status?: string, 
+/**
+ * Status categories (`open,in_progress,blocked,done`; W4-F): tickets
+ * whose status means one of them.
+ */
+category?: string, 
 /**
  * `me`, `none` (unassigned) or user ids.
  */

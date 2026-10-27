@@ -28,6 +28,7 @@ pub mod ticket_check;
 pub mod ticket_types;
 pub mod user;
 pub mod work;
+pub mod workflow;
 pub mod workspace;
 
 pub use common::{ApiError, ApiErrorCode, ApiErrorEnvelope, ApiResponse, ListMeta, ListResponse};

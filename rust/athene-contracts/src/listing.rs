@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;
 
-use crate::work::{TicketPriority, TicketStatus};
+use crate::work::TicketPriority;
 
 /// Tickets per page when the query names none.
 pub const TICKET_PAGE_DEFAULT_LIMIT: u32 = 50;
@@ -202,7 +202,11 @@ pub struct TicketSummary {
     pub sequence: i64,
     pub title: String,
     pub ticket_type: String,
-    pub status: TicketStatus,
+    /// A status key (W4-F); see `TicketResponse.status`.
+    pub status: String,
+    #[serde(default)]
+    #[ts(optional, as = "Option<crate::workflow::StatusCategory>")]
+    pub status_category: crate::workflow::StatusCategory,
     pub priority: TicketPriority,
     pub assignee_id: Option<String>,
     pub reporter_id: String,

@@ -35,7 +35,12 @@ use crate::Patch;
 // Vocabulary
 // ============================================================
 
-/// Where a ticket is in its workflow.
+/// The built-in ticket statuses and the legacy `closed` (W4-F): the keys
+/// tickets have always carried. A ticket's `status` is a **string** now —
+/// the key of one of its workspace's statuses ([`crate::workflow`]), these
+/// or one the workspace added — and what it means is its
+/// `status_category`. `closed` is legacy: still read (as `done`), never
+/// written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export_to = "work/")]
@@ -154,9 +159,14 @@ pub struct ListTicketsQuery {
     pub workspace_id: Option<String>,
     // The list parameters below (step 3.9) make the answer a
     // `listing::Page`; see `crate::listing`. Lists are comma-separated.
-    /// Statuses (`open,in_progress,…`; `done` does not include `closed`).
+    /// Status keys (`open,in_progress,qa,…`; `done` includes the legacy
+    /// `closed`). A key no workspace has matches nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
+    /// Status categories (`open,in_progress,blocked,done`; W4-F): tickets
+    /// whose status means one of them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
     /// `me`, `none` (unassigned) or user ids.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assignee: Option<String>,
@@ -226,6 +236,7 @@ impl ListTicketsQuery {
     /// Without one, the answer is the whole list (the old call).
     pub fn is_paged(&self) -> bool {
         self.status.is_some()
+            || self.category.is_some()
             || self.assignee.is_some()
             || self.priority.is_some()
             || self.ticket_type.is_some()
@@ -465,7 +476,15 @@ pub struct TicketResponse {
     /// A ticket-type key of the workspace (`task`, `bug`, `feature`,
     /// `support`, `epic` or one the workspace added).
     pub ticket_type: String,
-    pub status: TicketStatus,
+    /// The key of one of the workspace's statuses (W4-F): a built-in one
+    /// (`open`, `in_progress`, `in_review`, `blocked`, `done`, the strings
+    /// they always were), one the workspace added, or the legacy `closed`.
+    pub status: String,
+    /// What the status means: `open`, `in_progress`, `blocked` or `done`
+    /// (legacy `closed` is `done`). Derived by the server in every read.
+    #[serde(default)]
+    #[ts(optional, as = "Option<crate::workflow::StatusCategory>")]
+    pub status_category: crate::workflow::StatusCategory,
     pub priority: TicketPriority,
     pub assignee_id: Option<String>,
     pub reporter_id: String,
@@ -661,8 +680,9 @@ pub struct TicketExpected {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional, as = "Option<TicketPriority>")]
     pub priority: Option<String>,
+    /// A status key as the client saw it (legacy `closed` included).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional, as = "Option<TicketStatus>")]
+    #[ts(optional)]
     pub status: Option<String>,
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub assignee_id: Patch<String>,
@@ -775,9 +795,12 @@ pub struct BulkUpdateTicketsRequest {
     pub patch: UpdateTicketRequest,
     /// Taken apart from the patch and applied through the status endpoint's
     /// own path: a status change stamps SLA timers and clears a resolution
-    /// date, and writing it as a plain field would skip all of that.
+    /// date, and writing it as a plain field would skip all of that. A
+    /// status key of each ticket's workspace (W4-F): a ticket whose
+    /// workspace lacks it, or hides it in the ticket's project, lands in
+    /// `failed`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional, as = "Option<TicketStatus>")]
+    #[ts(optional)]
     pub status: Option<String>,
     /// The base per ticket, keyed by ticket id: each ticket is checked and
     /// written on its own, so a stale one lands in `conflicts` and the rest
@@ -930,7 +953,11 @@ pub struct DeletedTicketResponse {
 #[serde(deny_unknown_fields)]
 #[ts(export_to = "work/")]
 pub struct UpdateTicketStatusRequest {
-    /// A [`TicketStatus`] value.
+    /// A status key of the ticket's workspace (W4-F): live (not archived)
+    /// and not hidden in the ticket's project, else `400` with
+    /// `details.reason` `status_unknown`, `status_archived` or
+    /// `status_hidden`. Older spellings still work (`prog`, `review`;
+    /// `closed` and `resolved` set `done`).
     pub status: String,
     /// The base of the change (step 3.7): for `status`, the status the
     /// client saw. See [`TicketExpected`].
@@ -1493,7 +1520,11 @@ pub struct FlowPointResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[ts(export_to = "work/")]
 pub struct StatusShareResponse {
-    pub status: TicketStatus,
+    /// A status key (W4-F).
+    pub status: String,
+    #[serde(default)]
+    #[ts(optional, as = "Option<crate::workflow::StatusCategory>")]
+    pub category: crate::workflow::StatusCategory,
     pub count: usize,
     pub points: i64,
 }

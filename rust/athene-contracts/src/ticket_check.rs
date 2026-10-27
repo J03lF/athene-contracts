@@ -545,9 +545,9 @@ pub struct DuplicateCandidate {
     /// `WEB-12`.
     pub key: String,
     pub title: String,
-    #[schema(value_type = String)]
-    pub status: crate::work::TicketStatus,
-    /// Finished (shown, but marked).
+    /// A status key (W4-F).
+    pub status: String,
+    /// Finished (shown, but marked): its status is a `done` one.
     pub done: bool,
     /// Calibrated probability that it is the same issue, 0–1.
     pub score: f32,

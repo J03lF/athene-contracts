@@ -1,6 +1,8 @@
 import type {
   AddTeamMembersRequest,
   CreateTeamRequest,
+  DeleteTeamRequest,
+  DeleteTeamResponse,
   TeamListQuery,
   TeamResponse,
   TeamRole,
@@ -63,6 +65,17 @@ export class TeamsApiClient {
   /** Deletes the team and its memberships; people stay in the workspace. */
   delete(id: string): Promise<void> {
     return this.http.delete(`/work/teams/${id}`).then(() => undefined);
+  }
+
+  /**
+   * Delete a team that queues target (W4-F): its queues move to
+   * `replacement_team_id` in the same statement. A plain `delete` of such a
+   * team is `409` with `details.reason` `team_has_queues`.
+   */
+  deleteWithReplacement(id: string, body: DeleteTeamRequest): Promise<DeleteTeamResponse> {
+    return this.http
+      .post<ApiEnvelope<DeleteTeamResponse>>(`/work/teams/${id}/delete`, body)
+      .then(unwrap);
   }
 
   /** Returns the team with every member. */

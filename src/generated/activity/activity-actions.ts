@@ -77,4 +77,8 @@ export const ACTIVITY_ACTIONS: readonly ActivityAction[] = [
   "role_deleted",
   "override_set",
   "override_cleared",
+  "workflow_status_created",
+  "workflow_status_updated",
+  "workflow_status_archived",
+  "workflow_status_deleted",
 ];

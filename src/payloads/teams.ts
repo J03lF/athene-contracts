@@ -29,6 +29,8 @@ export const TEAM_MAX_MEMBERS_PER_REQUEST = 100;
 
 export type { AddTeamMembersRequest } from '../generated/teams/AddTeamMembersRequest';
 export type { CreateTeamRequest } from '../generated/teams/CreateTeamRequest';
+export type { DeleteTeamRequest } from '../generated/teams/DeleteTeamRequest';
+export type { DeleteTeamResponse } from '../generated/teams/DeleteTeamResponse';
 export type { TeamListQuery } from '../generated/teams/TeamListQuery';
 export type { TeamMemberInput } from '../generated/teams/TeamMemberInput';
 export type { TeamMemberResponse } from '../generated/teams/TeamMemberResponse';
@@ -36,3 +38,6 @@ export type { TeamResponse } from '../generated/teams/TeamResponse';
 export type { TeamRole } from '../generated/teams/TeamRole';
 export type { UpdateTeamMemberRequest } from '../generated/teams/UpdateTeamMemberRequest';
 export type { UpdateTeamRequest } from '../generated/teams/UpdateTeamRequest';
+
+/** `409` reason of a plain delete: queues target the team (`details.queues`). */
+export const TEAM_HAS_QUEUES_REASON = 'team_has_queues';

@@ -14,9 +14,13 @@
  */
 export type QueueActivity = { id: string, name: string, 
 /**
- * The target role.
+ * The target role (a role queue).
  */
-role_id: string, 
+role_id?: string, 
+/**
+ * The target team (a team queue, W4-F).
+ */
+team_id?: string, 
 /**
  * Who had the ticket before it entered the queue (`null`: nobody).
  */

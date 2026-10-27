@@ -3,4 +3,4 @@
 /**
  * Who works a queue.
  */
-export type QueueTargetKind = "role";
+export type QueueTargetKind = "role" | "team";

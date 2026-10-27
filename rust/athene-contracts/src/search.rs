@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;
 
-use crate::work::{TicketPriority, TicketStatus};
+use crate::work::TicketPriority;
 
 /// Query of `GET /work/workspaces/:workspace_id/search`. Lists are
 /// comma-separated; within a list any value matches, all given filters
@@ -95,8 +95,11 @@ pub struct TicketSearchHit {
     /// About 180 characters of the description around the first match,
     /// `…` where cut; empty for an empty description.
     pub snippet: Vec<TextPart>,
-    #[schema(value_type = String)]
-    pub status: TicketStatus,
+    /// A status key (W4-F).
+    pub status: String,
+    #[serde(default)]
+    #[ts(optional, as = "Option<crate::workflow::StatusCategory>")]
+    pub status_category: crate::workflow::StatusCategory,
     pub ticket_type: String,
     #[schema(value_type = String)]
     pub priority: TicketPriority,

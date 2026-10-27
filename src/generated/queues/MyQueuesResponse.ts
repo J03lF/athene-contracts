@@ -3,6 +3,7 @@ import type { QueueTickets } from "./QueueTickets";
 
 /**
  * `GET /work/workspaces/:workspace_id/queues/mine`: the queues whose
- * target role the caller holds, then (for owners and admins) the others.
+ * target the caller holds (their role, or a team they are in), then (for
+ * owners and admins) the others.
  */
 export type MyQueuesResponse = { queues: Array<QueueTickets>, };

@@ -12,11 +12,15 @@
 //! winner. **Handing back** returns the ticket to `in_progress` and to the
 //! person it came from, with a required comment.
 //!
-//! For C1 a queue targets a **role** ([`QueueTarget::Role`]); a team
-//! target ("the ticket's team", once tickets carry one) is the hook for
-//! later — the table already has the column. "Bereit zum Test" is the
-//! existing `in_review` with a display name per workspace
-//! ([`crate::workspace::StatusLabels`]); real custom statuses come in C2.
+//! A queue targets a **role** or a **team** (W4-F, [`QueueTargetKind`]):
+//! in a small team the developer can also be the tester — every member
+//! keeps exactly one role (E1), and teams are the second axis. Who works a
+//! queue: the members holding its role, or the members of its team; the
+//! workspace's owners and admins work every queue.
+//!
+//! A queue waits in any status of the workspace whose category is not
+//! `done` ([`crate::workflow`]): a built-in one ("Bereit zum Test" is
+//! `in_review`, the default) or one the workspace added.
 //!
 //! - `GET /work/workspaces/:workspace_id/queues` — every member: the
 //!   queues with how many tickets wait in each, whether the caller works
@@ -40,7 +44,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;
 
-use crate::work::{TicketExpected, TicketResponse, TicketStatus};
+use crate::work::{TicketExpected, TicketResponse};
 
 /// `409`: somebody else took the ticket first. `details.current` is the
 /// ticket now, `details.taken_by` `{ id, display_name }` who has it.
@@ -70,6 +74,8 @@ pub const QUEUE_MAX_LISTED_TICKETS: usize = 100;
 pub enum QueueTargetKind {
     /// The members holding one role of the workspace.
     Role,
+    /// The members of one team of the workspace (W4-F).
+    Team,
 }
 
 /// A queue of a workspace.
@@ -82,14 +88,14 @@ pub struct QueueResponse {
     /// status comes before the workspace-wide one.
     pub project_id: Option<String>,
     pub name: String,
-    /// The status a ticket waits in: `open`, `in_progress`, `in_review` or
-    /// `blocked` (never an end state).
-    #[schema(value_type = String)]
-    pub status: TicketStatus,
+    /// The status key a ticket waits in: any status of the workspace whose
+    /// category is not `done` (W4-F).
+    pub status: String,
     pub target_kind: QueueTargetKind,
-    /// The target role's id.
+    /// The target role's or team's id.
     pub target_id: String,
-    /// The target role's name and colour token, for the badge.
+    /// The target's name and colour (a role's token, a team's `#RRGGBB`),
+    /// for the badge.
     pub target_name: String,
     pub target_color: Option<String>,
     /// Entering the status unassigns the ticket (the hand-off). Without it
@@ -100,10 +106,11 @@ pub struct QueueResponse {
     /// Tickets in the status, unassigned, in a live project the queue
     /// covers.
     pub waiting: i64,
-    /// The caller holds the target role.
+    /// The caller holds the target role, or is in the target team.
     pub mine: bool,
-    /// The caller may take from it: holds the target role, or governs the
-    /// workspace (owners and admins), and has `ticket.take`.
+    /// The caller may take from it: holds the target (the role, or a place
+    /// in the team), or governs the workspace (owners and admins), and has
+    /// `ticket.take`.
     pub can_take: bool,
     /// For `PATCH` (3.7): orders answers, decides no conflict.
     pub version: i64,
@@ -129,10 +136,9 @@ pub struct CreateQueueRequest {
     /// 1–60 characters, trimmed.
     pub name: String,
     /// See [`QueueResponse::status`]. One queue per status and place.
-    #[schema(value_type = String)]
-    pub status: TicketStatus,
+    pub status: String,
     pub target_kind: QueueTargetKind,
-    /// A role of the workspace.
+    /// A role of the workspace (`role`) or a team of it (`team`).
     pub target_id: String,
     /// A project of the workspace; absent or `null` = workspace-wide.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -154,8 +160,11 @@ pub struct QueueExpected {
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
-    #[schema(value_type = Option<String>)]
-    pub status: Option<TicketStatus>,
+    pub status: Option<String>,
+    /// With `target_id`: the kind the client saw (absent = `role`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub target_kind: Option<QueueTargetKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub target_id: Option<String>,
@@ -177,9 +186,13 @@ pub struct UpdateQueueRequest {
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
-    #[schema(value_type = Option<String>)]
-    pub status: Option<TicketStatus>,
-    /// A role of the workspace (the target stays a role in C1).
+    pub status: Option<String>,
+    /// With `target_id`: a role or a team (absent = `role`, as C1 clients
+    /// send it). A queue may move from a role to a team and back.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub target_kind: Option<QueueTargetKind>,
+    /// A role or a team of the workspace, per `target_kind`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub target_id: Option<String>,
@@ -209,7 +222,8 @@ pub struct QueueTickets {
 }
 
 /// `GET /work/workspaces/:workspace_id/queues/mine`: the queues whose
-/// target role the caller holds, then (for owners and admins) the others.
+/// target the caller holds (their role, or a team they are in), then (for
+/// owners and admins) the others.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
 #[ts(export_to = "queues/")]
 pub struct MyQueuesResponse {
@@ -255,21 +269,23 @@ pub struct TakenBy {
 pub struct QueueActivity {
     pub id: String,
     pub name: String,
-    /// The target role.
-    pub role_id: String,
+    /// The target role (a role queue).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub role_id: Option<String>,
+    /// The target team (a team queue, W4-F).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub team_id: Option<String>,
     /// Who had the ticket before it entered the queue (`null`: nobody).
     #[serde(default)]
     #[ts(optional = nullable)]
     pub handed_off_by: Option<String>,
 }
 
-/// Statuses a queue may wait in: every status that is not an end.
-pub const QUEUE_STATUSES: [TicketStatus; 4] = [
-    TicketStatus::Open,
-    TicketStatus::InProgress,
-    TicketStatus::InReview,
-    TicketStatus::Blocked,
-];
+/// `400` reasons (`details.reason`) of a queue's status (W4-F): the status
+/// is a `done` one, archived, or not the workspace's.
+pub const QUEUE_STATUS_DONE_REASON: &str = "queue_status_done";
 
 #[cfg(test)]
 mod tests {
@@ -286,7 +302,7 @@ mod tests {
         assert_eq!(create.unassign_on_enter, None);
         assert!(
             serde_json::from_value::<CreateQueueRequest>(serde_json::json!({
-                "name": "x", "status": "in_review", "target_kind": "team", "target_id": "t"
+                "name": "x", "status": "in_review", "target_kind": "group", "target_id": "t"
             }))
             .is_err()
         );
@@ -305,8 +321,21 @@ mod tests {
     }
 
     #[test]
-    fn no_queue_waits_in_an_end_state() {
-        assert!(!QUEUE_STATUSES.contains(&TicketStatus::Done));
-        assert!(!QUEUE_STATUSES.contains(&TicketStatus::Closed));
+    fn a_team_is_a_target_and_an_activity_names_it() {
+        let create: CreateQueueRequest = serde_json::from_value(serde_json::json!({
+            "name": "iOS-Test", "status": "qa", "target_kind": "team", "target_id": "t"
+        }))
+        .unwrap();
+        assert_eq!(create.target_kind, QueueTargetKind::Team);
+        let activity = QueueActivity {
+            id: "q".into(),
+            name: "iOS-Test".into(),
+            role_id: None,
+            team_id: Some("t".into()),
+            handed_off_by: None,
+        };
+        let wire = serde_json::to_value(&activity).unwrap();
+        assert_eq!(wire["team_id"], "t");
+        assert!(wire.get("role_id").is_none());
     }
 }

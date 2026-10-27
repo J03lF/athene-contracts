@@ -140,6 +140,17 @@ pub enum ActivityAction {
     RoleDeleted,
     OverrideSet,
     OverrideCleared,
+    /// A status the workspace added (W4-F). Target `workflow_status`,
+    /// `detail` its name; metadata `{ key, category }`.
+    WorkflowStatusCreated,
+    /// Renamed, recoloured, recategorised, restored from the archive or
+    /// hidden/shown in a project; metadata also `{ fields }` (and
+    /// `{ project_id, hidden }` for a project's hidden statuses).
+    WorkflowStatusUpdated,
+    /// Archived: no new ticket enters it.
+    WorkflowStatusArchived,
+    /// Deleted; metadata also `{ moved_tickets, move_to, removed_queues }`.
+    WorkflowStatusDeleted,
 }
 
 impl ActivityAction {
@@ -219,6 +230,10 @@ impl ActivityAction {
         Self::RoleDeleted,
         Self::OverrideSet,
         Self::OverrideCleared,
+        Self::WorkflowStatusCreated,
+        Self::WorkflowStatusUpdated,
+        Self::WorkflowStatusArchived,
+        Self::WorkflowStatusDeleted,
     ];
 
     /// The verb on the wire and in the database.
@@ -298,6 +313,10 @@ impl ActivityAction {
             Self::RoleDeleted => "role_deleted",
             Self::OverrideSet => "override_set",
             Self::OverrideCleared => "override_cleared",
+            Self::WorkflowStatusCreated => "workflow_status_created",
+            Self::WorkflowStatusUpdated => "workflow_status_updated",
+            Self::WorkflowStatusArchived => "workflow_status_archived",
+            Self::WorkflowStatusDeleted => "workflow_status_deleted",
         }
     }
 

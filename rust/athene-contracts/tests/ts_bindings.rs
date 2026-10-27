@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 use athene_contracts::{
     activity, admin, athene_ai, attachments, auth, calendar, common, dashboard, docs, edit,
     field_assignments, field_definitions, listing, overrides, policy, queues, roles, search, teams,
-    ticket_check, ticket_types, user, work, workspace,
+    ticket_check, ticket_types, user, work, workflow, workspace,
 };
 use ts_rs::{Config, TS};
 
@@ -263,6 +263,8 @@ fn render(out: &Path) {
         teams::AddTeamMembersRequest,
         teams::UpdateTeamMemberRequest,
         teams::TeamListQuery,
+        teams::DeleteTeamRequest,
+        teams::DeleteTeamResponse,
         // ticket types
         ticket_types::TicketTypeIcon,
         ticket_types::TicketTypeColor,
@@ -336,6 +338,20 @@ fn render(out: &Path) {
         queues::HandBackTicketRequest,
         queues::TakenBy,
         queues::QueueActivity,
+        // workflow (W4-F): a workspace's own statuses
+        workflow::StatusCategory,
+        workflow::WorkflowStatusResponse,
+        workflow::WorkspaceWorkflowResponse,
+        workflow::WorkflowQuery,
+        workflow::CreateWorkflowStatusRequest,
+        workflow::WorkflowStatusExpected,
+        workflow::UpdateWorkflowStatusRequest,
+        workflow::ReorderWorkflowStatusesRequest,
+        workflow::DeleteWorkflowStatusRequest,
+        workflow::DeleteWorkflowStatusResponse,
+        workflow::SetHiddenStatusesRequest,
+        workflow::ProjectHiddenStatusesResponse,
+        workflow::WorkflowStatusActivity,
         // search (3.9)
         search::SearchTicketsQuery,
         search::TextPart,

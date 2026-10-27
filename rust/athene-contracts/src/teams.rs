@@ -128,6 +128,31 @@ pub struct UpdateTeamRequest {
     pub color: Patch<String>,
 }
 
+/// `POST /work/teams/:id/delete` (W4-F): delete a team that queues
+/// target. Its queues move to `replacement_team_id` in the delete's own
+/// statement, as a deleted role's queues move to its replacement. A plain
+/// `DELETE /work/teams/:id` of a team some queue targets is `409` with
+/// `details.reason` [`TEAM_HAS_QUEUES_REASON`] and `details.queues`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "teams/")]
+pub struct DeleteTeamRequest {
+    /// Another team of the workspace; where the team's queues go.
+    pub replacement_team_id: String,
+}
+
+/// `POST /work/teams/:id/delete`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema, TS)]
+#[ts(export_to = "teams/")]
+pub struct DeleteTeamResponse {
+    pub deleted_id: String,
+    pub replacement_team_id: String,
+    pub moved_queues: i64,
+}
+
+/// `409` reason (`details.reason`): queues target the team.
+pub const TEAM_HAS_QUEUES_REASON: &str = "team_has_queues";
+
 /// Either `members` (a role each) or `user_ids` sharing `role`, or both.
 /// Someone already in the team keeps their role.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize, ToSchema, TS)]

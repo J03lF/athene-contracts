@@ -6,7 +6,11 @@ import type { TicketExpected } from "./TicketExpected";
  */
 export type UpdateTicketStatusRequest = { 
 /**
- * A [`TicketStatus`] value.
+ * A status key of the ticket's workspace (W4-F): live (not archived)
+ * and not hidden in the ticket's project, else `400` with
+ * `details.reason` `status_unknown`, `status_archived` or
+ * `status_hidden`. Older spellings still work (`prog`, `review`;
+ * `closed` and `resolved` set `done`).
  */
 status: string, 
 /**
