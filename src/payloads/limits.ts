@@ -2,26 +2,8 @@
  * Length limits, generated from `rust/athene-contracts/src/limits.rs`
  * (BE-16, step 3.10): the numbers the core checks, for the forms that check
  * first.
+ *
+ * Every generated limit is exported: a list of names here fell behind once
+ * (the W4-H release-note limits had to be mirrored in the web).
  */
-export {
-  ATTACHMENT_MAX_BYTES,
-  ATTACHMENT_NAME_MAX_CHARS,
-  ATTACHMENT_WORKSPACE_MAX_BYTES,
-  ATTACHMENTS_PER_TICKET_MAX,
-  COMMENT_MAX_CHARS,
-  COMMENT_MIN_CHARS,
-  LABEL_NAME_MAX_CHARS,
-  RELEASE_NAME_MAX_CHARS,
-  SPRINT_NAME_MAX_CHARS,
-  TICKET_DESCRIPTION_MAX_BYTES,
-  TICKET_LIST_FIELD_FILTERS_MAX_CHARS,
-  TICKET_LIST_MAX_FIELD_FILTERS,
-  TICKET_LIST_MAX_FIELD_KEYS,
-  TICKET_LIST_QUERY_MAX_CHARS,
-  TICKET_PAGE_DEFAULT_LIMIT,
-  TICKET_PAGE_MAX_LIMIT,
-  TICKET_TITLE_MAX_CHARS,
-  TICKET_TITLE_MIN_CHARS,
-  WORK_LOG_NOTE_MAX_CHARS,
-  WORKSPACE_NAME_MAX_CHARS,
-} from '../generated/limits/limits';
+export * from '../generated/limits/limits';
