@@ -86,4 +86,12 @@ export class QueuesApiClient {
       .post<ApiEnvelope<TicketResponse>>(`/work/tickets/${ticketId}/hand-back`, body)
       .then(unwrap);
   }
+
+  /**
+   * [`handBack`] with what a WIP limit of `in_progress` warns about (W5-A):
+   * the envelope `{data, warnings?}`, like `take`.
+   */
+  handBackWarned(ticketId: string, body: HandBackTicketRequest): Promise<TicketWriteResponse> {
+    return this.http.post<TicketWriteResponse>(`/work/tickets/${ticketId}/hand-back`, body);
+  }
 }

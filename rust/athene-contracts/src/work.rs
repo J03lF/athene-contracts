@@ -269,7 +269,7 @@ pub struct ListProjectsQuery {
     pub workspace_id: Option<String>,
 }
 
-/// The per-user lists: `GET /work/inbox` and `GET /work/activity`.
+/// The per-user list `GET /work/activity` (the inbox: [`InboxQuery`]).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[ts(export_to = "work/", optional_fields)]
 pub struct PerUserListQuery {
@@ -278,6 +278,21 @@ pub struct PerUserListQuery {
     /// Only this workspace (403 for a non-member).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace_id: Option<String>,
+}
+
+/// `GET /work/inbox` (W5-A): the per-user list's parameters, and
+/// `with_digests` for the caller's digests beside the entries.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[ts(export_to = "work/", optional_fields)]
+pub struct InboxQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+    /// Only this workspace (403 for a non-member).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+    /// `true`: the answer carries `digests` (one more statement).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub with_digests: Option<bool>,
 }
 
 /// The per-user aggregates: `GET /work/stats` and `GET /work/my-tickets`.
@@ -1159,6 +1174,21 @@ pub struct InboxEntryResponse {
     pub created_at: String,
     pub reason: InboxReason,
     pub ticket: TicketResponse,
+}
+
+/// `GET /work/inbox` (W5-A): the entries, and with `with_digests=true`
+/// the caller's digests of the same workspaces (each counts as one more
+/// unread entry until it is read: the same `inbox_state` rules as an
+/// entry, by its `id` and `created_at`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[ts(export_to = "work/")]
+pub struct InboxResponse {
+    pub data: Vec<InboxEntryResponse>,
+    /// Absent unless asked for; newest first, only digests with tickets of
+    /// the workspaces the inbox shows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub digests: Option<Vec<crate::notifications::InboxDigest>>,
 }
 
 // ============================================================

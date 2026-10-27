@@ -727,6 +727,21 @@ pub struct DigestListResponse {
     pub digests: Vec<DigestResponse>,
 }
 
+/// One digest beside the inbox's entries (`GET /work/inbox?with_digests=
+/// true`, W5-A): enough for the unread badge and the row, counted over the
+/// tickets of the workspaces the inbox shows. The digest itself is
+/// `GET /user/notifications/digests`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "notifications/")]
+pub struct InboxDigest {
+    pub id: String,
+    pub cadence: DigestCadence,
+    /// RFC 3339; what `inbox_state.seen_at` compares.
+    pub created_at: String,
+    pub ticket_count: usize,
+    pub event_count: usize,
+}
+
 /// The template the core mails with through notification-service
 /// (`POST /api/v1/notifications/queue`).
 pub const NOTIFICATION_MAIL_TEMPLATE: &str = "athene_notification";

@@ -119,6 +119,8 @@ fn render(out: &Path) {
         work::WorkStatsResponse,
         work::WorkActivityEntryResponse,
         work::InboxEntryResponse,
+        work::InboxQuery,
+        work::InboxResponse,
         // work: comments, links, watchers
         work::TicketCommentResponse,
         work::AddTicketCommentRequest,
@@ -360,6 +362,7 @@ fn render(out: &Path) {
         notifications::DigestTicketResponse,
         notifications::DigestResponse,
         notifications::DigestListResponse,
+        notifications::InboxDigest,
         release_notes::ReleaseNoteLanguage,
         release_notes::ReleaseNotesVariant,
         release_notes::ReleaseNotesFormat,

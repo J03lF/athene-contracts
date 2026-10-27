@@ -257,6 +257,12 @@ pub struct HandBackTicketRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub expected: Option<TicketExpected>,
+    /// Past a blocking WIP limit of `in_progress` (W5-A): a hand-back fills
+    /// the column, and the person it goes to, like a status write and a
+    /// take; an owner's or admin's reason, ignored from anyone else.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub wip_override: Option<crate::status_rules::WipOverride>,
 }
 
 /// Who has a ticket that was taken first (`409` [`ALREADY_TAKEN_CODE`]).
@@ -329,6 +335,27 @@ mod tests {
         assert!(
             serde_json::from_value::<HandBackTicketRequest>(serde_json::json!({
                 "comment": "Fails on Safari", "assignee_id": "x"
+            }))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn a_hand_back_may_carry_a_wip_override() {
+        let back: HandBackTicketRequest = serde_json::from_value(serde_json::json!({
+            "comment": "Fails on Safari", "wip_override": { "reason": "Hotfix" }
+        }))
+        .unwrap();
+        assert_eq!(
+            back.wip_override.map(|w| w.reason).as_deref(),
+            Some("Hotfix")
+        );
+        let plain: HandBackTicketRequest =
+            serde_json::from_value(serde_json::json!({ "comment": "Fails on Safari" })).unwrap();
+        assert_eq!(plain.wip_override, None);
+        assert!(
+            serde_json::from_value::<HandBackTicketRequest>(serde_json::json!({
+                "comment": "Fails on Safari", "wip_override": { "why": "x" }
             }))
             .is_err()
         );

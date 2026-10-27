@@ -31,6 +31,8 @@ export type { CreateTicketRequest } from '../generated/work/CreateTicketRequest'
 export type { DeletedTicketResponse } from '../generated/work/DeletedTicketResponse';
 export type { FlowPointResponse } from '../generated/work/FlowPointResponse';
 export type { InboxEntryResponse } from '../generated/work/InboxEntryResponse';
+export type { InboxQuery } from '../generated/work/InboxQuery';
+export type { InboxResponse } from '../generated/work/InboxResponse';
 export type { InboxReason } from '../generated/work/InboxReason';
 export type { LabelAssignmentResponse } from '../generated/work/LabelAssignmentResponse';
 export type { LabelResponse } from '../generated/work/LabelResponse';

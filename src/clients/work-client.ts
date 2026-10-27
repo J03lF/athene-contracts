@@ -21,6 +21,8 @@ import type {
   CreateTicketLinkRequest,
   CreateTicketRequest,
   InboxEntryResponse,
+  InboxQuery,
+  InboxResponse,
   LabelResponse,
   LinkRelation,
   ListProjectsQuery,
@@ -108,6 +110,17 @@ export class WorkApiClient {
     return this.http
       .get<ApiEnvelope<InboxEntryResponse[]>>(`/work/inbox${perUserQs(q)}`)
       .then(unwrap);
+  }
+
+  /**
+   * The inbox with the caller's digests beside its entries (W5-A), for an
+   * unread badge that counts both in one request: `digests` uses the same
+   * read state as the entries (`inbox_state`, by `id` and `created_at`).
+   */
+  inboxWithDigests(q: Omit<InboxQuery, 'with_digests'> = {}): Promise<InboxResponse> {
+    const params = new URLSearchParams(perUserQs(q).slice(1));
+    params.set('with_digests', 'true');
+    return this.http.get<InboxResponse>(`/work/inbox?${params.toString()}`);
   }
 
   /**

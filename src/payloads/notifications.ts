@@ -20,6 +20,7 @@ export type { DigestResponse } from '../generated/notifications/DigestResponse';
 export type { DigestSchedulePatch } from '../generated/notifications/DigestSchedulePatch';
 export type { DigestScheduleResponse } from '../generated/notifications/DigestScheduleResponse';
 export type { DigestTicketResponse } from '../generated/notifications/DigestTicketResponse';
+export type { InboxDigest } from '../generated/notifications/InboxDigest';
 export type { EffectiveDelivery } from '../generated/notifications/EffectiveDelivery';
 export type { EventDefaultResponse } from '../generated/notifications/EventDefaultResponse';
 export type { EventDeliveryPatch } from '../generated/notifications/EventDeliveryPatch';
