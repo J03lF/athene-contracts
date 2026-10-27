@@ -20,6 +20,8 @@ export * from './payloads/roles';
 export * from './payloads/overrides';
 export * from './payloads/queues';
 export * from './payloads/workflow';
+export * from './payloads/notifications';
+export * from './payloads/release-notes';
 export * from './payloads/search';
 export * from './payloads/ticket-check';
 export * from './payloads/calendar';

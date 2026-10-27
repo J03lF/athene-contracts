@@ -88,6 +88,14 @@ pub enum ActivityAction {
     TicketAttachmentPurged,
     /// A file renamed; metadata also `{ from }`.
     TicketAttachmentRenamed,
+    /// The ticket's "Release-Notiz" set, changed or removed (W4-H).
+    /// metadata `{ set: bool }`; the text itself is not copied.
+    TicketReleaseNoteUpdated,
+    /// The ticket's due date (its own, else its sprint's end) is within
+    /// the workspace's "due soon" window (W4-H, written by the
+    /// notification job, no actor). metadata `{ due_at, source: own |
+    /// sprint, hours }`; once per ticket and due date.
+    TicketDueSoon,
     ProjectUpdated,
     ProjectCustomValuesUpdated,
     SprintCreated,
@@ -102,6 +110,18 @@ pub enum ActivityAction {
     MilestoneReleased,
     MilestoneReopened,
     MilestoneDeleted,
+    /// A release's notes were generated into its drafts (W4-H). Target the
+    /// release; metadata `{ variants: [...] }`.
+    ReleaseNotesGenerated,
+    /// A release's notes settings or drafts changed (W4-H). metadata
+    /// `{ fields: [...] }`.
+    ReleaseNotesUpdated,
+    /// A workspace's release-note template saved or reset (W4-H). Target
+    /// the workspace; metadata `{ reset: bool }`.
+    ReleaseNoteTemplateUpdated,
+    /// A workspace's notification defaults changed (W4-H). Target the
+    /// workspace; metadata `{ fields: [...] }`.
+    NotificationDefaultsUpdated,
     DocCreated,
     DocUpdated,
     DocDeleted,
@@ -178,6 +198,8 @@ impl ActivityAction {
         Self::TicketAttachmentRestored,
         Self::TicketAttachmentPurged,
         Self::TicketAttachmentRenamed,
+        Self::TicketReleaseNoteUpdated,
+        Self::TicketDueSoon,
         Self::ProjectUpdated,
         Self::ProjectCustomValuesUpdated,
         Self::SprintCreated,
@@ -192,6 +214,10 @@ impl ActivityAction {
         Self::MilestoneReleased,
         Self::MilestoneReopened,
         Self::MilestoneDeleted,
+        Self::ReleaseNotesGenerated,
+        Self::ReleaseNotesUpdated,
+        Self::ReleaseNoteTemplateUpdated,
+        Self::NotificationDefaultsUpdated,
         Self::DocCreated,
         Self::DocUpdated,
         Self::DocDeleted,
@@ -261,6 +287,8 @@ impl ActivityAction {
             Self::TicketAttachmentRestored => "ticket_attachment_restored",
             Self::TicketAttachmentPurged => "ticket_attachment_purged",
             Self::TicketAttachmentRenamed => "ticket_attachment_renamed",
+            Self::TicketReleaseNoteUpdated => "ticket_release_note_updated",
+            Self::TicketDueSoon => "ticket_due_soon",
             Self::ProjectUpdated => "project_updated",
             Self::ProjectCustomValuesUpdated => "project_custom_values_updated",
             Self::SprintCreated => "sprint_created",
@@ -275,6 +303,10 @@ impl ActivityAction {
             Self::MilestoneReleased => "milestone_released",
             Self::MilestoneReopened => "milestone_reopened",
             Self::MilestoneDeleted => "milestone_deleted",
+            Self::ReleaseNotesGenerated => "release_notes_generated",
+            Self::ReleaseNotesUpdated => "release_notes_updated",
+            Self::ReleaseNoteTemplateUpdated => "release_note_template_updated",
+            Self::NotificationDefaultsUpdated => "notification_defaults_updated",
             Self::DocCreated => "doc_created",
             Self::DocUpdated => "doc_updated",
             Self::DocDeleted => "doc_deleted",

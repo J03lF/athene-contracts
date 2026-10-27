@@ -60,3 +60,33 @@ export const ATTACHMENTS_PER_TICKET_MAX = 100;
 
 /** An attachment's name, after sanitising. */
 export const ATTACHMENT_NAME_MAX_CHARS = 200;
+
+/** A ticket's release note, after trimming. */
+export const TICKET_RELEASE_NOTE_MAX_CHARS = 500;
+
+/** A release-note template's title (one line). */
+export const RELEASE_NOTE_TITLE_MAX_CHARS = 160;
+
+/** A section heading of a release-note template (one line). */
+export const RELEASE_NOTE_HEADING_MAX_CHARS = 80;
+
+/** A release-note intro, outro or empty text. */
+export const RELEASE_NOTE_TEXT_MAX_CHARS = 4000;
+
+/** The sections of a release-note template. */
+export const RELEASE_NOTE_SECTIONS_MAX = 12;
+
+/** Ticket types plus labels one section matches. */
+export const RELEASE_NOTE_SECTION_MATCH_MAX = 20;
+
+/** A release-note link template. */
+export const RELEASE_NOTE_LINK_MAX_CHARS = 300;
+
+/** A stored release-notes draft, in UTF-8 bytes. */
+export const RELEASE_NOTES_DRAFT_MAX_BYTES = 32768;
+
+/** Tickets one release's notes may leave out. */
+export const RELEASE_NOTES_EXCLUDED_MAX = 200;
+
+/** Ticket ids the section orders of one release name together. */
+export const RELEASE_NOTES_ORDER_MAX = 300;

@@ -70,3 +70,32 @@ pub const ATTACHMENT_PART_MAX_BYTES: usize = 1024 * 1024;
 /// The JSON body of an upload part at the core: a part in base64 and the
 /// fields around it.
 pub const ATTACHMENT_PART_BODY_MAX_BYTES: usize = ATTACHMENT_PART_MAX_BYTES / 3 * 4 + 64 * 1024;
+
+/// A ticket's "Release-Notiz" (W4-H), after trimming: the line the release
+/// notes show instead of its title.
+pub const TICKET_RELEASE_NOTE_MAX_CHARS: usize = 500;
+
+/// A release-note template's title, a section heading and the heading of
+/// the tickets no section takes: one line each.
+pub const RELEASE_NOTE_TITLE_MAX_CHARS: usize = 160;
+pub const RELEASE_NOTE_HEADING_MAX_CHARS: usize = 80;
+
+/// A template's (or a release's) intro and outro, and its empty text.
+pub const RELEASE_NOTE_TEXT_MAX_CHARS: usize = 4000;
+
+/// The sections of a template, and the types plus labels one section
+/// matches.
+pub const RELEASE_NOTE_SECTIONS_MAX: usize = 12;
+pub const RELEASE_NOTE_SECTION_MATCH_MAX: usize = 20;
+
+/// A link template (`https://…/{key}`).
+pub const RELEASE_NOTE_LINK_MAX_CHARS: usize = 300;
+
+/// A stored release-notes draft, in UTF-8 bytes: one parameter of one
+/// connector request (64 KiB frame), like a ticket description.
+pub const RELEASE_NOTES_DRAFT_MAX_BYTES: usize = 32 * 1024;
+
+/// Tickets one release may leave out, and ticket ids its section orders
+/// name together: they travel in one connector request.
+pub const RELEASE_NOTES_EXCLUDED_MAX: usize = 200;
+pub const RELEASE_NOTES_ORDER_MAX: usize = 300;

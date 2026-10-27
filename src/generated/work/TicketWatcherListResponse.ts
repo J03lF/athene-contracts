@@ -5,4 +5,8 @@ import type { TicketWatcherResponse } from "./TicketWatcherResponse";
  * The watcher list plus whether the caller is on it, so the list and the
  * watch toggle come from one request instead of two.
  */
-export type TicketWatcherListResponse = { watchers: Array<TicketWatcherResponse>, watching: boolean, };
+export type TicketWatcherListResponse = { watchers: Array<TicketWatcherResponse>, watching: boolean, 
+/**
+ * How many watch the ticket (`watchers.len()`, W4-H).
+ */
+count: number, };

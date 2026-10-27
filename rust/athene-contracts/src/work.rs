@@ -1160,6 +1160,8 @@ pub struct TicketWatcherResponse {
 pub struct TicketWatcherListResponse {
     pub watchers: Vec<TicketWatcherResponse>,
     pub watching: bool,
+    /// How many watch the ticket (`watchers.len()`, W4-H).
+    pub count: usize,
 }
 
 /// Response of the watch / unwatch toggle.
