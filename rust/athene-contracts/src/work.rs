@@ -207,6 +207,18 @@ pub struct ListTicketsQuery {
     /// `true`: `meta.total` counts every match (one more statement).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub count: Option<bool>,
+    /// Custom-field conditions (CF5): a JSON array of
+    /// [`crate::listing::CustomFieldFilter`], at most 10, at most 4000
+    /// characters. Needs `workspace_id` or `project_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cf: Option<String>,
+    /// The custom field `sort=field` orders by (its key).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort_field: Option<String>,
+    /// Keys of the custom fields whose values a summary carries
+    /// (`TicketSummary.custom_values`), at most 20, comma-separated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cf_keys: Option<String>,
 }
 
 impl ListTicketsQuery {
@@ -231,6 +243,9 @@ impl ListTicketsQuery {
             || self.limit.is_some()
             || self.cursor.is_some()
             || self.count.is_some()
+            || self.cf.is_some()
+            || self.sort_field.is_some()
+            || self.cf_keys.is_some()
     }
 }
 
@@ -496,6 +511,10 @@ pub struct TicketResponse {
     #[serde(default)]
     #[ts(optional = nullable)]
     pub effective_due: Option<crate::listing::EffectiveDue>,
+    /// Its attachments and its comments', not counting the trash (W4-B).
+    #[serde(default)]
+    #[ts(optional, as = "Option<u32>")]
+    pub attachment_count: u32,
     /// Rises with every write to the ticket (also a background job's).
     /// Orders answers: a client drops one older than what it holds. It
     /// decides no conflict; `expected` does.
@@ -782,6 +801,37 @@ pub struct BulkUpdateTicketsRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub project_id: Option<String>,
+}
+
+/// One custom field set on a selection: `POST /work/tickets/bulk/fields`
+/// (CF5, "Feld setzen").
+///
+/// One statement writes every ticket whose base holds, the way the bulk
+/// edit answers: `updated`, `conflicts` (`fields: ["custom_values.<key>"]`)
+/// and `failed` (the field does not apply to the ticket, a required field
+/// would be emptied, …). The field must be one of the tickets' workspace.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct BulkSetFieldRequest {
+    pub ticket_ids: Vec<String>,
+    /// The field's key.
+    pub key: String,
+    /// The new value as `custom_values` holds it; `null` empties the
+    /// field. Absent with `ops`.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[ts(optional, type = "unknown")]
+    pub value: Patch<JsonValue>,
+    /// A multiple choice or several people: what to add and remove on
+    /// every ticket, as a set (no base needed, no conflict).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub ops: Option<SetOps<String>>,
+    /// Per ticket id, the value the client saw (`null`: empty). A ticket
+    /// whose value moved since is a conflict and keeps it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "Record<string, unknown>")]
+    pub expected: Option<BTreeMap<String, JsonValue>>,
 }
 
 /// Why one ticket in a bulk edit did not move.

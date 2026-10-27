@@ -44,7 +44,7 @@ use crate::workspace::WorkspaceMemberRole;
 
 /// The rules' revision. Bumped whenever a verdict in the matrix changes
 /// (`tests/policy_matrix.rs` keeps the history).
-pub const POLICY_REVISION: u32 = 6;
+pub const POLICY_REVISION: u32 = 7;
 
 /// The most an open link may grant (J6). Admins and owners are invited by
 /// email only: a forwarded link must not hand out the workspace.
@@ -705,6 +705,15 @@ pub enum Action {
     /// Facts: `owns` (the creator).
     #[serde(rename = "event.delete")]
     EventDelete,
+    /// Put a file onto a ticket, rename one (W4-B). The tick "Tickets
+    /// bearbeiten"; a file on a comment is an edit of the comment
+    /// (`comment.edit`) instead.
+    #[serde(rename = "attachment.add")]
+    AttachmentAdd,
+    /// Move a file to the trash, restore it, remove it for good. Facts:
+    /// `owns` (the uploader); anyone's with "Tickets löschen (alle)".
+    #[serde(rename = "attachment.delete")]
+    AttachmentDelete,
 }
 
 /// Whether an action changes something. Platform guests do no `Write`
@@ -749,7 +758,7 @@ pub enum Fact {
 
 impl Action {
     /// Every action, in wire order.
-    pub const ALL: [Action; 43] = [
+    pub const ALL: [Action; 45] = [
         Action::AdminAccess,
         Action::WorkspaceCreate,
         Action::SlaRead,
@@ -793,6 +802,8 @@ impl Action {
         Action::EventDelete,
         Action::FieldAttach,
         Action::FieldSuggest,
+        Action::AttachmentAdd,
+        Action::AttachmentDelete,
     ];
 
     /// The wire name (`ticket.edit`), the same string serde writes.
@@ -841,6 +852,8 @@ impl Action {
             Action::EventDelete => "event.delete",
             Action::FieldAttach => "field.attach",
             Action::FieldSuggest => "field.suggest",
+            Action::AttachmentAdd => "attachment.add",
+            Action::AttachmentDelete => "attachment.delete",
         }
     }
 
@@ -873,7 +886,9 @@ impl Action {
             | Action::CommentModerate
             | Action::TimeLog
             | Action::TimeDelete
-            | Action::TimeModerate => ActionScope::Ticket,
+            | Action::TimeModerate
+            | Action::AttachmentAdd
+            | Action::AttachmentDelete => ActionScope::Ticket,
             _ => ActionScope::Workspace,
         }
     }
@@ -892,7 +907,8 @@ impl Action {
             | Action::CommentEdit
             | Action::CommentDelete
             | Action::TimeDelete
-            | Action::EventDelete => &[Fact::Owns],
+            | Action::EventDelete
+            | Action::AttachmentDelete => &[Fact::Owns],
             _ => &[],
         }
     }
@@ -995,7 +1011,9 @@ pub const fn requires(action: Action) -> Need {
         Action::ProjectPlan => Need::One(P::ProjectPlan),
         Action::TicketPlan => Need::One(P::TicketPlan),
         Action::TicketCreate => Need::One(P::TicketCreate),
-        Action::TicketEdit | Action::FieldAttach | Action::FieldSuggest => Need::One(P::TicketEdit),
+        Action::TicketEdit | Action::FieldAttach | Action::FieldSuggest | Action::AttachmentAdd => {
+            Need::One(P::TicketEdit)
+        }
         Action::TicketDelete => Need::OwnOrAny {
             own: Gate::Needs(P::TicketDeleteOwn),
             any: Gate::Needs(P::TicketDeleteAny),
@@ -1025,6 +1043,13 @@ pub const fn requires(action: Action) -> Need {
         Action::EventDelete => Need::OwnOrAny {
             own: Gate::Needs(P::EventWrite),
             any: Gate::Needs(P::EventDeleteAny),
+        },
+        // One's own upload is one's own to take back, at every tier (a
+        // guest's file on their comment too); anyone's is for whoever may
+        // delete any ticket, which would take its files along anyway.
+        Action::AttachmentDelete => Need::OwnOrAny {
+            own: Gate::Always,
+            any: Gate::Needs(P::TicketDeleteAny),
         },
     }
 }
@@ -1862,7 +1887,7 @@ mod tests {
                 serde_json::from_value(serde_json::json!(action.as_str())).expect("parse");
             assert_eq!(back, action);
         }
-        assert_eq!(seen.len(), 43);
+        assert_eq!(seen.len(), 45);
     }
 
     #[test]

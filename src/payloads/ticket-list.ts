@@ -3,6 +3,8 @@
  * projection and a ticket's effective due date. Generated from
  * `rust/athene-contracts/src/listing.rs`; see `WorkApiClient.listTicketPage`.
  */
+export type { CustomFieldFilter } from '../generated/work/CustomFieldFilter';
+export type { CustomFieldOp } from '../generated/work/CustomFieldOp';
 export type { DueSource } from '../generated/work/DueSource';
 export type { EffectiveDue } from '../generated/work/EffectiveDue';
 export type { Page } from '../generated/work/Page';

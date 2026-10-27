@@ -68,6 +68,8 @@ pub enum RateClass {
     /// A long-lived event stream, counted once when it opens, and capped
     /// in how many a caller holds open at once ([`ConcurrencyLimitLayer`]).
     Stream,
+    /// A file upload: a large body and many writes behind it (W4-B).
+    Upload,
 }
 
 impl RateClass {
@@ -76,6 +78,7 @@ impl RateClass {
             Self::Standard => "standard",
             Self::Credential => "credential",
             Self::Stream => "stream",
+            Self::Upload => "upload",
         }
     }
 }
@@ -101,12 +104,17 @@ impl RateRule {
     }
 }
 
+/// Uploads per caller and minute by default: a person drops a few files at
+/// once, a script filling the database is stopped.
+pub const DEFAULT_UPLOADS_PER_MINUTE: u32 = 30;
+
 /// The rule of each class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RateClasses {
     pub standard: RateRule,
     pub credential: RateRule,
     pub stream: RateRule,
+    pub upload: RateRule,
 }
 
 impl RateClasses {
@@ -115,6 +123,7 @@ impl RateClasses {
             RateClass::Standard => self.standard,
             RateClass::Credential => self.credential,
             RateClass::Stream => self.stream,
+            RateClass::Upload => self.upload,
         }
     }
 }
@@ -128,11 +137,13 @@ impl Default for RateClasses {
     /// opens two streams, and every local client shares `127.0.0.1` (30/min
     /// was 15 page loads a minute for the whole machine, DEPLOY_3_6). What
     /// bounds streams is [`DEFAULT_STREAMS_PER_CALLER`] open at once.
+    /// `Upload` [`DEFAULT_UPLOADS_PER_MINUTE`] per caller on top.
     fn default() -> Self {
         Self {
             standard: RateRule::per_second(120),
             credential: RateRule::per_minute(60),
             stream: RateRule::per_minute(300),
+            upload: RateRule::per_minute(DEFAULT_UPLOADS_PER_MINUTE),
         }
     }
 }

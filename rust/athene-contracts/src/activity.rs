@@ -76,6 +76,18 @@ pub enum ActivityAction {
     TicketSprintAssigned,
     TicketSprintUnassigned,
     TicketDueFollowedSprint,
+    /// A file put onto the ticket or one of its comments (W4-B). `detail`:
+    /// the file name; metadata `{ attachment_id, comment_id, content_type,
+    /// size_bytes }`.
+    TicketAttachmentAdded,
+    /// A file moved to the ticket's trash.
+    TicketAttachmentRemoved,
+    /// A file back from the trash.
+    TicketAttachmentRestored,
+    /// A file removed from the trash for good.
+    TicketAttachmentPurged,
+    /// A file renamed; metadata also `{ from }`.
+    TicketAttachmentRenamed,
     ProjectUpdated,
     ProjectCustomValuesUpdated,
     SprintCreated,
@@ -150,6 +162,11 @@ impl ActivityAction {
         Self::TicketSprintAssigned,
         Self::TicketSprintUnassigned,
         Self::TicketDueFollowedSprint,
+        Self::TicketAttachmentAdded,
+        Self::TicketAttachmentRemoved,
+        Self::TicketAttachmentRestored,
+        Self::TicketAttachmentPurged,
+        Self::TicketAttachmentRenamed,
         Self::ProjectUpdated,
         Self::ProjectCustomValuesUpdated,
         Self::SprintCreated,
@@ -224,6 +241,11 @@ impl ActivityAction {
             Self::TicketSprintAssigned => "ticket_sprint_assigned",
             Self::TicketSprintUnassigned => "ticket_sprint_unassigned",
             Self::TicketDueFollowedSprint => "ticket_due_followed_sprint",
+            Self::TicketAttachmentAdded => "ticket_attachment_added",
+            Self::TicketAttachmentRemoved => "ticket_attachment_removed",
+            Self::TicketAttachmentRestored => "ticket_attachment_restored",
+            Self::TicketAttachmentPurged => "ticket_attachment_purged",
+            Self::TicketAttachmentRenamed => "ticket_attachment_renamed",
             Self::ProjectUpdated => "project_updated",
             Self::ProjectCustomValuesUpdated => "project_custom_values_updated",
             Self::SprintCreated => "sprint_created",

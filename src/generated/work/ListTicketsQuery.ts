@@ -78,4 +78,19 @@ cursor?: string,
 /**
  * `true`: `meta.total` counts every match (one more statement).
  */
-count?: boolean, };
+count?: boolean, 
+/**
+ * Custom-field conditions (CF5): a JSON array of
+ * [`crate::listing::CustomFieldFilter`], at most 10, at most 4000
+ * characters. Needs `workspace_id` or `project_id`.
+ */
+cf?: string, 
+/**
+ * The custom field `sort=field` orders by (its key).
+ */
+sort_field?: string, 
+/**
+ * Keys of the custom fields whose values a summary carries
+ * (`TicketSummary.custom_values`), at most 20, comma-separated.
+ */
+cf_keys?: string, };

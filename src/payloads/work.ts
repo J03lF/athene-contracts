@@ -15,6 +15,7 @@ export type { AddTicketCommentRequest } from '../generated/work/AddTicketComment
 export type { AddWorkLogRequest } from '../generated/work/AddWorkLogRequest';
 export type { AssignTicketRequest } from '../generated/work/AssignTicketRequest';
 export type { AssignTicketsRequest } from '../generated/work/AssignTicketsRequest';
+export type { BulkSetFieldRequest } from '../generated/work/BulkSetFieldRequest';
 export type { BulkUpdateConflict } from '../generated/work/BulkUpdateConflict';
 export type { BulkUpdateFailure } from '../generated/work/BulkUpdateFailure';
 export type { BulkUpdateTicketsRequest } from '../generated/work/BulkUpdateTicketsRequest';

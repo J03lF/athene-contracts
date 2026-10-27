@@ -6,4 +6,4 @@
  * ticket's id, so the order is total and a page boundary never splits or
  * repeats a ticket.
  */
-export type TicketSort = "updated" | "created" | "due" | "priority" | "status" | "title" | "key" | "points" | "rank";
+export type TicketSort = "updated" | "created" | "due" | "priority" | "status" | "title" | "key" | "points" | "rank" | "field";

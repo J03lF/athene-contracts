@@ -5,6 +5,7 @@ export * from './payloads/work';
 export * from './payloads/workspace';
 export * from './payloads/common';
 export * from './payloads/activity';
+export * from './payloads/attachments';
 export * from './payloads/limits';
 export * from './payloads/ticket-list';
 export * from './payloads/dashboard';

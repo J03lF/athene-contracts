@@ -6,6 +6,16 @@ import type { TicketStatus } from "./TicketStatus";
 /**
  * A ticket in a list (`fields=summary`): [`crate::work::TicketResponse`]
  * without `description`, `custom_values` and `triage_reason`. Open the
- * ticket (`GET /work/tickets/{id}`) for those.
+ * ticket (`GET /work/tickets/{id}`) for those, or name the custom fields
+ * a list shows in `cf_keys` (CF5).
  */
-export type TicketSummary = { id: string, project_id: string, sequence: number, title: string, ticket_type: string, status: TicketStatus, priority: TicketPriority, assignee_id: string | null, reporter_id: string, sla_policy_id: string | null, parent_ticket_id: string | null, sprint_id: string | null, milestone_id: string | null, team_id: string | null, adhoc_field_ids: Array<string>, story_points: number | null, triage_category: string | null, triaged_at: string | null, first_response_at: string | null, resolved_at: string | null, due_date: string | null, effective_due: EffectiveDue | null, sla_breached: boolean, board_rank: number | null, handoff_from: string | null, version: number, created_at: string, updated_at: string, };
+export type TicketSummary = { id: string, project_id: string, sequence: number, title: string, ticket_type: string, status: TicketStatus, priority: TicketPriority, assignee_id: string | null, reporter_id: string, sla_policy_id: string | null, parent_ticket_id: string | null, sprint_id: string | null, milestone_id: string | null, team_id: string | null, adhoc_field_ids: Array<string>, story_points: number | null, triage_category: string | null, triaged_at: string | null, first_response_at: string | null, resolved_at: string | null, due_date: string | null, effective_due: EffectiveDue | null, sla_breached: boolean, board_rank: number | null, handoff_from: string | null, 
+/**
+ * The values of the custom fields `cf_keys` names (those the ticket
+ * holds); absent without `cf_keys`.
+ */
+custom_values?: Record<string, unknown>, 
+/**
+ * Its attachments and its comments', not counting the trash (W4-B).
+ */
+attachment_count?: number, version: number, created_at: string, updated_at: string, };

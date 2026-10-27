@@ -61,6 +61,10 @@ handoff_from?: string | null,
  */
 effective_due?: EffectiveDue | null, 
 /**
+ * Its attachments and its comments', not counting the trash (W4-B).
+ */
+attachment_count?: number, 
+/**
  * Rises with every write to the ticket (also a background job's).
  * Orders answers: a client drops one older than what it holds. It
  * decides no conflict; `expected` does.

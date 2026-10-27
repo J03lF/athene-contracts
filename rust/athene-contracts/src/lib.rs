@@ -5,6 +5,7 @@
 pub mod activity;
 pub mod admin;
 pub mod athene_ai;
+pub mod attachments;
 pub mod auth;
 pub mod calendar;
 pub mod common;

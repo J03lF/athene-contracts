@@ -43,3 +43,30 @@ pub const RELEASE_NAME_MAX_CHARS: usize = 80;
 
 /// A label's name.
 pub const LABEL_NAME_MAX_CHARS: usize = 32;
+
+/// One attachment, in bytes (W4-B). The files live in the database, which
+/// the host's connector feeds 64 KiB at a time: 10 MiB is a screenshot, a
+/// log or a short screen recording, and stays a second or two of writes.
+pub const ATTACHMENT_MAX_BYTES: usize = 10 * 1024 * 1024;
+
+/// All attachments of one workspace together, in bytes: its trash and its
+/// unfinished uploads included. Bounds what one workspace can put into the
+/// shared database (a hundred files at the largest).
+pub const ATTACHMENT_WORKSPACE_MAX_BYTES: usize = 1024 * 1024 * 1024;
+
+/// Attachments of one ticket (its comments' included), not counting the
+/// trash.
+pub const ATTACHMENTS_PER_TICKET_MAX: usize = 100;
+
+/// An attachment's name, after sanitising.
+pub const ATTACHMENT_NAME_MAX_CHARS: usize = 200;
+
+/// One part of an upload or a download between gateway and core, in
+/// bytes: base64 in the JSON of the host's call envelope, which takes at
+/// most 2 MiB per request. A multiple of
+/// [`crate::attachments::ATTACHMENT_CHUNK_BYTES`].
+pub const ATTACHMENT_PART_MAX_BYTES: usize = 1024 * 1024;
+
+/// The JSON body of an upload part at the core: a part in base64 and the
+/// fields around it.
+pub const ATTACHMENT_PART_BODY_MAX_BYTES: usize = ATTACHMENT_PART_MAX_BYTES / 3 * 4 + 64 * 1024;

@@ -13,6 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
+use utoipa::ToSchema;
 
 use crate::work::{TicketPriority, TicketStatus};
 
@@ -27,6 +28,12 @@ pub const TICKET_CURSOR_MAX_CHARS: usize = 2048;
 pub const TICKET_LIST_QUERY_MAX_CHARS: usize = 100;
 /// The most values one comma-separated filter takes.
 pub const TICKET_LIST_MAX_FILTER_VALUES: usize = 50;
+/// The most custom-field conditions one list takes (`cf`).
+pub const TICKET_LIST_MAX_FIELD_FILTERS: usize = 10;
+/// The longest `cf` parameter (its JSON).
+pub const TICKET_LIST_FIELD_FILTERS_MAX_CHARS: usize = 4000;
+/// The most custom fields a summary carries values of (`cf_keys`).
+pub const TICKET_LIST_MAX_FIELD_KEYS: usize = 20;
 
 /// One page of a list. `data` is in the order the query asked for.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
@@ -79,6 +86,11 @@ pub enum TicketSort {
     /// A board column's order (`board_rank`); unranked tickets after the
     /// ranked ones, newest first.
     Rank,
+    /// A custom field named by `sort_field` (CF5): number, date, date and
+    /// time, choice and version (in the order of the field's choices; a
+    /// version not among them after them, by its text) and checkbox (no,
+    /// then yes). Empty values last.
+    Field,
 }
 
 /// The direction of [`TicketSort`]. Absent: the sort's own default —
@@ -129,9 +141,59 @@ pub struct EffectiveDue {
     pub source: DueSource,
 }
 
+/// What a custom-field condition of a list asks (CF5, `cf`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "work/")]
+pub enum CustomFieldOp {
+    /// One of `values`: a choice, version or person (`me` for the reader);
+    /// a multiple choice or several people match when they hold any.
+    In,
+    /// None of `values`; a ticket without a value matches.
+    NotIn,
+    /// Between `min` and `max`, both included, either open: a number
+    /// (decimal), a date (`YYYY-MM-DD`) or a date and time (RFC 3339).
+    Range,
+    /// Holds no value (absent, `null`, `""` or `[]`).
+    Empty,
+    NotEmpty,
+    /// A text, long text or URL that contains `value`, folded like the
+    /// search (case and umlauts).
+    Contains,
+    /// A checkbox that is `value` (`true` or `false`; unset counts as
+    /// `false`).
+    Is,
+}
+
+/// One custom-field condition of a list: `cf` is a JSON array of these,
+/// e.g. `[{"key":"device","op":"in","values":["ios"]}]`. Conditions add up
+/// (all must hold). A key the workspace does not have, or an operator its
+/// type does not take, is a `400`; a list with `cf` needs `workspace_id`
+/// or `project_id`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "work/")]
+pub struct CustomFieldFilter {
+    pub key: String,
+    pub op: CustomFieldOp,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(as = "Option<Vec<String>>", optional)]
+    pub values: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub min: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub max: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub value: Option<String>,
+}
+
 /// A ticket in a list (`fields=summary`): [`crate::work::TicketResponse`]
 /// without `description`, `custom_values` and `triage_reason`. Open the
-/// ticket (`GET /work/tickets/{id}`) for those.
+/// ticket (`GET /work/tickets/{id}`) for those, or name the custom fields
+/// a list shows in `cf_keys` (CF5).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
 #[ts(export_to = "work/")]
 pub struct TicketSummary {
@@ -160,6 +222,15 @@ pub struct TicketSummary {
     pub sla_breached: bool,
     pub board_rank: Option<i64>,
     pub handoff_from: Option<String>,
+    /// The values of the custom fields `cf_keys` names (those the ticket
+    /// holds); absent without `cf_keys`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "Record<string, unknown>")]
+    pub custom_values: Option<serde_json::Map<String, serde_json::Value>>,
+    /// Its attachments and its comments', not counting the trash (W4-B).
+    #[serde(default)]
+    #[ts(optional, as = "Option<u32>")]
+    pub attachment_count: u32,
     pub version: i64,
     pub created_at: String,
     pub updated_at: String,

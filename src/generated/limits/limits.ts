@@ -39,3 +39,24 @@ export const TICKET_PAGE_DEFAULT_LIMIT = 50;
 
 /** The most tickets one page holds. */
 export const TICKET_PAGE_MAX_LIMIT = 200;
+
+/** The most custom-field conditions one list takes (`cf`). */
+export const TICKET_LIST_MAX_FIELD_FILTERS = 10;
+
+/** The longest `cf` parameter of a list (its JSON). */
+export const TICKET_LIST_FIELD_FILTERS_MAX_CHARS = 4000;
+
+/** The most custom fields a list summary carries values of (`cf_keys`). */
+export const TICKET_LIST_MAX_FIELD_KEYS = 20;
+
+/** One attachment, in bytes. */
+export const ATTACHMENT_MAX_BYTES = 10485760;
+
+/** All attachments of one workspace together, in bytes (trash included). */
+export const ATTACHMENT_WORKSPACE_MAX_BYTES = 1073741824;
+
+/** Attachments of one ticket and its comments, not counting the trash. */
+export const ATTACHMENTS_PER_TICKET_MAX = 100;
+
+/** An attachment's name, after sanitising. */
+export const ATTACHMENT_NAME_MAX_CHARS = 200;

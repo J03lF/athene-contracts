@@ -31,6 +31,10 @@ use athene_contracts::workspace::WorkspaceMemberRole as R;
 ///
 /// 6: custom fields (wave 3, CF1) — `field.attach` and `field.suggest`,
 /// both on the tick "Tickets bearbeiten"; no other verdict moved.
+///
+/// 7: attachments (W4-B) — `attachment.add` on the tick "Tickets
+/// bearbeiten", `attachment.delete` one's own always, anyone's with
+/// "Tickets löschen (alle)"; no other verdict moved.
 const RECORDED: &[(u32, &str)] = &[
     (1, "61b199d11696ad0c"),
     (2, "aaa9fb11da7f0950"),
@@ -38,6 +42,7 @@ const RECORDED: &[(u32, &str)] = &[
     (4, "18c7f2144c23bb8d"),
     (5, "d6c7fa24109644bd"),
     (6, "43b4ecf917bba111"),
+    (7, "b397066edeec2ec9"),
 ];
 
 /// Subjects, in the table's column order.
@@ -97,6 +102,11 @@ const TABLE: &[(Action, [Cell; 16])] = &[
     // one are ticket edits.
     (Action::FieldAttach,          [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   Y,   N,   N,   N]),
     (Action::FieldSuggest,         [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   Y,   N,   N,   N]),
+    // Attachments (W4-B): a file onto a ticket is a ticket edit; one's own
+    // upload is one's own to take back, anyone's needs "Tickets löschen
+    // (alle)".
+    (Action::AttachmentAdd,        [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   Y,   N,   N,   N]),
+    (Action::AttachmentDelete,     [Y,   Y,   Own, Own, Y,   Y,   Own, Own, N,   Own, Own, Y,   Own, Own, Own, N]),
     (Action::TicketTake,           [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   N,   N,   N,   N]),
     (Action::TicketClose,          [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   N,   N,   N,   N]),
     (Action::TicketCheck,          [Y,   Y,   Y,   N,   Y,   Y,   N,   N,   N,   Y,   Y,   Y,   N,   N,   N,   N]),
