@@ -14,3 +14,12 @@ export const EVENT_MAX_SPAN_DAYS = 31;
 
 /** The widest window a calendar read may ask for, in days (`to - from`). */
 export const CALENDAR_MAX_WINDOW_DAYS = 62;
+
+/** Every N days/weeks/months/years: at most this N (W6-A). */
+export const RECURRENCE_MAX_INTERVAL = 99;
+
+/** A series that ends "after N times" has at most this N. */
+export const RECURRENCE_MAX_COUNT = 999;
+
+/** The zone a series is anchored in when its creator has set none. */
+export const SERIES_DEFAULT_TIME_ZONE = "Europe/Zurich";

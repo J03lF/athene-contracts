@@ -88,4 +88,11 @@ export const ACTIVITY_ACTIONS: readonly ActivityAction[] = [
   "workflow_status_updated",
   "workflow_status_archived",
   "workflow_status_deleted",
+  "event_series_created",
+  "event_series_updated",
+  "event_series_split",
+  "event_series_ended",
+  "event_series_deleted",
+  "event_occurrence_updated",
+  "event_occurrence_cancelled",
 ];

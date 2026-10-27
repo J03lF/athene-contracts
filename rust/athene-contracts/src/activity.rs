@@ -175,6 +175,26 @@ pub enum ActivityAction {
     WorkflowStatusArchived,
     /// Deleted; metadata also `{ moved_tickets, move_to, removed_queues }`.
     WorkflowStatusDeleted,
+    /// A recurring event created (W6-A). Target `event`, `detail` its
+    /// title; metadata `{ frequency, interval }`.
+    EventSeriesCreated,
+    /// The whole series changed ("Alle Termine"); metadata `{ fields,
+    /// occurrence_start }`.
+    EventSeriesUpdated,
+    /// "Dieser und alle folgenden": the series ends before an occurrence
+    /// and a new one starts there. Target the old series; metadata
+    /// `{ occurrence_start, new_event_id, fields }`.
+    EventSeriesSplit,
+    /// The occurrences from one on deleted: the series ends before it;
+    /// metadata `{ occurrence_start }`.
+    EventSeriesEnded,
+    /// A series deleted with all its occurrences.
+    EventSeriesDeleted,
+    /// One occurrence changed ("Nur dieser Termin"); metadata
+    /// `{ occurrence_start, fields }`.
+    EventOccurrenceUpdated,
+    /// One occurrence deleted; metadata `{ occurrence_start }`.
+    EventOccurrenceCancelled,
 }
 
 impl ActivityAction {
@@ -265,6 +285,13 @@ impl ActivityAction {
         Self::WorkflowStatusUpdated,
         Self::WorkflowStatusArchived,
         Self::WorkflowStatusDeleted,
+        Self::EventSeriesCreated,
+        Self::EventSeriesUpdated,
+        Self::EventSeriesSplit,
+        Self::EventSeriesEnded,
+        Self::EventSeriesDeleted,
+        Self::EventOccurrenceUpdated,
+        Self::EventOccurrenceCancelled,
     ];
 
     /// The verb on the wire and in the database.
@@ -355,6 +382,13 @@ impl ActivityAction {
             Self::WorkflowStatusUpdated => "workflow_status_updated",
             Self::WorkflowStatusArchived => "workflow_status_archived",
             Self::WorkflowStatusDeleted => "workflow_status_deleted",
+            Self::EventSeriesCreated => "event_series_created",
+            Self::EventSeriesUpdated => "event_series_updated",
+            Self::EventSeriesSplit => "event_series_split",
+            Self::EventSeriesEnded => "event_series_ended",
+            Self::EventSeriesDeleted => "event_series_deleted",
+            Self::EventOccurrenceUpdated => "event_occurrence_updated",
+            Self::EventOccurrenceCancelled => "event_occurrence_cancelled",
         }
     }
 

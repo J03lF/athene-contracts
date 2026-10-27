@@ -506,6 +506,15 @@ fn render(out: &Path) {
         calendar::CalendarRelease,
         calendar::CalendarResponse,
         edit::EditConflictDetails<calendar::EventResponse>,
+        // recurring events (W6-A)
+        calendar::Weekday,
+        calendar::RecurrenceFrequency,
+        calendar::MonthlyRule,
+        calendar::RecurrenceEnd,
+        calendar::RecurrenceRule,
+        calendar::SeriesScope,
+        calendar::OccurrenceEdit,
+        calendar::OccurrenceDelete,
         // Athene AI (AI1)
         athene_ai::AtheneAiAvailability,
         athene_ai::AtheneAiWorkspaceResponse,
@@ -619,12 +628,21 @@ fn render(out: &Path) {
          /** The longest an event may run, in days. */\n\
          export const EVENT_MAX_SPAN_DAYS = {};\n\n\
          /** The widest window a calendar read may ask for, in days (`to - from`). */\n\
-         export const CALENDAR_MAX_WINDOW_DAYS = {};\n",
+         export const CALENDAR_MAX_WINDOW_DAYS = {};\n\n\
+         /** Every N days/weeks/months/years: at most this N (W6-A). */\n\
+         export const RECURRENCE_MAX_INTERVAL = {};\n\n\
+         /** A series that ends \"after N times\" has at most this N. */\n\
+         export const RECURRENCE_MAX_COUNT = {};\n\n\
+         /** The zone a series is anchored in when its creator has set none. */\n\
+         export const SERIES_DEFAULT_TIME_ZONE = {};\n",
         calendar::EVENT_MAX_TITLE_CHARS,
         calendar::EVENT_MAX_DESCRIPTION_CHARS,
         calendar::EVENT_MAX_PARTICIPANTS,
         calendar::EVENT_MAX_SPAN_DAYS,
         calendar::CALENDAR_MAX_WINDOW_DAYS,
+        calendar::RECURRENCE_MAX_INTERVAL,
+        calendar::RECURRENCE_MAX_COUNT,
+        serde_json::to_string(calendar::SERIES_DEFAULT_TIME_ZONE).expect("zone"),
     );
     fs::create_dir_all(out.join("calendar")).expect("calendar dir");
     fs::write(out.join("calendar/calendar-constants.ts"), calendar).expect("write constants");

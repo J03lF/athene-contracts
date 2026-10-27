@@ -4,6 +4,8 @@ import type {
   CreateEventRequest,
   EventEdit,
   EventResponse,
+  OccurrenceDelete,
+  OccurrenceEdit,
 } from '../payloads/calendar';
 import type { AtheneHttpClient, RequestOptions } from '../http';
 
@@ -57,6 +59,24 @@ export class CalendarApiClient {
 
   deleteEvent(id: string): Promise<void> {
     return this.http.delete(`/work/events/${id}`).then(() => undefined);
+  }
+
+  /**
+   * Edit one occurrence of the series `seriesId` (W6-A): only it, it and
+   * every later one, or the whole series (`body.scope`). Answers the
+   * occurrence as it is now.
+   */
+  updateOccurrence(seriesId: string, body: OccurrenceEdit): Promise<EventResponse> {
+    return this.http
+      .patch<ApiEnvelope<EventResponse>>(`/work/events/${seriesId}/occurrences`, body)
+      .then(unwrap);
+  }
+
+  /** Delete one occurrence, it and every later one, or the whole series. */
+  deleteOccurrence(seriesId: string, body: OccurrenceDelete): Promise<void> {
+    return this.http
+      .post<unknown>(`/work/events/${seriesId}/occurrences/delete`, body)
+      .then(() => undefined);
   }
 
   /** Sprint bands with their open counts, release markers, watched tickets. */

@@ -8,6 +8,10 @@
 //! - `PATCH  /work/events/:id`: a field-level edit ([`EventEdit`], 409
 //!   `ATH-RES-003` on a stale base, as for tickets).
 //! - `DELETE /work/events/:id`: the creator or a manager.
+//! - `PATCH  /work/events/:id/occurrences`: an edit of one occurrence of a
+//!   series with its scope ([`OccurrenceEdit`], W6-A).
+//! - `POST   /work/events/:id/occurrences/delete`: delete one occurrence,
+//!   it and the ones after it, or the series ([`OccurrenceDelete`]).
 //! - `GET    /work/workspaces/:id/calendar?from=&to=`: sprint bands with
 //!   their open counts, release markers and the caller's watched tickets
 //!   ([`CalendarResponse`]).
@@ -20,6 +24,10 @@
 //! **all-day** (two calendar dates, stored as dates): an all-day event is
 //! the same day for every reader, whatever their zone — never "midnight
 //! UTC", which is the day before west of Greenwich.
+//!
+//! A **series** (W6-A) is an event with a [`RecurrenceRule`] and an IANA
+//! zone: its `when` is the first occurrence, the window read expands the
+//! rest on the server, at the same wall-clock time in that zone.
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -139,7 +147,345 @@ impl EventWhen {
     }
 }
 
+// ------------------------------------------------------------
+// Recurring events ("Serien", W6-A)
+// ------------------------------------------------------------
+
+/// Every N days/weeks/months/years: at most this N.
+pub const RECURRENCE_MAX_INTERVAL: u16 = 99;
+/// A series that ends "after N times" has at most this N.
+pub const RECURRENCE_MAX_COUNT: u16 = 999;
+/// At most this many occurrences of one series in one window read. A
+/// daily series fills the widest window (63 days) with 63; the cap guards
+/// the server, it never cuts a valid rule.
+pub const SERIES_WINDOW_MAX_OCCURRENCES: usize = 100;
+/// At most this many events and occurrences in one window read; the
+/// earliest are kept.
+pub const CALENDAR_MAX_ITEMS: usize = 2000;
+/// The zone a series is anchored in when its creator has set none.
+pub const SERIES_DEFAULT_TIME_ZONE: &str = "Europe/Zurich";
+
+/// A day of the week, spelled as RFC 5545 spells it (`BYDAY`).
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema, TS,
+)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "calendar/")]
+pub enum Weekday {
+    Mo,
+    Tu,
+    We,
+    Th,
+    Fr,
+    Sa,
+    Su,
+}
+
+impl Weekday {
+    /// Monday first, as the week of a series starts (RFC 5545 `WKST=MO`).
+    pub const ALL: [Self; 7] = [
+        Self::Mo,
+        Self::Tu,
+        Self::We,
+        Self::Th,
+        Self::Fr,
+        Self::Sa,
+        Self::Su,
+    ];
+
+    /// Days after Monday, 0..=6.
+    pub const fn index(self) -> u8 {
+        match self {
+            Self::Mo => 0,
+            Self::Tu => 1,
+            Self::We => 2,
+            Self::Th => 3,
+            Self::Fr => 4,
+            Self::Sa => 5,
+            Self::Su => 6,
+        }
+    }
+
+    /// The day `index` days after Monday (`None` past Sunday).
+    pub fn from_index(index: u8) -> Option<Self> {
+        Self::ALL.get(usize::from(index)).copied()
+    }
+}
+
+/// How often a series repeats (RFC 5545 `FREQ`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "calendar/")]
+pub enum RecurrenceFrequency {
+    Daily,
+    Weekly,
+    Monthly,
+    Yearly,
+}
+
+impl RecurrenceFrequency {
+    /// The text the database stores (`athene_events.rec_frequency`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Daily => "daily",
+            Self::Weekly => "weekly",
+            Self::Monthly => "monthly",
+            Self::Yearly => "yearly",
+        }
+    }
+
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "daily" => Some(Self::Daily),
+            "weekly" => Some(Self::Weekly),
+            "monthly" => Some(Self::Monthly),
+            "yearly" => Some(Self::Yearly),
+            _ => None,
+        }
+    }
+}
+
+/// Which day of the month a monthly series takes.
+///
+/// Read through `MonthlyRuleWire` (unknown keys refused, C3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema, TS)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[ts(export_to = "calendar/")]
+pub enum MonthlyRule {
+    /// The same day number every month: 1..=31, or -1 for the last day. A
+    /// month without that day is skipped (RFC 5545: "monthly on the 31st"
+    /// has no February); the last day never is.
+    DayOfMonth { day: i8 },
+    /// The nth weekday of the month: 1..=5, or -1 for the last ("2nd
+    /// Tuesday", "last Friday"). A month without a 5th one is skipped.
+    NthWeekday { nth: i8, weekday: Weekday },
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum MonthlyRuleWire {
+    DayOfMonth { day: i8 },
+    NthWeekday { nth: i8, weekday: Weekday },
+}
+
+impl<'de> Deserialize<'de> for MonthlyRule {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(match MonthlyRuleWire::deserialize(deserializer)? {
+            MonthlyRuleWire::DayOfMonth { day } => Self::DayOfMonth { day },
+            MonthlyRuleWire::NthWeekday { nth, weekday } => Self::NthWeekday { nth, weekday },
+        })
+    }
+}
+
+/// When a series stops.
+///
+/// Read through `RecurrenceEndWire` (unknown keys refused, C3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema, TS)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[ts(export_to = "calendar/")]
+pub enum RecurrenceEnd {
+    /// It goes on.
+    Never,
+    /// Its last occurrence starts on or before this day (`YYYY-MM-DD`, in
+    /// the series' zone; RFC 5545 `UNTIL`).
+    Until {
+        #[schema(value_type = String)]
+        day: NaiveDate,
+    },
+    /// After this many occurrences, the first included (RFC 5545 `COUNT`).
+    Count { count: u16 },
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum RecurrenceEndWire {
+    Never,
+    Until { day: NaiveDate },
+    Count { count: u16 },
+}
+
+impl<'de> Deserialize<'de> for RecurrenceEnd {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(match RecurrenceEndWire::deserialize(deserializer)? {
+            RecurrenceEndWire::Never => Self::Never,
+            RecurrenceEndWire::Until { day } => Self::Until { day },
+            RecurrenceEndWire::Count { count } => Self::Count { count },
+        })
+    }
+}
+
+/// How a series repeats: a typed subset of the RFC 5545 `RRULE`
+/// (`FREQ`, `INTERVAL`, `BYDAY`, `BYMONTHDAY`, `BYDAY` with an ordinal,
+/// `UNTIL`, `COUNT`).
+///
+/// - `daily`: every `interval` days.
+/// - `weekly`: every `interval` weeks on `weekdays` (Monday starts the
+///   week). "Every weekday" is weekly on Monday to Friday. Without
+///   `weekdays`: the weekday of the first occurrence.
+/// - `monthly`: every `interval` months by `monthly`; without it, the day
+///   of the month of the first occurrence.
+/// - `yearly`: every `interval` years on the month and day of the first
+///   occurrence (a series from 29 February is in leap years only).
+///
+/// The first occurrence is the event's `when`: a rule that does not take
+/// that day starts on the next day it does (the server moves `when` there).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "calendar/")]
+pub struct RecurrenceRule {
+    pub frequency: RecurrenceFrequency,
+    /// 1..=99: every N days, weeks, months or years.
+    pub interval: u16,
+    /// Weekly only: the days, in any order (answered Monday first).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(optional, as = "Option<Vec<Weekday>>")]
+    pub weekdays: Vec<Weekday>,
+    /// Monthly only: by the day of the month or by the nth weekday.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub monthly: Option<MonthlyRule>,
+    pub end: RecurrenceEnd,
+}
+
+/// Why a [`RecurrenceRule`] is refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecurrenceError {
+    Interval,
+    WeekdaysOutsideWeekly,
+    MonthlyOutsideMonthly,
+    DayOfMonth,
+    NthWeekday,
+    Count,
+}
+
+impl RecurrenceError {
+    /// The validation message the core answers with.
+    pub const fn message(self) -> &'static str {
+        match self {
+            Self::Interval => "a series repeats every 1 to 99 days, weeks, months or years",
+            Self::WeekdaysOutsideWeekly => "weekdays belong to a weekly series",
+            Self::MonthlyOutsideMonthly => "a day of the month belongs to a monthly series",
+            Self::DayOfMonth => "a day of the month is 1 to 31, or -1 for the last",
+            Self::NthWeekday => "the nth weekday of a month is 1 to 5, or -1 for the last",
+            Self::Count => "a series ends after 1 to 999 times",
+        }
+    }
+}
+
+impl RecurrenceRule {
+    /// The shape every rule obeys, whatever its first occurrence.
+    pub fn check(&self) -> Result<(), RecurrenceError> {
+        if self.interval == 0 || self.interval > RECURRENCE_MAX_INTERVAL {
+            return Err(RecurrenceError::Interval);
+        }
+        if !self.weekdays.is_empty() && self.frequency != RecurrenceFrequency::Weekly {
+            return Err(RecurrenceError::WeekdaysOutsideWeekly);
+        }
+        match self.monthly {
+            Some(_) if self.frequency != RecurrenceFrequency::Monthly => {
+                return Err(RecurrenceError::MonthlyOutsideMonthly)
+            }
+            Some(MonthlyRule::DayOfMonth { day }) if day != -1 && !(1..=31).contains(&day) => {
+                return Err(RecurrenceError::DayOfMonth)
+            }
+            Some(MonthlyRule::NthWeekday { nth, .. }) if nth != -1 && !(1..=5).contains(&nth) => {
+                return Err(RecurrenceError::NthWeekday)
+            }
+            _ => {}
+        }
+        if let RecurrenceEnd::Count { count } = self.end {
+            if count == 0 || count > RECURRENCE_MAX_COUNT {
+                return Err(RecurrenceError::Count);
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Which occurrences of a series an edit or a delete applies to, as in
+/// Google Calendar's "Nur dieser Termin / Dieser und alle folgenden / Alle
+/// Termine".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "calendar/")]
+pub enum SeriesScope {
+    /// The one occurrence: an exception of the series.
+    This,
+    /// This one and every later one: the series splits here.
+    Following,
+    /// The whole series.
+    All,
+}
+
+impl SeriesScope {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::This => "this",
+            Self::Following => "following",
+            Self::All => "all",
+        }
+    }
+}
+
+/// `PATCH /work/events/:id/occurrences`: an edit of one occurrence of the
+/// series `:id`, with its scope.
+///
+/// - `patch` and `expected` read as on `PATCH /work/events/:id`, against
+///   the occurrence as the client saw it (its own title, time and text when
+///   it has them). A stale field is a `409` `ATH-RES-003` whose
+///   `details.current` is the occurrence as it is now.
+/// - `this`: title, description, `when` and participants only; the links
+///   and the rule belong to the series (400).
+/// - `following`: the series ends before this occurrence, a new one starts
+///   here with the patch (and the rest of a "N times" count).
+/// - `all`: the series changes; a new `when` moves every occurrence by the
+///   same step. A new time or rule drops the exceptions; a new title,
+///   description or participant list drops theirs of that field.
+/// - `recurrence: null` (following, all) stops repeating: what is left is
+///   a single event.
+///
+/// The answer is the occurrence as it is now (for `following` the first
+/// of the new series, for `recurrence: null` the single event).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "calendar/")]
+pub struct OccurrenceEdit {
+    /// The occurrence's `occurrence_start` as the window read answered it.
+    pub occurrence_start: String,
+    pub scope: SeriesScope,
+    #[serde(default, skip_serializing_if = "UpdateEventRequest::is_empty")]
+    #[ts(optional, as = "Option<UpdateEventRequest>")]
+    pub patch: UpdateEventRequest,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub expected: Option<EventExpected>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    #[ts(optional)]
+    pub participants: Option<SetOps<String>>,
+}
+
+/// `POST /work/events/:id/occurrences/delete`: delete one occurrence of
+/// the series `:id`, this one and all after it, or the whole series
+/// (`204`). The creator or a manager, as for an event.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "calendar/")]
+pub struct OccurrenceDelete {
+    pub occurrence_start: String,
+    pub scope: SeriesScope,
+}
+
 /// An event of a workspace: a meeting, a review, a demo.
+///
+/// A window read answers single events and the occurrences of series in
+/// one list. An occurrence carries `series_id` (the event the rule lives
+/// on; writes go to `/work/events/:series_id/occurrences`), its
+/// `occurrence_start` (the start the rule gives it, which stays when the
+/// occurrence is moved: its key) and the series' `recurrence` and
+/// `time_zone`. Its `id` is `<series_id>_<key>` (key `YYYYMMDDTHHMMSSZ` or
+/// `YYYYMMDD`), unique in the list and stable, as Google Calendar names
+/// instances; its `version` is the series'.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "calendar/")]
 pub struct EventResponse {
@@ -161,6 +507,25 @@ pub struct EventResponse {
     pub version: i64,
     pub created_at: String,
     pub updated_at: String,
+    /// The series an occurrence belongs to (absent on a single event).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub series_id: Option<String>,
+    /// The occurrence's start as its rule gives it: RFC 3339 in UTC
+    /// (`2026-10-27T09:00:00Z`) for a timed series, `YYYY-MM-DD` for an
+    /// all-day one. The key of its exception.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub occurrence_start: Option<String>,
+    /// How the series repeats (on every occurrence, for the summary).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub recurrence: Option<RecurrenceRule>,
+    /// The IANA zone the series keeps its wall-clock time in, so a 09:00
+    /// daily stays at 09:00 across a change of summer time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub time_zone: Option<String>,
 }
 
 /// `POST /work/workspaces/:id/events`.
@@ -185,6 +550,15 @@ pub struct CreateEventRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub sprint_id: Option<String>,
+    /// Makes the event a series; `when` is its first occurrence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub recurrence: Option<RecurrenceRule>,
+    /// The IANA zone of the series (with `recurrence` only). Without it:
+    /// the creator's zone setting, else [`SERIES_DEFAULT_TIME_ZONE`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub time_zone: Option<String>,
 }
 
 /// The fields of an event edit. An absent key leaves that part as it is;
@@ -209,6 +583,12 @@ pub struct UpdateEventRequest {
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<String>)]
     pub sprint_id: Patch<String>,
+    /// A rule makes a single event a series (`PATCH /work/events/:id`) or
+    /// changes a series' rule (`…/occurrences`, following or all); `null`
+    /// stops repeating. A series itself is edited through `…/occurrences`.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<Object>)]
+    pub recurrence: Patch<RecurrenceRule>,
 }
 
 impl UpdateEventRequest {
@@ -242,6 +622,10 @@ pub struct EventExpected {
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<String>)]
     pub sprint_id: Patch<String>,
+    /// The rule as the client saw it; `null`: it did not repeat.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<Object>)]
+    pub recurrence: Patch<RecurrenceRule>,
 }
 
 /// `PATCH /work/events/:id`: the changed fields, their base and the
@@ -423,6 +807,138 @@ mod tests {
             }
             .check(),
             Err(EventWhenError::TooLong)
+        );
+    }
+
+    #[test]
+    fn a_rule_travels_typed_and_refuses_unknown_keys_and_bad_values() {
+        let rule: RecurrenceRule = serde_json::from_value(serde_json::json!({
+            "frequency": "weekly",
+            "interval": 2,
+            "weekdays": ["tu", "th"],
+            "end": { "kind": "until", "day": "2027-03-31" }
+        }))
+        .unwrap_or(RecurrenceRule {
+            frequency: RecurrenceFrequency::Daily,
+            interval: 1,
+            weekdays: Vec::new(),
+            monthly: None,
+            end: RecurrenceEnd::Never,
+        });
+        assert_eq!(rule.frequency, RecurrenceFrequency::Weekly);
+        assert_eq!(rule.weekdays, [Weekday::Tu, Weekday::Th]);
+        assert_eq!(
+            rule.end,
+            RecurrenceEnd::Until {
+                day: NaiveDate::from_ymd_opt(2027, 3, 31).unwrap_or_default()
+            }
+        );
+        assert!(rule.check().is_ok());
+        let monthly: RecurrenceRule = serde_json::from_value(serde_json::json!({
+            "frequency": "monthly", "interval": 1,
+            "monthly": { "kind": "nth_weekday", "nth": -1, "weekday": "fr" },
+            "end": { "kind": "count", "count": 10 }
+        }))
+        .unwrap_or(rule.clone());
+        assert_eq!(
+            monthly.monthly,
+            Some(MonthlyRule::NthWeekday {
+                nth: -1,
+                weekday: Weekday::Fr
+            })
+        );
+        for refused in [
+            serde_json::json!({ "frequency": "hourly", "interval": 1, "end": { "kind": "never" } }),
+            serde_json::json!({ "frequency": "daily", "interval": 1, "end": { "kind": "never" }, "byhour": 9 }),
+            serde_json::json!({ "frequency": "daily", "interval": 1, "end": { "kind": "count", "count": 3, "x": 1 } }),
+            serde_json::json!({ "frequency": "monthly", "interval": 1, "monthly": { "kind": "day_of_month", "day": 3, "nth": 1 }, "end": { "kind": "never" } }),
+            serde_json::json!({ "frequency": "daily", "end": { "kind": "never" } }),
+            serde_json::json!("FREQ=DAILY;INTERVAL=1"),
+        ] {
+            assert!(
+                serde_json::from_value::<RecurrenceRule>(refused.clone()).is_err(),
+                "{refused}"
+            );
+        }
+        let base = RecurrenceRule {
+            frequency: RecurrenceFrequency::Daily,
+            interval: 1,
+            weekdays: Vec::new(),
+            monthly: None,
+            end: RecurrenceEnd::Never,
+        };
+        let with = |f: &dyn Fn(&mut RecurrenceRule)| {
+            let mut r = base.clone();
+            f(&mut r);
+            r.check()
+        };
+        assert_eq!(with(&|r| r.interval = 0), Err(RecurrenceError::Interval));
+        assert_eq!(with(&|r| r.interval = 100), Err(RecurrenceError::Interval));
+        assert_eq!(
+            with(&|r| r.weekdays = vec![Weekday::Mo]),
+            Err(RecurrenceError::WeekdaysOutsideWeekly)
+        );
+        assert_eq!(
+            with(&|r| r.monthly = Some(MonthlyRule::DayOfMonth { day: 1 })),
+            Err(RecurrenceError::MonthlyOutsideMonthly)
+        );
+        assert_eq!(
+            with(&|r| {
+                r.frequency = RecurrenceFrequency::Monthly;
+                r.monthly = Some(MonthlyRule::DayOfMonth { day: 32 });
+            }),
+            Err(RecurrenceError::DayOfMonth)
+        );
+        assert_eq!(
+            with(&|r| {
+                r.frequency = RecurrenceFrequency::Monthly;
+                r.monthly = Some(MonthlyRule::NthWeekday {
+                    nth: 0,
+                    weekday: Weekday::Mo,
+                });
+            }),
+            Err(RecurrenceError::NthWeekday)
+        );
+        assert_eq!(
+            with(&|r| r.end = RecurrenceEnd::Count { count: 1000 }),
+            Err(RecurrenceError::Count)
+        );
+        assert!(with(&|r| {
+            r.frequency = RecurrenceFrequency::Monthly;
+            r.monthly = Some(MonthlyRule::DayOfMonth { day: -1 });
+        })
+        .is_ok());
+    }
+
+    #[test]
+    fn an_occurrence_edit_names_its_scope_and_refuses_unknown_fields() {
+        let edit: Option<OccurrenceEdit> = serde_json::from_value(serde_json::json!({
+            "occurrence_start": "2026-10-27T09:00:00Z",
+            "scope": "following",
+            "patch": { "title": "Daily", "recurrence": null },
+        }))
+        .ok();
+        let edit = edit.map(|e| (e.scope, e.patch.recurrence.is_null()));
+        assert_eq!(edit, Some((SeriesScope::Following, true)));
+        for refused in [
+            serde_json::json!({ "occurrence_start": "x", "scope": "some" }),
+            serde_json::json!({ "occurrence_start": "x", "scope": "this", "series": true }),
+            serde_json::json!({ "scope": "this" }),
+        ] {
+            assert!(
+                serde_json::from_value::<OccurrenceEdit>(refused.clone()).is_err(),
+                "{refused}"
+            );
+        }
+        assert!(serde_json::from_value::<OccurrenceDelete>(
+            serde_json::json!({ "occurrence_start": "2026-10-27", "scope": "all", "x": 1 })
+        )
+        .is_err());
+        assert_eq!(Weekday::from_index(6), Some(Weekday::Su));
+        assert_eq!(Weekday::from_index(7), None);
+        assert_eq!(
+            RecurrenceFrequency::parse(RecurrenceFrequency::Yearly.as_str()),
+            Some(RecurrenceFrequency::Yearly)
         );
     }
 

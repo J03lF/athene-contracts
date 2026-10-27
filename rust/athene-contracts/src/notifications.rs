@@ -183,7 +183,16 @@ impl NotificationEvent {
             | A::WorkflowStatusCreated
             | A::WorkflowStatusUpdated
             | A::WorkflowStatusArchived
-            | A::WorkflowStatusDeleted => None,
+            | A::WorkflowStatusDeleted
+            // Events and series (W6-A) notify nobody, as single events
+            // never have: the calendar shows them.
+            | A::EventSeriesCreated
+            | A::EventSeriesUpdated
+            | A::EventSeriesSplit
+            | A::EventSeriesEnded
+            | A::EventSeriesDeleted
+            | A::EventOccurrenceUpdated
+            | A::EventOccurrenceCancelled => None,
         }
     }
 }
