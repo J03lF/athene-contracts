@@ -29,6 +29,7 @@ pub mod status_rules;
 pub mod teams;
 pub mod ticket_check;
 pub mod ticket_types;
+pub mod timer;
 pub mod user;
 pub mod work;
 pub mod workflow;
