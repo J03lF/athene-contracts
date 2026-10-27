@@ -35,6 +35,12 @@ use athene_contracts::workspace::WorkspaceMemberRole as R;
 /// 7: attachments (W4-B) — `attachment.add` on the tick "Tickets
 /// bearbeiten", `attachment.delete` one's own always, anyone's with
 /// "Tickets löschen (alle)"; no other verdict moved.
+///
+/// 8: several roles per member (W4-G) — the permission and action
+/// `members.roles.assign`: owners and admins as for a role change, anyone
+/// else with the tick, only for members and guests and only roles within
+/// their own rights and tier; never overridable, not in the platform
+/// operator's extra. The matrix's custom role gains the tick.
 const RECORDED: &[(u32, &str)] = &[
     (1, "61b199d11696ad0c"),
     (2, "aaa9fb11da7f0950"),
@@ -43,6 +49,7 @@ const RECORDED: &[(u32, &str)] = &[
     (5, "d6c7fa24109644bd"),
     (6, "43b4ecf917bba111"),
     (7, "b397066edeec2ec9"),
+    (8, "8cc66fc3572a3d92"),
 ];
 
 /// Subjects, in the table's column order.
@@ -84,6 +91,9 @@ const TABLE: &[(Action, [Cell; 16])] = &[
     (Action::InviteCreate,         [Y,   Y,   N,   N,   N,   N,   N,   N,   N,   N,   N,   N,   Y,   N,   N,   N]),
     (Action::MembersRoleChange,    [Y,   Y,   N,   N,   N,   N,   N,   N,   N,   N,   N,   N,   N,   N,   N,   N]),
     (Action::MembersRemove,        [Y,   Y,   Slf, Slf, Slf, Slf, Slf, Slf, N,   Slf, Slf, Slf, Slf, Slf, Slf, N]),
+    // W4-G: roles besides the tier. Owners and admins; anyone else with
+    // "Rollen zuweisen", within their own rights (checked below).
+    (Action::MembersRolesAssign,   [Y,   Y,   N,   N,   N,   N,   N,   N,   N,   N,   N,   N,   Y,   N,   N,   N]),
     (Action::TeamsManage,          [Y,   Y,   N,   N,   Y,   Y,   N,   N,   N,   N,   N,   Y,   N,   N,   N,   N]),
     (Action::LabelsManage,         [Y,   Y,   N,   N,   Y,   Y,   N,   N,   N,   N,   N,   Y,   N,   N,   N,   N]),
     (Action::TicketTypesManage,    [Y,   Y,   N,   N,   Y,   Y,   N,   N,   N,   N,   N,   Y,   N,   N,   N,   N]),
@@ -423,6 +433,113 @@ fn escalation_assigning_a_higher_role_is_governance() {
         for to in R::ALL {
             assert!(!may(name, R::Guest, to), "{name} assigns {to:?}");
         }
+    }
+}
+
+/// Roles besides the tier (W4-G): owners and admins hand any of them out
+/// (admins never to an owner); anyone else needs "Rollen zuweisen" and
+/// moves only roles within their own rights and tier, only for members and
+/// guests — taking one away included. Nobody gains a right this way.
+#[test]
+fn escalation_handing_out_roles_stays_within_ones_own_rights() {
+    use athene_contracts::policy::may_assign;
+    let edit = PermissionSet::EMPTY
+        .with(Permission::TicketEdit)
+        .with(Permission::CommentCreate);
+    let more = edit.with(Permission::ProjectCreate);
+    for target in R::ALL {
+        for to in [R::Member, R::Guest] {
+            assert!(may_assign(
+                &subject("O"),
+                target,
+                false,
+                to,
+                PermissionSet::ALL
+            ));
+            assert_eq!(
+                may_assign(&subject("A"), target, false, to, PermissionSet::ALL),
+                target != R::Owner,
+                "admin onto {target:?}"
+            );
+        }
+    }
+    assert!(may_assign(
+        &subject("A"),
+        R::Admin,
+        true,
+        R::Member,
+        PermissionSet::ALL
+    ));
+    // The tick, within one's rights, onto members and guests only.
+    let cus = subject("Cus");
+    assert!(may_assign(&cus, R::Member, false, R::Member, edit));
+    assert!(may_assign(&cus, R::Guest, false, R::Guest, GUEST_CEILING));
+    assert!(
+        may_assign(&cus, R::Member, true, R::Member, edit),
+        "oneself, within"
+    );
+    assert!(
+        !may_assign(&cus, R::Member, false, R::Member, more),
+        "beyond its rights"
+    );
+    assert!(
+        !may_assign(&cus, R::Member, true, R::Member, more),
+        "no self-escalation"
+    );
+    assert!(
+        !may_assign(&cus, R::Admin, false, R::Member, edit),
+        "never a governor"
+    );
+    assert!(!may_assign(
+        &cus,
+        R::Owner,
+        false,
+        R::Member,
+        PermissionSet::EMPTY
+    ));
+    // A role named without its permissions is handed out by nobody but a
+    // governor.
+    assert!(!allows(
+        &cus,
+        Action::MembersRolesAssign,
+        &Facts::target(Some(R::Member), false).granting(R::Member)
+    ));
+    // Without the tick, nothing: not the presets, not an operator.
+    for name in [
+        "M", "G", "Dev", "Tst", "PO", "OpM", "AdM", "Nil", "GsW", "PgM", "X",
+    ] {
+        assert!(
+            !may_assign(
+                &subject(name),
+                R::Member,
+                false,
+                R::Member,
+                PermissionSet::EMPTY
+            ),
+            "{name}"
+        );
+    }
+    // A guest never holds the tick, whatever its role says.
+    let guest_asking = Subject::new(
+        UserRole::User,
+        Some(Membership::new(
+            R::Guest,
+            GUEST_CEILING.with(Permission::MembersRolesAssign),
+        )),
+    );
+    assert!(!may_assign(
+        &guest_asking,
+        R::Guest,
+        false,
+        R::Guest,
+        PermissionSet::EMPTY
+    ));
+    // The tick is a governance-like right: no override, no operator extra.
+    assert!(
+        !athene_contracts::policy::PLATFORM_MEMBER_EXTRA.contains(Permission::MembersRolesAssign)
+    );
+    for place in athene_contracts::overrides::OverridePlace::ALL {
+        assert!(!Permission::MembersRolesAssign.overridable_at(place));
     }
 }
 

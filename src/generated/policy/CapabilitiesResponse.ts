@@ -36,9 +36,15 @@ standing: Standing,
  */
 tier: WorkspaceMemberRole, 
 /**
- * The caller's role in the workspace.
+ * The caller's first role in the workspace (by position; the tier's
+ * system role when they hold none): what an older client shows.
  */
 role: CapabilitiesRole, 
+/**
+ * Every workspace role the caller holds (W4-G), by position. Owners
+ * and admins: their fixed role and any others.
+ */
+roles: Array<CapabilitiesRole>, 
 /**
  * The permissions in effect for the caller here (guest ceiling and
  * the platform operator's extra applied).

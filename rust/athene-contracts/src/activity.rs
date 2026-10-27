@@ -152,6 +152,10 @@ pub enum ActivityAction {
     TeamMemberRemoved,
     TeamMemberLeft,
     MemberRoleChanged,
+    /// The roles someone holds changed (W4-G): target `workspace_member`,
+    /// `detail` their name; metadata `{ added, removed, role_ids }`
+    /// (`roles::MemberRolesActivity`).
+    MemberRolesChanged,
     MemberRemoved,
     MemberLeft,
     InviteRevoked,
@@ -248,6 +252,7 @@ impl ActivityAction {
         Self::TeamMemberRemoved,
         Self::TeamMemberLeft,
         Self::MemberRoleChanged,
+        Self::MemberRolesChanged,
         Self::MemberRemoved,
         Self::MemberLeft,
         Self::InviteRevoked,
@@ -337,6 +342,7 @@ impl ActivityAction {
             Self::TeamMemberRemoved => "team_member_removed",
             Self::TeamMemberLeft => "team_member_left",
             Self::MemberRoleChanged => "member_role_changed",
+            Self::MemberRolesChanged => "member_roles_changed",
             Self::MemberRemoved => "member_removed",
             Self::MemberLeft => "member_left",
             Self::InviteRevoked => "invite_revoked",

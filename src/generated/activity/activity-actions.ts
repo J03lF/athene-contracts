@@ -75,6 +75,7 @@ export const ACTIVITY_ACTIONS: readonly ActivityAction[] = [
   "team_member_removed",
   "team_member_left",
   "member_role_changed",
+  "member_roles_changed",
   "member_removed",
   "member_left",
   "invite_revoked",

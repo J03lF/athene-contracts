@@ -44,7 +44,7 @@ use crate::workspace::WorkspaceMemberRole;
 
 /// The rules' revision. Bumped whenever a verdict in the matrix changes
 /// (`tests/policy_matrix.rs` keeps the history).
-pub const POLICY_REVISION: u32 = 7;
+pub const POLICY_REVISION: u32 = 8;
 
 /// The most an open link may grant (J6). Admins and owners are invited by
 /// email only: a forwarded link must not hand out the workspace.
@@ -143,6 +143,10 @@ pub enum Permission {
     /// See, revoke and renew invitations (within one's own rights).
     #[serde(rename = "invite.manage")]
     InviteManage,
+    /// Give people workspace roles and take them away again, only roles
+    /// within one's own rights (W4-G). Never overridable.
+    #[serde(rename = "members.roles.assign")]
+    MembersRolesAssign,
 }
 
 /// The sections of the role editor, in display order.
@@ -160,7 +164,7 @@ pub enum PermissionGroup {
 
 impl Permission {
     /// Every permission, in the editor's order.
-    pub const ALL: [Permission; 29] = [
+    pub const ALL: [Permission; 30] = [
         Permission::LabelsManage,
         Permission::TicketTypesManage,
         Permission::FieldsManage,
@@ -190,6 +194,7 @@ impl Permission {
         Permission::DocManage,
         Permission::InviteCreate,
         Permission::InviteManage,
+        Permission::MembersRolesAssign,
     ];
 
     /// The stored bit. Fixed forever: the database keeps masks of these,
@@ -225,6 +230,7 @@ impl Permission {
             Permission::DocManage => 26,
             Permission::InviteCreate => 27,
             Permission::InviteManage => 28,
+            Permission::MembersRolesAssign => 29,
         }
     }
 
@@ -260,6 +266,7 @@ impl Permission {
             Permission::DocManage => "doc.manage",
             Permission::InviteCreate => "invite.create",
             Permission::InviteManage => "invite.manage",
+            Permission::MembersRolesAssign => "members.roles.assign",
         }
     }
 
@@ -295,7 +302,9 @@ impl Permission {
             | Permission::DocWrite
             | Permission::DocDeleteOwn
             | Permission::DocManage => PermissionGroup::Docs,
-            Permission::InviteCreate | Permission::InviteManage => PermissionGroup::Members,
+            Permission::InviteCreate
+            | Permission::InviteManage
+            | Permission::MembersRolesAssign => PermissionGroup::Members,
         }
     }
 
@@ -426,10 +435,12 @@ pub const GUEST_CEILING: PermissionSet =
 
 /// The content rights a platform operator or admin keeps as a member of
 /// any role of tier `member` (E7, J1): everything but governance, which is
-/// the workspace's own owners' and admins' — inviting included.
+/// the workspace's own owners' and admins' — inviting and handing out
+/// roles included.
 pub const PLATFORM_MEMBER_EXTRA: PermissionSet = PermissionSet::ALL
     .without(Permission::InviteCreate)
-    .without(Permission::InviteManage);
+    .without(Permission::InviteManage)
+    .without(Permission::MembersRolesAssign);
 
 /// The permissions that make a role read as "manager" in the derived
 /// [`Standing`] (a display, no rule reads it).
@@ -614,6 +625,12 @@ pub enum Action {
     /// Facts: `target_role`, `target_is_self` (leaving).
     #[serde(rename = "members.remove")]
     MembersRemove,
+    /// Give someone a workspace role or take one away (W4-G: several roles
+    /// per member). Facts: `target_role` (their tier), `target_is_self`,
+    /// `granted_role` (the role's tier), `granted_grants` (its
+    /// permissions; required for someone who does not govern).
+    #[serde(rename = "members.roles.assign")]
+    MembersRolesAssign,
     #[serde(rename = "teams.manage")]
     TeamsManage,
     /// Facts: `target_is_self` (leaving a team).
@@ -758,7 +775,7 @@ pub enum Fact {
 
 impl Action {
     /// Every action, in wire order.
-    pub const ALL: [Action; 45] = [
+    pub const ALL: [Action; 46] = [
         Action::AdminAccess,
         Action::WorkspaceCreate,
         Action::SlaRead,
@@ -770,6 +787,7 @@ impl Action {
         Action::InviteManage,
         Action::MembersRoleChange,
         Action::MembersRemove,
+        Action::MembersRolesAssign,
         Action::TeamsManage,
         Action::TeamsMemberRemove,
         Action::LabelsManage,
@@ -820,6 +838,7 @@ impl Action {
             Action::InviteManage => "invite.manage",
             Action::MembersRoleChange => "members.role.change",
             Action::MembersRemove => "members.remove",
+            Action::MembersRolesAssign => "members.roles.assign",
             Action::TeamsManage => "teams.manage",
             Action::TeamsMemberRemove => "teams.member.remove",
             Action::LabelsManage => "labels.manage",
@@ -899,6 +918,12 @@ impl Action {
             Action::InviteCreate => &[Fact::GrantedRole, Fact::GrantedGrants],
             Action::MembersRoleChange => &[Fact::TargetRole, Fact::GrantedRole, Fact::TargetIsSelf],
             Action::MembersRemove => &[Fact::TargetRole, Fact::TargetIsSelf],
+            Action::MembersRolesAssign => &[
+                Fact::TargetRole,
+                Fact::TargetIsSelf,
+                Fact::GrantedRole,
+                Fact::GrantedGrants,
+            ],
             Action::TeamsMemberRemove => &[Fact::TargetIsSelf],
             Action::DocDelete
             | Action::DocCollectionManage
@@ -959,6 +984,11 @@ pub enum Need {
     /// The permission, and only for roles within the actor's own rights
     /// ([`may_grant`]).
     Grant(Permission),
+    /// Hand a role to someone or take it away (W4-G): governors as for a
+    /// role change (owners only by owners, never above their own tier);
+    /// anyone else with the permission, only for members and guests, and
+    /// only roles within their own rights and tier ([`may_assign`]).
+    Assign(Permission),
     Governance(Governance),
 }
 
@@ -971,7 +1001,7 @@ impl Need {
             Gate::Always | Gate::Never => None,
         };
         match self {
-            Need::One(p) | Need::SelfOr(p) | Need::Grant(p) => vec![p],
+            Need::One(p) | Need::SelfOr(p) | Need::Grant(p) | Need::Assign(p) => vec![p],
             Need::OwnOrAny { own, any } => gate(own).into_iter().chain(gate(any)).collect(),
             Need::Platform | Need::Member | Need::Governance(_) => Vec::new(),
         }
@@ -990,6 +1020,7 @@ pub const fn requires(action: Action) -> Need {
         Action::WorkspaceSettingsEdit | Action::RolesManage => Need::Governance(Governance::Runs),
         Action::MembersRoleChange => Need::Governance(Governance::RoleChange),
         Action::MembersRemove => Need::Governance(Governance::Remove),
+        Action::MembersRolesAssign => Need::Assign(P::MembersRolesAssign),
         Action::InviteCreate => Need::Grant(P::InviteCreate),
         Action::InviteManage => Need::One(P::InviteManage),
         Action::TeamsManage => Need::One(P::TeamsManage),
@@ -1307,6 +1338,19 @@ pub fn allows(subject: &Subject, action: Action, facts: &Facts) -> bool {
                 && within_own(subject, facts.granted_role)
                 && (governing || grant_within(grants, facts))
         }
+        Need::Assign(p) => {
+            within_own(subject, facts.granted_role)
+                && if governing {
+                    may_touch(subject, facts.target_role)
+                } else {
+                    grants.contains(p)
+                        && !matches!(
+                            facts.target_role,
+                            Some(WorkspaceMemberRole::Owner | WorkspaceMemberRole::Admin)
+                        )
+                        && grant_within(grants, facts)
+                }
+        }
         Need::Governance(Governance::Runs) => governing,
         Need::Governance(Governance::RoleChange) => governing && changes_role(subject, facts),
         // Leaving is everyone's own call; removing others is governing.
@@ -1366,6 +1410,24 @@ pub fn may_grant(subject: &Subject, tier: WorkspaceMemberRole, grants: Permissio
         subject,
         Action::InviteCreate,
         &Facts::NONE.granting_role(tier, grants),
+    )
+}
+
+/// Whether the subject may give a role of `tier` with `grants` to someone
+/// of `target_tier`, or take it from them (W4-G): the escalation rule for
+/// roles held in addition to the tier — nobody hands out (or strips) a
+/// role with rights they do not hold themselves.
+pub fn may_assign(
+    subject: &Subject,
+    target_tier: WorkspaceMemberRole,
+    target_is_self: bool,
+    tier: WorkspaceMemberRole,
+    grants: PermissionSet,
+) -> bool {
+    allows(
+        subject,
+        Action::MembersRolesAssign,
+        &Facts::target(Some(target_tier), target_is_self).granting_role(tier, grants),
     )
 }
 
@@ -1519,8 +1581,13 @@ pub struct CapabilitiesResponse {
     pub standing: Standing,
     /// The membership's tier.
     pub tier: WorkspaceMemberRole,
-    /// The caller's role in the workspace.
+    /// The caller's first role in the workspace (by position; the tier's
+    /// system role when they hold none): what an older client shows.
     pub role: CapabilitiesRole,
+    /// Every workspace role the caller holds (W4-G), by position. Owners
+    /// and admins: their fixed role and any others.
+    #[serde(default)]
+    pub roles: Vec<CapabilitiesRole>,
     /// The permissions in effect for the caller here (guest ceiling and
     /// the platform operator's extra applied).
     #[ts(as = "Vec<Permission>")]
@@ -1583,6 +1650,7 @@ pub fn capabilities(
         workspace_id,
         standing,
         tier,
+        roles: vec![role.clone()],
         role,
         permissions: subject.effective(),
         roles_epoch,
@@ -1614,11 +1682,12 @@ pub mod matrix {
     use crate::auth::UserRole;
     use crate::workspace::WorkspaceMemberRole;
 
-    /// A custom role of the matrix: it may invite, edits tickets and
-    /// comments, and nothing else.
+    /// A custom role of the matrix: it may invite and hand out roles
+    /// within its rights, edits tickets and comments, and nothing else.
     pub const CUSTOM: PermissionSet = PermissionSet::of(&[
         Permission::InviteCreate,
         Permission::InviteManage,
+        Permission::MembersRolesAssign,
         Permission::TicketEdit,
         Permission::TicketWatch,
         Permission::CommentCreate,
@@ -1757,6 +1826,34 @@ pub mod matrix {
                     out.push(Facts::target(None, true).granting(granted));
                 }
             }
+            Action::MembersRolesAssign => {
+                // Onto each tier, oneself included; a role of each tier
+                // with no permissions, the presets', a custom one, and
+                // every permission there is.
+                let masks = [
+                    PermissionSet::EMPTY,
+                    MEMBER_DEFAULT,
+                    RolePreset::Tester.permissions(),
+                    RolePreset::ProductOwner.permissions(),
+                    CUSTOM,
+                    PermissionSet::ALL,
+                ];
+                for target in WorkspaceMemberRole::ALL {
+                    for mask in masks {
+                        out.push(
+                            Facts::target(Some(target), false)
+                                .granting_role(WorkspaceMemberRole::Member, mask),
+                        );
+                    }
+                    out.push(
+                        Facts::target(Some(target), false)
+                            .granting_role(WorkspaceMemberRole::Guest, GUEST_CEILING),
+                    );
+                }
+                out.push(
+                    Facts::target(None, true).granting_role(WorkspaceMemberRole::Member, CUSTOM),
+                );
+            }
             Action::TeamsMemberRemove => out.push(Facts::target(None, true)),
             _ => {}
         }
@@ -1887,7 +1984,7 @@ mod tests {
                 serde_json::from_value(serde_json::json!(action.as_str())).expect("parse");
             assert_eq!(back, action);
         }
-        assert_eq!(seen.len(), 45);
+        assert_eq!(seen.len(), 46);
     }
 
     #[test]

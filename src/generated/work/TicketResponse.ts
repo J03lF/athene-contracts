@@ -66,6 +66,12 @@ board_rank: number | null,
  */
 handoff_from?: string | null, 
 /**
+ * Who moved the ticket into its status (W4-G, the four-eyes rule
+ * `not_entered_by`): its reporter for a new ticket, `null` when nobody
+ * moved it since W4-G.
+ */
+status_entered_by?: string | null, 
+/**
  * The deadline the ticket has: its own due date, else its running or
  * planned sprint's end (`listing::EffectiveDue`). Computed by the
  * server in every read; `null` without either.

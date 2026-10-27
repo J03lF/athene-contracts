@@ -34,6 +34,7 @@ export const PERMISSIONS: ReadonlyArray<{ permission: Permission; group: Permiss
   { permission: 'doc.manage', group: 'docs', guest: false, effective: true },
   { permission: 'invite.create', group: 'members', guest: false, effective: true },
   { permission: 'invite.manage', group: 'members', guest: false, effective: true },
+  { permission: 'members.roles.assign', group: 'members', guest: false, effective: true },
 ];
 
 /** What a guest role can ever hold (`GUEST_CEILING`). */
@@ -60,7 +61,7 @@ export const ROLE_PRESETS: Readonly<Record<RolePreset, ReadonlyArray<Permission>
 };
 
 /** The rules' revision (`POLICY_REVISION`): what this package's matrix was made with. */
-export const POLICY_REVISION = 7;
+export const POLICY_REVISION = 8;
 
 /** The longest role name, in characters. */
 export const ROLE_MAX_NAME_CHARS = 40;

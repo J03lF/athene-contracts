@@ -524,6 +524,12 @@ pub struct TicketResponse {
     #[serde(default)]
     #[ts(optional = nullable)]
     pub handoff_from: Option<String>,
+    /// Who moved the ticket into its status (W4-G, the four-eyes rule
+    /// `not_entered_by`): its reporter for a new ticket, `null` when nobody
+    /// moved it since W4-G.
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub status_entered_by: Option<String>,
     /// The deadline the ticket has: its own due date, else its running or
     /// planned sprint's end (`listing::EffectiveDue`). Computed by the
     /// server in every read; `null` without either.
@@ -824,6 +830,11 @@ pub struct BulkUpdateTicketsRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub project_id: Option<String>,
+    /// An owner's or admin's reason to move past a blocking WIP limit
+    /// (W4-G, `status_rules`); every other caller is refused as without.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub wip_override: Option<crate::status_rules::WipOverride>,
 }
 
 /// One custom field set on a selection: `POST /work/tickets/bulk/fields`
@@ -895,6 +906,12 @@ pub struct BulkUpdateTicketsResponse {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[ts(optional, as = "Option<Vec<TicketProjectMove>>")]
     pub moved: Vec<TicketProjectMove>,
+    /// What WIP limits warn about (W4-G), per ticket. A ticket a blocking
+    /// limit, an approval rule or a missing right refused is in `failed`
+    /// (`ATH-RES-002`, the reason in the message).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(optional, as = "Option<Vec<crate::status_rules::TicketWarning>>")]
+    pub warnings: Vec<crate::status_rules::TicketWarning>,
 }
 
 /// `POST /work/tickets/:id/project`: move a ticket to another project of
@@ -964,6 +981,13 @@ pub struct UpdateTicketStatusRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub expected: Option<TicketExpected>,
+    /// An owner's or admin's reason to move past a blocking WIP limit
+    /// (W4-G). The status rules are `status_rules`: an approval refused is
+    /// `409` `approval_*`, a blocking limit `409` `wip_limit_reached`; the
+    /// answer carries `warnings` when a limit warns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub wip_override: Option<crate::status_rules::WipOverride>,
 }
 
 /// A board drag: `PATCH /work/tickets/:id/move`.
@@ -987,6 +1011,10 @@ pub struct MoveTicketRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub expected: Option<TicketExpected>,
+    /// As in [`UpdateTicketStatusRequest`] (W4-G).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub wip_override: Option<crate::status_rules::WipOverride>,
 }
 
 /// `PATCH /work/tickets/:id/assign`. `null` (or a missing key) unassigns.

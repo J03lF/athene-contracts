@@ -119,11 +119,12 @@ pub const DOC_COLLECTION_OVERRIDABLE: PermissionSet = PermissionSet::of(&[
 ]);
 
 /// What a team's workspace-wide override may name: every right but
-/// inviting (a role's tick only) and watching and commenting (per project
-/// only, §3).
+/// inviting and handing out roles (a role's tick only) and watching and
+/// commenting (per project only, §3).
 pub const WORKSPACE_OVERRIDABLE: PermissionSet = PermissionSet::ALL
     .without(Permission::InviteCreate)
     .without(Permission::InviteManage)
+    .without(Permission::MembersRolesAssign)
     .without(Permission::TicketWatch)
     .without(Permission::CommentCreate);
 
@@ -286,6 +287,26 @@ pub fn resolve(
         WorkspaceMemberRole::Guest => value.intersection(GUEST_CEILING),
         _ => value,
     }
+}
+
+/// The permissions in effect for a member holding several roles (W4-G):
+/// the union of each held role resolved on its own path — its ticks, then
+/// per level its own override and the member's teams' — so a role's deny
+/// at a place never takes away what another held role is allowed there
+/// (an action is allowed when any role allows it). `paths` holds one
+/// entry per role: its ticks and its levels (the teams' masks in each).
+/// A member who holds no role resolves one path with no ticks, so a team
+/// override can still allow. Owners and admins: everything; a guest is
+/// capped after the union.
+pub fn resolve_any(
+    tier: WorkspaceMemberRole,
+    paths: &[(PermissionSet, Vec<LevelMasks>)],
+) -> PermissionSet {
+    paths
+        .iter()
+        .fold(PermissionSet::EMPTY, |all, (base, levels)| {
+            all.union(resolve(tier, *base, levels))
+        })
 }
 
 /// A team's override at one level, for the traced resolution.
@@ -1025,6 +1046,66 @@ mod tests {
         assert!(!OverridePlace::Workspace.takes(OverrideTarget::Role));
         assert!(OverridePlace::Workspace.takes(OverrideTarget::Team));
         assert!(OverridePlace::Project.takes(OverrideTarget::Role));
+    }
+
+    #[test]
+    fn several_roles_resolve_as_a_union_and_a_deny_takes_only_its_own() {
+        use Permission as P;
+        let one = |p| PermissionSet::EMPTY.with(p);
+        let tester = one(P::TicketEdit).with(P::TicketClose);
+        let dev = one(P::TicketEdit).with(P::TicketPlan);
+        // In project X, the tester role's "Tickets bearbeiten" is denied;
+        // the developer role still allows it there.
+        let tester_levels = vec![
+            LevelMasks::default(),
+            LevelMasks {
+                role: OverrideMasks::new(PermissionSet::EMPTY, one(P::TicketEdit)).expect("masks"),
+                teams: OverrideMasks::NONE,
+            },
+        ];
+        let dev_levels = vec![LevelMasks::default(), LevelMasks::default()];
+        let both = resolve_any(
+            WorkspaceMemberRole::Member,
+            &[(tester, tester_levels.clone()), (dev, dev_levels)],
+        );
+        assert!(both.contains(P::TicketEdit), "the other role allows it");
+        assert!(both.contains(P::TicketClose) && both.contains(P::TicketPlan));
+        let tester_only = resolve_any(WorkspaceMemberRole::Member, &[(tester, tester_levels)]);
+        assert!(!tester_only.contains(P::TicketEdit), "the deny holds alone");
+        // A team's deny reaches every path; a team's allow needs no role.
+        let team_deny = LevelMasks {
+            role: OverrideMasks::NONE,
+            teams: OverrideMasks::new(PermissionSet::EMPTY, one(P::TicketPlan)).expect("masks"),
+        };
+        let denied = resolve_any(
+            WorkspaceMemberRole::Member,
+            &[(dev, vec![team_deny]), (tester, vec![team_deny])],
+        );
+        assert!(!denied.contains(P::TicketPlan));
+        let team_allow = LevelMasks {
+            role: OverrideMasks::NONE,
+            teams: OverrideMasks::new(one(P::TimeLog), PermissionSet::EMPTY).expect("masks"),
+        };
+        assert_eq!(
+            resolve_any(
+                WorkspaceMemberRole::Member,
+                &[(PermissionSet::EMPTY, vec![team_allow])]
+            ),
+            one(P::TimeLog)
+        );
+        // Guests are capped after the union; owners hold everything.
+        assert_eq!(
+            resolve_any(WorkspaceMemberRole::Guest, &[(tester, Vec::new())]),
+            PermissionSet::EMPTY
+        );
+        assert_eq!(
+            resolve_any(
+                WorkspaceMemberRole::Owner,
+                &[(PermissionSet::EMPTY, Vec::new())]
+            ),
+            PermissionSet::ALL
+        );
+        assert!(!P::MembersRolesAssign.overridable_at(OverridePlace::Workspace));
     }
 
     #[test]

@@ -7,13 +7,16 @@ import type {
 } from '../payloads/overrides';
 import { placeQuery } from './policy-client';
 import type {
+  AddMemberRoleRequest,
   AnswerRolesNoticeRequest,
   CreatePresetRolesRequest,
   CreateRoleRequest,
   DeleteRoleRequest,
   DeleteRoleResponse,
   EffectiveRoleResponse,
+  MemberRolesResponse,
   ReorderRolesRequest,
+  SetMemberRolesRequest,
   UpdateRoleRequest,
   WorkspaceRoleResponse,
   WorkspaceRolesResponse,
@@ -118,6 +121,54 @@ export class RolesApiClient {
   setOverride(workspaceId: string, body: SetOverrideRequest): Promise<SetOverrideResponse> {
     return this.http
       .put<ApiEnvelope<SetOverrideResponse>>(`/workspaces/${workspaceId}/overrides`, body)
+      .then(unwrap);
+  }
+
+  /** The roles someone holds besides their tier (W4-G; every member reads them). */
+  memberRoles(workspaceId: string, userId: string): Promise<MemberRolesResponse> {
+    return this.http
+      .get<ApiEnvelope<MemberRolesResponse>>(`/workspaces/${workspaceId}/members/${userId}/roles`)
+      .then(unwrap);
+  }
+
+  /**
+   * The whole set (`expected`: the set the client saw; `409 ATH-RES-003`
+   * with `details.current` when it moved). Owners and admins, or
+   * `members.roles.assign` within one's own rights (403 otherwise).
+   */
+  setMemberRoles(
+    workspaceId: string,
+    userId: string,
+    body: SetMemberRolesRequest,
+  ): Promise<MemberRolesResponse> {
+    return this.http
+      .put<ApiEnvelope<MemberRolesResponse>>(
+        `/workspaces/${workspaceId}/members/${userId}/roles`,
+        body,
+      )
+      .then(unwrap);
+  }
+
+  /** One more role (holding it already changes nothing). */
+  addMemberRole(
+    workspaceId: string,
+    userId: string,
+    body: AddMemberRoleRequest,
+  ): Promise<MemberRolesResponse> {
+    return this.http
+      .post<ApiEnvelope<MemberRolesResponse>>(
+        `/workspaces/${workspaceId}/members/${userId}/roles`,
+        body,
+      )
+      .then(unwrap);
+  }
+
+  /** One role taken away (not holding it changes nothing). */
+  removeMemberRole(workspaceId: string, userId: string, roleId: string): Promise<MemberRolesResponse> {
+    return this.http
+      .delete<ApiEnvelope<MemberRolesResponse>>(
+        `/workspaces/${workspaceId}/members/${userId}/roles/${roleId}`,
+      )
       .then(unwrap);
   }
 

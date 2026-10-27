@@ -25,6 +25,7 @@ pub mod queues;
 pub mod release_notes;
 pub mod roles;
 pub mod search;
+pub mod status_rules;
 pub mod teams;
 pub mod ticket_check;
 pub mod ticket_types;

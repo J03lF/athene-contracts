@@ -128,3 +128,23 @@ export function resolveOverrides(
 ): EffectivePermission[] {
   return PERMISSIONS.map((p) => resolvePermission(tier, base, levels, p.permission));
 }
+
+/** One held role's path for [`resolveAnyPermission`]: its ticks and its levels. */
+export interface HeldRolePath {
+  base: ReadonlyArray<Permission>;
+  levels: ReadonlyArray<OverrideLevel>;
+}
+
+/**
+ * Several roles per member (W4-G, `overrides::resolve_any`): a permission
+ * is allowed when any held role's path allows it — a role's deny at a
+ * place never takes away what another held role is allowed there. A
+ * member who holds no role resolves one path without ticks.
+ */
+export function resolveAnyPermission(
+  tier: WorkspaceMemberRole,
+  paths: ReadonlyArray<HeldRolePath>,
+  permission: Permission,
+): boolean {
+  return paths.some((path) => resolvePermission(tier, path.base, path.levels, permission).allowed);
+}

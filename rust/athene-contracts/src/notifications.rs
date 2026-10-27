@@ -170,6 +170,7 @@ impl NotificationEvent {
             | A::TeamMemberRemoved
             | A::TeamMemberLeft
             | A::MemberRoleChanged
+            | A::MemberRolesChanged
             | A::MemberRemoved
             | A::MemberLeft
             | A::InviteRevoked

@@ -2,10 +2,15 @@
 import type { WorkspaceMemberRole } from "./WorkspaceMemberRole";
 
 /**
- * `PATCH /workspaces/:id/members/:user_id`.
+ * `PATCH /workspaces/:id/members/:user_id`: the base level.
  *
  * Owners and admins only; only an owner may grant, change or remove the
- * owner role; the last owner cannot be demoted (409). `DELETE` on the same
+ * owner role; the last owner cannot be demoted (409). With a tier, the
+ * roles the member holds stay as far as the new tier takes them (a guest
+ * keeps only guest roles) and a member or guest gets the tier's system
+ * role (Mitglied, Gast) if they hold no role of that tier. With a
+ * `role_id` (one role, as before W4-G): the member holds exactly that
+ * role afterwards, at its tier. Several roles: `…/members/:user_id/roles`. `DELETE` on the same
  * path removes the member, or leaves when the id is the caller's own;
  * `POST /workspaces/:id/invites/:invite_id/revoke` revokes an invite and
  * `…/rotate` gives it a new link (the old one stops working).

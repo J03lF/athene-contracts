@@ -343,10 +343,11 @@ impl DbEnum for WorkspaceMemberRole {
 #[ts(export_to = "workspace/")]
 pub struct WorkspaceMemberResponse {
     pub user_id: String,
-    /// The tier (`owner | admin | member | guest`), from the role.
+    /// The tier (`owner | admin | member | guest`): the base level.
     pub role: WorkspaceMemberRole,
-    /// The member's workspace role (custom roles, phase A); `null` only
-    /// in memory mode.
+    /// The member's first role (by position; the tier's system role when
+    /// they hold none), for clients that show one role. `null` only in
+    /// memory mode.
     #[serde(default)]
     pub role_id: Option<String>,
     #[serde(default)]
@@ -362,6 +363,10 @@ pub struct WorkspaceMemberResponse {
     /// vanishing.
     pub display_name: Option<String>,
     pub email: Option<String>,
+    /// Every workspace role the member holds (W4-G), by position. Owners
+    /// and admins hold their base level, and roles only for queues.
+    #[serde(default)]
+    pub roles: Vec<crate::roles::MemberRoleRef>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS)]
@@ -440,10 +445,15 @@ pub const INVITE_DEFAULT_DAYS: i64 = 7;
 /// The longest an invitation may live (J4).
 pub const INVITE_MAX_DAYS: i64 = 30;
 
-/// `PATCH /workspaces/:id/members/:user_id`.
+/// `PATCH /workspaces/:id/members/:user_id`: the base level.
 ///
 /// Owners and admins only; only an owner may grant, change or remove the
-/// owner role; the last owner cannot be demoted (409). `DELETE` on the same
+/// owner role; the last owner cannot be demoted (409). With a tier, the
+/// roles the member holds stay as far as the new tier takes them (a guest
+/// keeps only guest roles) and a member or guest gets the tier's system
+/// role (Mitglied, Gast) if they hold no role of that tier. With a
+/// `role_id` (one role, as before W4-G): the member holds exactly that
+/// role afterwards, at its tier. Several roles: `…/members/:user_id/roles`. `DELETE` on the same
 /// path removes the member, or leaves when the id is the caller's own;
 /// `POST /workspaces/:id/invites/:invite_id/revoke` revokes an invite and
 /// `…/rotate` gives it a new link (the old one stops working).

@@ -51,6 +51,12 @@ deletable: boolean,
  */
 grantable: boolean, 
 /**
+ * Whether the caller may give this role to a member or take it away
+ * (W4-G, `members.roles.assign`; owners and admins: every role but
+ * Owner and Admin).
+ */
+assignable: boolean, 
+/**
  * For `PATCH` (3.7).
  */
 version: number, created_at: string, updated_at: string, };
