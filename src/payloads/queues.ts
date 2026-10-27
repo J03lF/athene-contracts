@@ -16,6 +16,7 @@ export type { QueueExpected } from '../generated/queues/QueueExpected';
 export type { QueueResponse } from '../generated/queues/QueueResponse';
 export type { QueueTargetKind } from '../generated/queues/QueueTargetKind';
 export type { QueueTickets } from '../generated/queues/QueueTickets';
+export type { TakeTicketRequest } from '../generated/queues/TakeTicketRequest';
 export type { TakenBy } from '../generated/queues/TakenBy';
 export type { UpdateQueueRequest } from '../generated/queues/UpdateQueueRequest';
 export type { WorkspaceQueuesResponse } from '../generated/queues/WorkspaceQueuesResponse';

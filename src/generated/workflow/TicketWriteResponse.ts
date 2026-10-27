@@ -3,7 +3,9 @@ import type { TicketResponse } from "../work/TicketResponse";
 import type { TicketWarning } from "./TicketWarning";
 
 /**
- * The answer of a single status write (`PATCH …/status`, `…/move`): the
- * ticket, and `warnings` when a WIP limit warns.
+ * The answer of a single write that a WIP limit can warn about: a status
+ * write (`PATCH …/status`, `…/move`) and, per person, an assignment
+ * (`PATCH …/assign`) and a take (`POST …/take`, W4-K): the ticket, and
+ * `warnings` when a WIP limit warns.
  */
 export type TicketWriteResponse = { data: TicketResponse, warnings?: Array<TicketWarning>, };

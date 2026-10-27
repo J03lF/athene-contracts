@@ -8,4 +8,19 @@ export type BulkUpdateFailure = { ticket_id: string,
  * The error code the single edit would have answered
  * (`ATH-RES-001`, `ATH-AUTH-002`, `ATH-VAL-001`, …).
  */
-code: string, message: string, };
+code: string, message: string, 
+/**
+ * The `details.reason` the single edit would have answered (W4-K):
+ * an approval (`approval_not_allowed`, `approval_four_eyes`,
+ * `approval_target_not_allowed`), a blocking WIP limit
+ * (`wip_limit_reached`), a status the ticket's workspace or project
+ * does not take (`status_unknown`, `status_archived`,
+ * `status_hidden`), … Absent when the refusal names none.
+ */
+reason?: string, 
+/**
+ * The rest of that refusal's `details` (`status`, `to`, `limit`,
+ * `current`, `scope`, `place`, `assignee_id`, `fields`, …), without
+ * `reason`. Only a client error carries any; absent when empty.
+ */
+details?: Record<string, unknown>, };

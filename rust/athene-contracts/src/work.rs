@@ -877,6 +877,51 @@ pub struct BulkUpdateFailure {
     /// (`ATH-RES-001`, `ATH-AUTH-002`, `ATH-VAL-001`, …).
     pub code: String,
     pub message: String,
+    /// The `details.reason` the single edit would have answered (W4-K):
+    /// an approval (`approval_not_allowed`, `approval_four_eyes`,
+    /// `approval_target_not_allowed`), a blocking WIP limit
+    /// (`wip_limit_reached`), a status the ticket's workspace or project
+    /// does not take (`status_unknown`, `status_archived`,
+    /// `status_hidden`), … Absent when the refusal names none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub reason: Option<String>,
+    /// The rest of that refusal's `details` (`status`, `to`, `limit`,
+    /// `current`, `scope`, `place`, `assignee_id`, `fields`, …), without
+    /// `reason`. Only a client error carries any; absent when empty.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "Record<string, unknown>")]
+    pub details: Option<JsonValue>,
+}
+
+impl BulkUpdateFailure {
+    /// The failure of `ticket_id` from a refusal's code, sentence and
+    /// `details` (a 4xx's; a server error passes `None`): `reason` taken
+    /// out of the details when it is a string, the rest kept when there is
+    /// any.
+    pub fn from_refusal(
+        ticket_id: impl Into<String>,
+        code: impl Into<String>,
+        message: impl Into<String>,
+        details: Option<&JsonValue>,
+    ) -> Self {
+        let mut rest = details.and_then(JsonValue::as_object).cloned();
+        let reason = rest.as_mut().and_then(|map| match map.remove("reason") {
+            Some(JsonValue::String(reason)) => Some(reason),
+            Some(other) => {
+                map.insert("reason".to_string(), other);
+                None
+            }
+            None => None,
+        });
+        Self {
+            ticket_id: ticket_id.into(),
+            code: code.into(),
+            message: message.into(),
+            reason,
+            details: rest.filter(|map| !map.is_empty()).map(JsonValue::Object),
+        }
+    }
 }
 
 /// One ticket of a bulk edit whose base no longer held: nothing of it was
@@ -1028,6 +1073,13 @@ pub struct AssignTicketRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub expected: Option<TicketExpected>,
+    /// An owner's or admin's reason to assign past a blocking WIP limit
+    /// per person on the ticket's status (W4-K): the new assignee counts
+    /// one more there. A limit that warns answers `warnings`, one that
+    /// blocks `409` `wip_limit_reached`, as a status write does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub wip_override: Option<crate::status_rules::WipOverride>,
 }
 
 /// Triage a ticket: `PATCH /work/tickets/:id/triage`. Allowed to any member
@@ -1614,6 +1666,62 @@ mod tests {
         );
         assert!(serde_json::from_value::<BulkUpdateTicketsRequest>(json!({
             "ticket_ids": [], "patch": { "titel": "x" }
+        }))
+        .is_err());
+    }
+
+    #[test]
+    fn a_bulk_failure_names_the_reason_of_its_refusal() {
+        let details = json!({
+            "reason": "wip_limit_reached", "status": "qa", "limit": 2, "current": 2,
+            "scope": "column", "place": "project", "assignee_id": null
+        });
+        let failure =
+            BulkUpdateFailure::from_refusal("t1", "ATH-RES-002", "at the limit", Some(&details));
+        assert_eq!(failure.reason.as_deref(), Some("wip_limit_reached"));
+        let rest = failure.details.clone().expect("details");
+        assert_eq!(rest["limit"], 2);
+        assert!(rest.get("reason").is_none());
+        let wire = serde_json::to_value(&failure).expect("serialise");
+        assert_eq!(wire["reason"], "wip_limit_reached");
+        assert_eq!(wire["details"]["status"], "qa");
+
+        // A refusal without details (a missing ticket) says nothing more,
+        // and an older answer without the two fields still reads.
+        let plain = BulkUpdateFailure::from_refusal("t2", "ATH-RES-001", "not found", None);
+        assert_eq!(
+            serde_json::to_value(&plain).expect("serialise"),
+            json!({ "ticket_id": "t2", "code": "ATH-RES-001", "message": "not found" })
+        );
+        let older: BulkUpdateFailure = serde_json::from_value(
+            json!({ "ticket_id": "t3", "code": "ATH-RES-002", "message": "m" }),
+        )
+        .expect("older");
+        assert_eq!((older.reason, older.details), (None, None));
+
+        // Only `reason` alone: no empty `details`.
+        let only = BulkUpdateFailure::from_refusal(
+            "t4",
+            "ATH-VAL-001",
+            "hidden",
+            Some(&json!({ "reason": "status_hidden" })),
+        );
+        assert_eq!(only.reason.as_deref(), Some("status_hidden"));
+        assert_eq!(only.details, None);
+    }
+
+    #[test]
+    fn an_assignment_may_carry_a_wip_override() {
+        let req: AssignTicketRequest = serde_json::from_value(json!({
+            "assignee_id": "u", "wip_override": { "reason": "Release tomorrow" }
+        }))
+        .expect("assign");
+        assert_eq!(
+            req.wip_override.map(|w| w.reason).as_deref(),
+            Some("Release tomorrow")
+        );
+        assert!(serde_json::from_value::<AssignTicketRequest>(json!({
+            "assignee_id": "u", "wip_override": { "reason": "x", "force": true }
         }))
         .is_err());
     }

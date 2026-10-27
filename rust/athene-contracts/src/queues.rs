@@ -230,6 +230,20 @@ pub struct MyQueuesResponse {
     pub queues: Vec<QueueTickets>,
 }
 
+/// `POST /work/tickets/:id/take` (W4-K): the body is optional; an empty
+/// one takes the ticket as before. Taking fills a WIP limit per person on
+/// the ticket's status like an assignment: a limit that warns answers
+/// `warnings`, one that blocks `409` `wip_limit_reached`, unless an owner
+/// or admin names a reason here.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "queues/")]
+pub struct TakeTicketRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub wip_override: Option<crate::status_rules::WipOverride>,
+}
+
 /// `POST /work/tickets/:id/hand-back`: back to `in_progress` and to the
 /// person it came from (`handoff_from`), with a comment saying why.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
@@ -318,6 +332,24 @@ mod tests {
             }))
             .is_err()
         );
+    }
+
+    #[test]
+    fn a_take_body_is_optional_and_strict() {
+        let empty: TakeTicketRequest = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert_eq!(empty, TakeTicketRequest::default());
+        let past: TakeTicketRequest = serde_json::from_value(serde_json::json!({
+            "wip_override": { "reason": "Hotfix" }
+        }))
+        .unwrap();
+        assert_eq!(
+            past.wip_override.map(|w| w.reason).as_deref(),
+            Some("Hotfix")
+        );
+        assert!(serde_json::from_value::<TakeTicketRequest>(
+            serde_json::json!({ "assignee_id": "u" })
+        )
+        .is_err());
     }
 
     #[test]

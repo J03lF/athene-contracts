@@ -398,6 +398,7 @@ fn render(out: &Path) {
         queues::QueueTickets,
         queues::MyQueuesResponse,
         queues::HandBackTicketRequest,
+        queues::TakeTicketRequest,
         queues::TakenBy,
         queues::QueueActivity,
         // workflow (W4-F): a workspace's own statuses

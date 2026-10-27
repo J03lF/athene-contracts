@@ -309,8 +309,10 @@ pub struct TicketWarning {
     pub assignee_id: Option<String>,
 }
 
-/// The answer of a single status write (`PATCH …/status`, `…/move`): the
-/// ticket, and `warnings` when a WIP limit warns.
+/// The answer of a single write that a WIP limit can warn about: a status
+/// write (`PATCH …/status`, `…/move`) and, per person, an assignment
+/// (`PATCH …/assign`) and a take (`POST …/take`, W4-K): the ticket, and
+/// `warnings` when a WIP limit warns.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "workflow/")]
 pub struct TicketWriteResponse {

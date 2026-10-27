@@ -49,6 +49,7 @@ import type {
   WatchStateResponse,
   WorkStatsResponse,
 } from '../payloads/work';
+import type { TicketWriteResponse } from '../payloads/status-rules';
 import type { Page, TicketSummary, WorkspaceSprintsQuery } from '../payloads/ticket-list';
 import type { AtheneHttpClient, RequestOptions } from '../http';
 
@@ -237,13 +238,17 @@ export class WorkApiClient {
       .post<ApiEnvelope<BulkUpdateTicketsResponse>>('/work/tickets/bulk', body)
       .then(unwrap);
   }
+  /**
+   * A status write. The answer keeps the envelope (W4-K): `data` is the
+   * ticket, `warnings` what a WIP limit warns about (absent when nothing).
+   * An approval refused is `409` `approval_*`, a blocking limit `409`
+   * `wip_limit_reached` (owners and admins may send `wip_override`).
+   */
   updateTicketStatus(
     id: string,
     body: UpdateTicketStatusRequest,
-  ): Promise<TicketResponse> {
-    return this.http
-      .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}/status`, body)
-      .then(unwrap);
+  ): Promise<TicketWriteResponse> {
+    return this.http.patch<TicketWriteResponse>(`/work/tickets/${id}/status`, body);
   }
   /** Comments on a ticket, oldest first. */
   listTicketComments(id: string): Promise<TicketCommentResponse[]> {
@@ -293,19 +298,24 @@ export class WorkApiClient {
       .post<ApiEnvelope<MoveTicketProjectResponse>>(`/work/tickets/${id}/project`, body)
       .then(unwrap);
   }
-  /** Board drag: target column and position in one request. */
-  moveTicket(id: string, body: MoveTicketRequest): Promise<TicketResponse> {
-    return this.http
-      .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}/move`, body)
-      .then(unwrap);
+  /**
+   * Board drag: target column and position in one request. Answers like
+   * `updateTicketStatus`, with the envelope's `warnings`.
+   */
+  moveTicket(id: string, body: MoveTicketRequest): Promise<TicketWriteResponse> {
+    return this.http.patch<TicketWriteResponse>(`/work/tickets/${id}/move`, body);
   }
+  /**
+   * Hand a ticket to someone (or nobody). The new assignee counts against
+   * a WIP limit per person on the ticket's status (W4-K): `warnings` in
+   * the envelope, or `409` `wip_limit_reached` (owners and admins may send
+   * `wip_override`).
+   */
   assignTicket(
     id: string,
     body: AssignTicketRequest,
-  ): Promise<TicketResponse> {
-    return this.http
-      .patch<ApiEnvelope<TicketResponse>>(`/work/tickets/${id}/assign`, body)
-      .then(unwrap);
+  ): Promise<TicketWriteResponse> {
+    return this.http.patch<TicketWriteResponse>(`/work/tickets/${id}/assign`, body);
   }
   /** Any workspace member but a guest. */
   triageTicket(id: string, body: TriageTicketRequest): Promise<TicketResponse> {

@@ -5,10 +5,12 @@ import type {
   HandBackTicketRequest,
   MyQueuesResponse,
   QueueResponse,
+  TakeTicketRequest,
   UpdateQueueRequest,
   WorkspaceQueuesResponse,
 } from '../payloads/queues';
 import type { TicketResponse } from '../payloads/work';
+import type { TicketWriteResponse } from '../payloads/status-rules';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -69,12 +71,13 @@ export class QueuesApiClient {
   /**
    * "Nehmen": the caller becomes the assignee if nobody is. `409
    * ATH-RES-005` names who was faster (`details.taken_by`), `409
-   * ATH-RES-006` says the ticket left the queue.
+   * ATH-RES-006` says the ticket left the queue. Taking fills a WIP limit
+   * per person on the ticket's status (W4-K): `warnings` in the envelope,
+   * or `409` `wip_limit_reached` (owners and admins may send
+   * `wip_override`).
    */
-  take(ticketId: string): Promise<TicketResponse> {
-    return this.http
-      .post<ApiEnvelope<TicketResponse>>(`/work/tickets/${ticketId}/take`, {})
-      .then(unwrap);
+  take(ticketId: string, body: TakeTicketRequest = {}): Promise<TicketWriteResponse> {
+    return this.http.post<TicketWriteResponse>(`/work/tickets/${ticketId}/take`, body);
   }
 
   /** "Zurückschicken": `in_progress`, to `handoff_from`, with a comment. */
