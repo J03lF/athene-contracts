@@ -16,6 +16,7 @@ pub mod field_assignments;
 pub mod field_definitions;
 pub mod limits;
 pub mod listing;
+pub mod mail;
 pub mod notifications;
 pub mod overrides;
 pub mod patch;

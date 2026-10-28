@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 
 use athene_contracts::{
     activity, admin, athene_ai, attachments, auth, calendar, common, dashboard, docs, edit,
-    field_assignments, field_definitions, listing, notifications, overrides, policy, queues,
+    field_assignments, field_definitions, listing, mail, notifications, overrides, policy, queues,
     release_notes, roles, search, status_rules, teams, ticket_check, ticket_types, timer, user,
     work, workflow, workspace,
 };
@@ -546,6 +546,10 @@ fn render(out: &Path) {
         athene_ai::AiModelCheck,
         athene_ai::AiModelSwap,
         athene_ai::AiWorkspaceModel,
+        // Mail sending in the admin console (W6-E)
+        mail::MailStatusResponse,
+        mail::SendTestMailRequest,
+        mail::TestMailResponse,
     );
     // The verdicts the web's local rules are tested against (3.12).
     let matrix = policy::matrix::to_json(&policy::matrix::build()).expect("policy matrix");

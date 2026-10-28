@@ -10,7 +10,8 @@
 //!
 //! | module | what |
 //! |---|---|
-//! | [`config`] | `bind_addr()` (`FENRIR_SERVICE_ADDR`, loopback default), `*_FILE` secrets, [`config::Secret`] |
+//! | [`config`] | `bind_addr()` (`FENRIR_SERVICE_ADDR`, loopback default), `*_FILE` secrets, [`config::Secret`], [`config::password_from`] |
+//! | [`mail`] | whether an address can receive mail at all (no `.local`, `.test`, `example.com`, …) |
 //! | [`client_ip`] | client address from trusted proxies only: layer and extractor |
 //! | [`rate_limit`] | bounded per-key limiter with eviction, keys by IP / verified token / account, a layer per [`rate_limit::RateClass`], a cap on open streams per caller |
 //! | [`request_id`] | accept or mint `x-request-id`, `http` span, response header, [`request_id::current`] |
@@ -33,6 +34,7 @@ pub mod body_fault;
 pub mod client_ip;
 pub mod config;
 pub mod error_class;
+pub mod mail;
 pub mod observability;
 pub mod outbound;
 pub mod principal;

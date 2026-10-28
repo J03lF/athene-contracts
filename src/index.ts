@@ -28,6 +28,7 @@ export * from './payloads/ticket-check';
 export * from './payloads/calendar';
 export * from './payloads/athene-ai';
 export * from './payloads/timer';
+export * from './payloads/mail';
 export * from './http';
 export * from './clients/auth-client';
 export * from './clients/user-client';

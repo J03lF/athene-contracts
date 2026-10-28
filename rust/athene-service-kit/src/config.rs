@@ -8,6 +8,9 @@
 //! - [`secret`]: a secret comes from `NAME` or from the file `NAME_FILE`
 //!   names (0600, outside every repo, S2/S4), never both. Errors are
 //!   values, not panics (BE-14), and never contain the secret.
+//! - [`password_from`]: a password for an outside service (SMTP); the
+//!   file wins over the variable and keeps its spaces (W6-E).
+//! - A secret file that group or others can read is used with a warning.
 
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -176,19 +179,119 @@ fn read_secret_file(var: &str, path: &str) -> Result<Secret, ConfigError> {
             var: var.to_string(),
         });
     }
+    let raw = read_checked(var, path)?;
+    let value = raw.trim();
+    if value.is_empty() {
+        return Err(no_secret(var, path));
+    }
+    Ok(Secret(value.to_string()))
+}
+
+/// The file's content, with a warning when others than its owner may read
+/// it (the file should be 0600 in a 0700 folder, S4). Read errors name the
+/// variable and the path, never the content.
+fn read_checked(var: &str, path: &str) -> Result<String, ConfigError> {
     let raw = std::fs::read_to_string(path).map_err(|err| ConfigError::Unreadable {
         var: var.to_string(),
         path: path.to_string(),
         reason: err.kind().to_string(),
     })?;
-    let value = raw.trim();
-    if value.is_empty() {
-        return Err(ConfigError::Invalid {
-            var: var.to_string(),
-            reason: format!("'{path}' holds no secret"),
-        });
+    if let Some(mode) = loose_mode(path) {
+        tracing::warn!(
+            event = "config.secret_file.permissions",
+            var,
+            path,
+            mode = %format!("{mode:o}"),
+            "secret file can be read by group or others; chmod 600 it"
+        );
     }
-    Ok(Secret(value.to_string()))
+    Ok(raw)
+}
+
+/// The permission bits of `path` when group or others have any access.
+#[cfg(unix)]
+fn loose_mode(path: &str) -> Option<u32> {
+    use std::os::unix::fs::PermissionsExt;
+    let mode = std::fs::metadata(path).ok()?.permissions().mode() & 0o777;
+    (mode & 0o077 != 0).then_some(mode)
+}
+
+#[cfg(not(unix))]
+fn loose_mode(_path: &str) -> Option<u32> {
+    None
+}
+
+fn no_secret(var: &str, path: &str) -> ConfigError {
+    ConfigError::Invalid {
+        var: var.to_string(),
+        reason: format!("'{path}' holds no secret"),
+    }
+}
+
+/// Where [`password_from`] took the value from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SecretSource {
+    /// `NAME_FILE`.
+    File,
+    /// `NAME`.
+    Variable,
+}
+
+impl SecretSource {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::File => "file",
+            Self::Variable => "env",
+        }
+    }
+}
+
+/// A password for an outside service (an SMTP relay), read once at start:
+///
+/// - `NAME_FILE=<path>` wins: the file's content with the trailing line
+///   break(s) removed and nothing else, because a password may begin or
+///   end with a space. A group- or world-readable file is used, with a
+///   warning (see [`read_checked`]); an unreadable or empty one is an
+///   error.
+/// - else `NAME=<value>`, likewise only without its trailing line break.
+///   When both are set, `NAME` is ignored with a warning.
+///
+/// Neither the value nor any part of it is ever in an error or a log.
+pub fn password_from(
+    lookup: &dyn Fn(&str) -> Option<String>,
+    name: &str,
+) -> Result<Option<(Secret, SecretSource)>, ConfigError> {
+    let file_var = format!("{name}_FILE");
+    let direct = lookup(name).filter(|value| !value.is_empty());
+    if let Some(path) = lookup(&file_var) {
+        let path = path.trim().to_string();
+        if path.is_empty() {
+            return Err(ConfigError::Empty { var: file_var });
+        }
+        if direct.is_some() {
+            tracing::warn!(
+                event = "config.secret.both_set",
+                var = name,
+                file_var = %file_var,
+                "both are set; the file wins and the variable is ignored"
+            );
+        }
+        let raw = read_checked(&file_var, &path)?;
+        let value = without_line_break(&raw);
+        if value.is_empty() {
+            return Err(no_secret(&file_var, &path));
+        }
+        return Ok(Some((Secret(value.to_string()), SecretSource::File)));
+    }
+    Ok(direct
+        .map(|value| without_line_break(&value).to_string())
+        .filter(|value| !value.is_empty())
+        .map(|value| (Secret(value), SecretSource::Variable)))
+}
+
+/// `value` without the line breaks at its end (`echo` and editors add one).
+fn without_line_break(value: &str) -> &str {
+    value.trim_end_matches(['\n', '\r'])
 }
 
 /// A boolean flag of `names` (first one set wins): `1/true/yes/on` or
@@ -348,6 +451,67 @@ mod tests {
             Err(ConfigError::Invalid { .. })
         ));
         std::fs::remove_file(empty).unwrap();
+    }
+
+    #[test]
+    fn a_password_file_wins_and_keeps_its_spaces() {
+        let path = scratch_file(" pass word \r\n\n");
+        let both = env(&[
+            ("SMTP_PASSWORD", "from-the-variable"),
+            ("SMTP_PASSWORD_FILE", path.to_str().unwrap()),
+        ]);
+        let (secret, source) = password_from(&both, "SMTP_PASSWORD").unwrap().unwrap();
+        assert_eq!(secret.expose(), " pass word ");
+        assert_eq!(source, SecretSource::File);
+        std::fs::remove_file(&path).unwrap();
+
+        let direct = env(&[("SMTP_PASSWORD", "only-env\n")]);
+        let (secret, source) = password_from(&direct, "SMTP_PASSWORD").unwrap().unwrap();
+        assert_eq!(secret.expose(), "only-env");
+        assert_eq!(source, SecretSource::Variable);
+
+        assert_eq!(password_from(&env(&[]), "SMTP_PASSWORD"), Ok(None));
+        assert_eq!(
+            password_from(&env(&[("SMTP_PASSWORD", "")]), "SMTP_PASSWORD"),
+            Ok(None)
+        );
+    }
+
+    #[test]
+    fn a_password_file_that_cannot_be_used_is_an_error_without_the_value() {
+        let empty = scratch_file("\n");
+        let lookup = env(&[
+            ("SMTP_PASSWORD", "fallback-must-not-be-used"),
+            ("SMTP_PASSWORD_FILE", empty.to_str().unwrap()),
+        ]);
+        let err = password_from(&lookup, "SMTP_PASSWORD").unwrap_err();
+        assert!(matches!(err, ConfigError::Invalid { .. }));
+        assert!(!err.to_string().contains("fallback"));
+        std::fs::remove_file(empty).unwrap();
+
+        let missing = env(&[("SMTP_PASSWORD_FILE", "/nonexistent/kit/password")]);
+        assert!(matches!(
+            password_from(&missing, "SMTP_PASSWORD"),
+            Err(ConfigError::Unreadable { .. })
+        ));
+        let blank = env(&[("SMTP_PASSWORD_FILE", " ")]);
+        assert!(matches!(
+            password_from(&blank, "SMTP_PASSWORD"),
+            Err(ConfigError::Empty { .. })
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_readable_secret_file_is_noticed() {
+        use std::os::unix::fs::PermissionsExt;
+        let path = scratch_file("x");
+        let name = path.to_str().unwrap().to_string();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert_eq!(loose_mode(&name), Some(0o644));
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert_eq!(loose_mode(&name), None);
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]
