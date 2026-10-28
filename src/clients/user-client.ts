@@ -11,6 +11,8 @@ import type {
 } from '../payloads/legal';
 import type {
   AccountDeletionCheck,
+  ChangePasswordRequest,
+  ChangePasswordResponse,
   DeleteAccountRequest,
   DeleteAccountResponse,
 } from '../payloads/account';
@@ -96,6 +98,19 @@ export class UserApiClient {
   deleteAccount(body: DeleteAccountRequest): Promise<DeleteAccountResponse> {
     return this.http
       .post<ApiEnvelope<DeleteAccountResponse>>('/user/account/delete', body)
+      .then(unwrap);
+  }
+
+  /**
+   * Sets a new password with the current one (W13). Wrong current
+   * password: `401 ATH-ACCOUNT-003` (the session stays, do not sign out);
+   * a new password against the rules: `400` with `details.reason`
+   * (`PASSWORD_REASON_*`). Afterwards every other session of the person
+   * has ended; this one stays.
+   */
+  changePassword(body: ChangePasswordRequest): Promise<ChangePasswordResponse> {
+    return this.http
+      .post<ApiEnvelope<ChangePasswordResponse>>('/user/account/password', body)
       .then(unwrap);
   }
 }

@@ -9,11 +9,16 @@ export const ACCOUNT_BLOCKED_BY_WORKSPACES_CODE = 'ATH-ACCOUNT-001';
 /** Deletion blocked: the only active platform admin (409). */
 export const ACCOUNT_LAST_ADMIN_CODE = 'ATH-ACCOUNT-002';
 
-/** The deletion's password is wrong (401; not a sign-out). */
+/** The deletion's password, or a password change's current one, is wrong (401; not a sign-out). */
 export const ACCOUNT_WRONG_PASSWORD_CODE = 'ATH-ACCOUNT-003';
 
-/** The name a deleted person's contributions show. */
-export const DELETED_PERSON_NAME = 'Gelöschte Person';
+/** The stored name of an erased account: a marker, shown as "Deleted person" in the reader's language. */
+export const DELETED_PERSON_MARKER = '[deleted-person]';
+
+/** `details.reason` of a refused new password (400). */
+export const PASSWORD_REASON_TOO_SHORT = 'password_too_short';
+export const PASSWORD_REASON_TOO_WEAK = 'password_too_weak';
+export const PASSWORD_REASON_UNCHANGED = 'password_unchanged';
 
 /** Real announcement sends per 24 hours, and the code past them (429). */
 export const ANNOUNCEMENT_SENDS_PER_DAY = 3;

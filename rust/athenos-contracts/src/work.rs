@@ -1275,6 +1275,12 @@ pub struct TicketCommentResponse {
     pub id: String,
     pub ticket_id: String,
     pub author_id: String,
+    /// `true` when the author deleted their account (W13): the roster no
+    /// longer knows them, and the client names them "Deleted person" in
+    /// the reader's language instead of "Unknown user". Absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub author_deleted: Option<bool>,
     pub body: String,
     /// RFC 3339.
     pub created_at: String,
@@ -1745,6 +1751,26 @@ pub struct ProjectReportResponse {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_comment_names_a_deleted_author_only_when_there_is_one() {
+        let mut comment = TicketCommentResponse {
+            id: "c".into(),
+            ticket_id: "t".into(),
+            author_id: "u".into(),
+            author_deleted: None,
+            body: "Hi".into(),
+            created_at: "2026-10-29T00:00:00Z".into(),
+            edited_at: None,
+        };
+        let plain = serde_json::to_value(&comment).unwrap();
+        assert!(plain.get("author_deleted").is_none());
+        comment.author_deleted = Some(true);
+        let deleted = serde_json::to_value(&comment).unwrap();
+        assert_eq!(deleted["author_deleted"], serde_json::json!(true));
+        let back: TicketCommentResponse = serde_json::from_value(plain).unwrap();
+        assert_eq!(back.author_deleted, None);
+    }
 
     #[test]
     fn create_ticket_carries_story_points() {

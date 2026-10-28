@@ -76,6 +76,8 @@ fn render(out: &Path) {
         account::AccountDeletionCheck,
         account::DeleteAccountRequest,
         account::DeleteAccountResponse,
+        account::ChangePasswordRequest,
+        account::ChangePasswordResponse,
         account::ExportedConsent,
         account::ExportedWorkspace,
         account::ExportedTicket,
@@ -776,10 +778,14 @@ fn legal_constants_ts() -> String {
          export const ACCOUNT_BLOCKED_BY_WORKSPACES_CODE = '{}';\n\n\
          /** Deletion blocked: the only active platform admin (409). */\n\
          export const ACCOUNT_LAST_ADMIN_CODE = '{}';\n\n\
-         /** The deletion's password is wrong (401; not a sign-out). */\n\
+         /** The deletion's password, or a password change's current one, is wrong (401; not a sign-out). */\n\
          export const ACCOUNT_WRONG_PASSWORD_CODE = '{}';\n\n\
-         /** The name a deleted person's contributions show. */\n\
-         export const DELETED_PERSON_NAME = '{}';\n\n\
+         /** The stored name of an erased account: a marker, shown as \"Deleted person\" in the reader's language. */\n\
+         export const DELETED_PERSON_MARKER = '{}';\n\n\
+         /** `details.reason` of a refused new password (400). */\n\
+         export const PASSWORD_REASON_TOO_SHORT = '{}';\n\
+         export const PASSWORD_REASON_TOO_WEAK = '{}';\n\
+         export const PASSWORD_REASON_UNCHANGED = '{}';\n\n\
          /** Real announcement sends per 24 hours, and the code past them (429). */\n\
          export const ANNOUNCEMENT_SENDS_PER_DAY = {};\n\
          export const ANNOUNCEMENT_RATE_CODE = '{}';\n\n\
@@ -794,7 +800,10 @@ fn legal_constants_ts() -> String {
         account::ACCOUNT_BLOCKED_BY_WORKSPACES_CODE,
         account::ACCOUNT_LAST_ADMIN_CODE,
         account::ACCOUNT_WRONG_PASSWORD_CODE,
-        account::DELETED_PERSON_NAME,
+        account::DELETED_PERSON_MARKER,
+        account::PASSWORD_REASON_TOO_SHORT,
+        account::PASSWORD_REASON_TOO_WEAK,
+        account::PASSWORD_REASON_UNCHANGED,
         admin::ANNOUNCEMENT_SENDS_PER_DAY,
         admin::ANNOUNCEMENT_RATE_CODE,
         limits::QUOTA_WORKSPACES_CODE,

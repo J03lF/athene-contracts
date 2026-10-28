@@ -8,8 +8,16 @@
 //!   [`ACCOUNT_WRONG_PASSWORD_CODE`]; blocked ⇒ `409`
 //!   [`ACCOUNT_BLOCKED_BY_WORKSPACES_CODE`] or
 //!   [`ACCOUNT_LAST_ADMIN_CODE`]. The person's own data goes, their
-//!   contributions to shared workspaces stay under „Gelöschte Person“, and
-//!   every session ends.
+//!   contributions to shared workspaces stay under the
+//!   [`DELETED_PERSON_MARKER`] name, and every session ends.
+//! - `POST /user/account/password` ([`ChangePasswordRequest`] →
+//!   [`ChangePasswordResponse`], W13): the current password and a new one.
+//!   Wrong current password ⇒ `401` [`ACCOUNT_WRONG_PASSWORD_CODE`] (no
+//!   sign-out); a new password that breaks the rules ⇒ `400
+//!   ATH-VAL-001` with `details.reason` one of [`PASSWORD_REASON_TOO_SHORT`],
+//!   [`PASSWORD_REASON_TOO_WEAK`], [`PASSWORD_REASON_UNCHANGED`]; too many
+//!   tries ⇒ `429`. On success every *other* session ends, the session in
+//!   use stays, and a confirmation mail goes to the account's address.
 //! - `GET /user/account/export` ([`AccountExport`]): the person's data as
 //!   one JSON file (a download), bounded in size ([`EXPORT_MAX_BYTES`]).
 
@@ -25,12 +33,40 @@ use crate::user::{UserProfileResponse, UserSettingsResponse};
 pub const ACCOUNT_BLOCKED_BY_WORKSPACES_CODE: &str = "ATH-ACCOUNT-001";
 /// Deletion blocked: the person is the only active platform admin (`409`).
 pub const ACCOUNT_LAST_ADMIN_CODE: &str = "ATH-ACCOUNT-002";
-/// The password given for the deletion is wrong (`401`; the session stays
-/// valid, the client must not sign out on it).
+/// The password given for the deletion, or the current password given for
+/// a password change, is wrong (`401`; the session stays valid, the client
+/// must not sign out on it).
 pub const ACCOUNT_WRONG_PASSWORD_CODE: &str = "ATH-ACCOUNT-003";
 
-/// The name a deleted person's contributions show.
-pub const DELETED_PERSON_NAME: &str = "Gelöschte Person";
+/// The stored name of an erased account (W13): a marker, not a word in
+/// some language. Its contributions keep it as their author's name; every
+/// place that shows a name shows the marker as "Deleted person" /
+/// „Gelöschte Person“ in the reader's language ([`is_deleted_person`]).
+/// Up to W13 the name was stored as the German text; auth-service's
+/// migration `0003` turned those rows into the marker.
+pub const DELETED_PERSON_MARKER: &str = "[deleted-person]";
+
+/// Whether a served or stored name is [`DELETED_PERSON_MARKER`].
+pub fn is_deleted_person(name: &str) -> bool {
+    name.trim() == DELETED_PERSON_MARKER
+}
+
+/// The name [`DELETED_PERSON_MARKER`] stands for, German (`de`) or English.
+pub fn deleted_person_name(de: bool) -> &'static str {
+    if de {
+        "Gelöschte Person"
+    } else {
+        "Deleted person"
+    }
+}
+
+/// `details.reason` of a refused new password (`400`): shorter than the
+/// minimum (`details.min_length`), ...
+pub const PASSWORD_REASON_TOO_SHORT: &str = "password_too_short";
+/// ... without upper case, lower case and a digit, ...
+pub const PASSWORD_REASON_TOO_WEAK: &str = "password_too_weak";
+/// ... or the same as the current one.
+pub const PASSWORD_REASON_UNCHANGED: &str = "password_unchanged";
 
 /// `format` of an export.
 pub const EXPORT_FORMAT: &str = "athenos-account-export";
@@ -92,6 +128,35 @@ impl std::fmt::Debug for DeleteAccountRequest {
 #[ts(export_to = "account/")]
 pub struct DeleteAccountResponse {
     pub deleted: bool,
+}
+
+/// `POST /user/account/password` (W13): the signed-in person sets a new
+/// password with the current one.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Validate, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "account/")]
+pub struct ChangePasswordRequest {
+    #[validate(length(min = 1, max = 1024))]
+    pub current_password: String,
+    #[validate(length(min = 1, max = 1024))]
+    pub new_password: String,
+}
+
+impl std::fmt::Debug for ChangePasswordRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChangePasswordRequest")
+            .field("current_password", &"<redacted>")
+            .field("new_password", &"<redacted>")
+            .finish()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
+#[ts(export_to = "account/")]
+pub struct ChangePasswordResponse {
+    pub changed: bool,
+    /// The person's other sessions that ended with the change.
+    pub other_sessions_ended: u64,
 }
 
 /// One accepted version of the legal texts.
@@ -199,5 +264,37 @@ mod tests {
         assert!(check.allowed());
         check.last_platform_admin = true;
         assert!(!check.allowed());
+    }
+
+    #[test]
+    fn neither_password_of_a_change_prints_and_unknown_fields_are_refused() {
+        let req: ChangePasswordRequest = serde_json::from_value(json!({
+            "current_password": "old-secret-1A",
+            "new_password": "new-secret-2B"
+        }))
+        .unwrap();
+        let printed = format!("{req:?}");
+        assert!(!printed.contains("old-secret") && !printed.contains("new-secret"));
+        assert!(validator::Validate::validate(&req).is_ok());
+        assert!(serde_json::from_value::<ChangePasswordRequest>(json!({
+            "current_password": "a", "new_password": "b", "keep_sessions": true
+        }))
+        .is_err());
+        let empty: ChangePasswordRequest =
+            serde_json::from_value(json!({ "current_password": "", "new_password": "b" })).unwrap();
+        assert!(validator::Validate::validate(&empty).is_err());
+    }
+
+    #[test]
+    fn the_deleted_person_is_a_marker_shown_in_the_readers_language() {
+        assert!(is_deleted_person(DELETED_PERSON_MARKER));
+        assert!(is_deleted_person(" [deleted-person] "));
+        assert!(!is_deleted_person("Gelöschte Person"));
+        assert!(!is_deleted_person("Ada"));
+        assert_eq!(deleted_person_name(true), "Gelöschte Person");
+        assert_eq!(deleted_person_name(false), "Deleted person");
+        // No language's word is stored.
+        assert!(DELETED_PERSON_MARKER.is_ascii());
+        assert_ne!(DELETED_PERSON_MARKER, deleted_person_name(true));
     }
 }
