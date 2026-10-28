@@ -7,6 +7,16 @@
 //! whatever headers it sends. (Moved unchanged from auth-service
 //! `transport/http/client_ip.rs`.)
 //!
+//! Only `X-Forwarded-For` is read. `Forwarded`, `X-Real-IP`,
+//! `CF-Connecting-IP` and the like are never believed here: deciding which
+//! edge header names the real client is the host's job (W9-SPEC §2). The
+//! host's static edge takes its configured header only from its own
+//! trusted proxies, drops every client-supplied address header and sends
+//! `X-Forwarded-For: <client>`; every loopback hop behind it (host gateway,
+//! athenos-api, the core) appends its peer. Walking from the right past the
+//! trusted loopback hops therefore lands on the client the edge resolved,
+//! and anything a client managed to put further left is never reached.
+//!
 //! [`ClientIpLayer`] resolves it once per request and stores [`ClientIp`]
 //! as a request extension; [`ClientIp`] is also an axum extractor (features
 //! `axum` for 0.8, `axum07` for 0.7). The peer comes from axum's
@@ -111,15 +121,21 @@ pub fn resolve_client_ip(
     Some(client)
 }
 
-/// One `X-Forwarded-For` element: a bare IP, `ip:port` or `[v6]:port`.
+/// One `X-Forwarded-For` element: a bare IP, `ip:port`, `[v6]` or
+/// `[v6]:port`. Anything else (names, zone ids, `unknown`, obfuscated
+/// identifiers) is garbage.
 fn parse_hop(raw: &str) -> Option<IpAddr> {
     let raw = raw.trim();
     if raw.is_empty() {
         return None;
     }
+    let bracketed = raw
+        .strip_prefix('[')
+        .and_then(|rest| rest.strip_suffix(']'));
     raw.parse::<IpAddr>()
         .ok()
         .or_else(|| raw.parse::<SocketAddr>().ok().map(|addr| addr.ip()))
+        .or_else(|| bracketed.and_then(|inner| inner.parse::<Ipv6Addr>().ok().map(IpAddr::V6)))
         .map(|ip| ip.to_canonical())
 }
 
@@ -324,6 +340,123 @@ mod tests {
         assert_eq!(
             resolve_client_ip(Some(ip("::1")), &v6, &loopback()),
             Some(ip("2001:db8::1"))
+        );
+    }
+
+    /// The W9 chain: the host edge resolved the client and set
+    /// `X-Forwarded-For: <client>`; the gateway, athenos-api and the core
+    /// each appended their loopback peer on the way to this service.
+    #[test]
+    fn the_host_chain_resolves_to_the_edge_client() {
+        let headers = xff(&["198.51.100.23, 127.0.0.1, 127.0.0.1, ::1"]);
+        assert_eq!(
+            resolve_client_ip(Some(ip("127.0.0.1")), &headers, &loopback()),
+            Some(ip("198.51.100.23"))
+        );
+        let v6 = xff(&["2001:db8:7::42", "127.0.0.1"]);
+        assert_eq!(
+            resolve_client_ip(Some(ip("::1")), &v6, &loopback()),
+            Some(ip("2001:db8:7::42"))
+        );
+    }
+
+    /// Whatever a client managed to put to the left of the address the edge
+    /// resolved is never reached: the walk stops at the first untrusted hop.
+    #[test]
+    fn a_client_supplied_chain_cannot_replace_the_resolved_client() {
+        for spoof in [
+            "127.0.0.1, 198.51.100.23, 127.0.0.1",
+            "10.0.0.1, 1.1.1.1, 198.51.100.23, 127.0.0.1",
+            "::1, 198.51.100.23, ::1",
+        ] {
+            assert_eq!(
+                resolve_client_ip(Some(ip("127.0.0.1")), &xff(&[spoof]), &loopback()),
+                Some(ip("198.51.100.23")),
+                "{spoof}"
+            );
+        }
+        // Split over several header lines: still one list, in order.
+        let lines = xff(&["6.6.6.6", "198.51.100.23", "127.0.0.1"]);
+        assert_eq!(
+            resolve_client_ip(Some(ip("127.0.0.1")), &lines, &loopback()),
+            Some(ip("198.51.100.23"))
+        );
+    }
+
+    /// Other address headers are never believed at module level, from any
+    /// peer: only the host decides which edge header names the client.
+    #[test]
+    fn other_address_headers_are_ignored() {
+        let mut headers = xff(&["198.51.100.23"]);
+        for (name, value) in [
+            ("forwarded", "for=6.6.6.6;proto=https"),
+            ("x-real-ip", "6.6.6.6"),
+            ("cf-connecting-ip", "6.6.6.6"),
+            ("true-client-ip", "6.6.6.6"),
+            ("x-client-ip", "6.6.6.6"),
+        ] {
+            headers.insert(name, HeaderValue::from_static(value));
+        }
+        assert_eq!(
+            resolve_client_ip(Some(ip("127.0.0.1")), &headers, &loopback()),
+            Some(ip("198.51.100.23"))
+        );
+        let mut only_others = HeaderMap::new();
+        only_others.insert("x-real-ip", HeaderValue::from_static("6.6.6.6"));
+        only_others.insert("cf-connecting-ip", HeaderValue::from_static("6.6.6.6"));
+        only_others.insert("forwarded", HeaderValue::from_static("for=6.6.6.6"));
+        assert_eq!(
+            resolve_client_ip(Some(ip("127.0.0.1")), &only_others, &loopback()),
+            Some(ip("127.0.0.1"))
+        );
+        // An untrusted peer gets nothing out of any of them.
+        assert_eq!(
+            resolve_client_ip(Some(ip("203.0.113.5")), &headers, &loopback()),
+            Some(ip("203.0.113.5"))
+        );
+    }
+
+    #[test]
+    fn ipv6_forms_parse_and_garbage_does_not() {
+        for (hop, want) in [
+            ("2001:db8::1", "2001:db8::1"),
+            ("[2001:db8::1]", "2001:db8::1"),
+            ("[2001:db8::1]:8443", "2001:db8::1"),
+            ("::ffff:198.51.100.23", "198.51.100.23"),
+            ("198.51.100.23:61000", "198.51.100.23"),
+        ] {
+            assert_eq!(parse_hop(hop), Some(ip(want)), "{hop}");
+        }
+        for garbage in [
+            "unknown",
+            "_hidden",
+            "example.com",
+            "fe80::1%eth0",
+            "[2001:db8::1",
+            "2001:db8::1]",
+            "1.2.3",
+            "1.2.3.4.5",
+            "999.1.1.1",
+            "for=1.2.3.4",
+            "\"1.2.3.4\"",
+        ] {
+            assert_eq!(parse_hop(garbage), None, "{garbage}");
+        }
+        // Garbage right of the client hides it: the last trusted hop stays.
+        let headers = xff(&["198.51.100.23, unknown, 127.0.0.1"]);
+        assert_eq!(
+            resolve_client_ip(Some(ip("127.0.0.1")), &headers, &loopback()),
+            Some(ip("127.0.0.1"))
+        );
+        // Header bytes that are not text: the peer.
+        let mut binary = HeaderMap::new();
+        binary.insert(
+            FORWARDED_FOR_HEADER,
+            HeaderValue::from_bytes(b"198.51.100.23\xff").unwrap(),
+        );
+        assert_eq!(
+            resolve_client_ip(Some(ip("127.0.0.1")), &binary, &loopback()),
+            Some(ip("127.0.0.1"))
         );
     }
 

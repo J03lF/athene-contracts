@@ -21,6 +21,7 @@
 //! | [`upstream`] | the client to the host gateway: budget, breaker per target with half-open, idempotent retries only |
 //! | [`outbound`] | the client for user-supplied URLs (webhooks): SSRF guard after DNS, scheme/port allowlist, size cap |
 //! | [`observability`] | tracing init (text or JSON, env filter, optional OTLP), [`observability::redact`] |
+//! | [`run_mode`] | `FENRIR_ENV` → production or dev (missing/unknown = production), module overrides only tighten, dev-only settings refused in production |
 //! | [`shutdown`] | signal, [`shutdown::Drain`] and the layer that answers `ATH-SYS-005` while draining |
 //! | [`body_fault`] | what a request body that does not fit its contract got wrong |
 //! | [`error_class`] | the error classes every failure maps onto |
@@ -41,6 +42,7 @@ pub mod principal;
 pub mod rate_limit;
 pub mod request_id;
 pub mod retry;
+pub mod run_mode;
 pub mod service_auth;
 pub mod shutdown;
 pub mod upstream;
@@ -55,6 +57,7 @@ pub use rate_limit::{
     SlotHolder, SlotRefusal, VerifiedCallers,
 };
 pub use request_id::RequestIdLayer;
+pub use run_mode::RunMode;
 pub use service_auth::{
     AuthenticatedService, ServiceAuth, ServiceAuthConfig, ServiceAuthLayer, ServiceAuthMode,
     ServiceCredential,
