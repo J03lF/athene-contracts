@@ -15,6 +15,7 @@ pub mod docs;
 pub mod edit;
 pub mod field_assignments;
 pub mod field_definitions;
+pub mod integrations;
 pub mod legal;
 pub mod limits;
 pub mod listing;
