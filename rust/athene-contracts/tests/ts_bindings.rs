@@ -26,9 +26,9 @@ use std::path::{Path, PathBuf};
 
 use athene_contracts::{
     activity, admin, athene_ai, attachments, auth, calendar, common, dashboard, docs, edit,
-    field_assignments, field_definitions, listing, mail, notifications, overrides, policy, queues,
-    release_notes, roadmap, roles, search, status_rules, teams, ticket_check, ticket_types, timer,
-    user, work, workflow, workspace,
+    field_assignments, field_definitions, listing, mail, notifications, overrides, policy,
+    project_stats, queues, release_notes, roadmap, roles, search, status_rules, teams,
+    ticket_changes, ticket_check, ticket_types, timer, user, work, workflow, workspace,
 };
 use ts_rs::{Config, TS};
 
@@ -108,6 +108,14 @@ fn render(out: &Path) {
         listing::WorkspaceSprintsQuery,
         listing::CustomFieldOp,
         listing::CustomFieldFilter,
+        listing::TicketFacet,
+        listing::TicketFacets,
+        project_stats::ProjectStatsQuery,
+        project_stats::ProjectStatsResponse,
+        ticket_changes::TicketChangesQuery,
+        ticket_changes::TicketChangesResponse,
+        ticket_changes::TicketChangedEvent,
+        ticket_changes::TicketStreamClosed,
         // work: projects and tickets
         work::ProjectResponse,
         work::CreateProjectRequest,
@@ -904,6 +912,11 @@ fn limits_ts() -> String {
             "TICKET_LIST_MAX_FIELD_KEYS",
             "The most custom fields a list summary carries values of (`cf_keys`).",
             athene_contracts::listing::TICKET_LIST_MAX_FIELD_KEYS,
+        ),
+        (
+            "TICKET_LIST_MAX_IDS",
+            "The most ticket ids one list filter takes (`ids`).",
+            athene_contracts::listing::TICKET_LIST_MAX_IDS,
         ),
         (
             "ATTACHMENT_MAX_BYTES",

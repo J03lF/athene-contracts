@@ -30,6 +30,8 @@ export * from './payloads/athene-ai';
 export * from './payloads/timer';
 export * from './payloads/roadmap';
 export * from './payloads/mail';
+export * from './payloads/project-stats';
+export * from './payloads/ticket-changes';
 export * from './http';
 export * from './clients/auth-client';
 export * from './clients/user-client';

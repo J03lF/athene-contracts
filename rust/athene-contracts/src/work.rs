@@ -170,6 +170,14 @@ pub struct ListTicketsQuery {
     /// `me`, `none` (unassigned) or user ids.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assignee: Option<String>,
+    /// `me` or user ids: tickets these people reported (B1, W7-P).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reporter: Option<String>,
+    /// Ticket ids, at most [`crate::listing::TICKET_LIST_MAX_IDS`]: only
+    /// these (B4, W7-P). An id the reader cannot see, or that is gone, is
+    /// simply not in the answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ids: Option<String>,
     /// Priorities (`low,medium,high,critical`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub priority: Option<String>,
@@ -194,6 +202,11 @@ pub struct ListTicketsQuery {
     /// `true`: only tickets without an effective due date.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub no_due: Option<bool>,
+    /// `true`: `due_before`, `due_after` and `no_due` read the ticket's
+    /// **own** due date, not the one it inherits from its sprint (B3,
+    /// W7-P; the calendar). The order `sort=due` stays effective.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub own_due: Option<bool>,
     /// Changed at or after this instant (RFC 3339).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub updated_since: Option<String>,
@@ -217,6 +230,11 @@ pub struct ListTicketsQuery {
     /// `true`: `meta.total` counts every match (one more statement).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub count: Option<bool>,
+    /// Facets to count (B6, W7-P), comma-separated
+    /// [`crate::listing::TicketFacet`] names: `meta.facets` then holds
+    /// the counts per value (one more statement for all of them).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub facets: Option<String>,
     /// Custom-field conditions (CF5): a JSON array of
     /// [`crate::listing::CustomFieldFilter`], at most 10, at most 4000
     /// characters. Needs `workspace_id` or `project_id`.
@@ -238,6 +256,8 @@ impl ListTicketsQuery {
         self.status.is_some()
             || self.category.is_some()
             || self.assignee.is_some()
+            || self.reporter.is_some()
+            || self.ids.is_some()
             || self.priority.is_some()
             || self.ticket_type.is_some()
             || self.label.is_some()
@@ -246,6 +266,7 @@ impl ListTicketsQuery {
             || self.due_before.is_some()
             || self.due_after.is_some()
             || self.no_due.is_some()
+            || self.own_due.is_some()
             || self.updated_since.is_some()
             || self.q.is_some()
             || self.sort.is_some()
@@ -254,6 +275,7 @@ impl ListTicketsQuery {
             || self.limit.is_some()
             || self.cursor.is_some()
             || self.count.is_some()
+            || self.facets.is_some()
             || self.cf.is_some()
             || self.sort_field.is_some()
             || self.cf_keys.is_some()

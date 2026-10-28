@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;
 
+pub use crate::search::FacetCount;
 use crate::work::TicketPriority;
 
 /// Tickets per page when the query names none.
@@ -34,6 +35,13 @@ pub const TICKET_LIST_MAX_FIELD_FILTERS: usize = 10;
 pub const TICKET_LIST_FIELD_FILTERS_MAX_CHARS: usize = 4000;
 /// The most custom fields a summary carries values of (`cf_keys`).
 pub const TICKET_LIST_MAX_FIELD_KEYS: usize = 20;
+/// The most ticket ids one `ids` filter takes (B4, W7-P): a feed or a
+/// lookup names at most a page of tickets.
+pub const TICKET_LIST_MAX_IDS: usize = 100;
+/// The most values one facet answers (B6, W7-P), largest counts first;
+/// the rest are left out (`TicketFacets` says how many matched in all
+/// only through `PageMeta.total`).
+pub const TICKET_FACET_MAX_VALUES: usize = 50;
 
 /// One page of a list. `data` is in the order the query asked for.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
@@ -55,6 +63,88 @@ pub struct PageMeta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub total: Option<u64>,
+    /// The counts per value of the facets `facets` asked for (B6, W7-P);
+    /// absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub facets: Option<TicketFacets>,
+}
+
+/// A dimension a list can count its matches by (`facets=`, B6, W7-P).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "work/")]
+pub enum TicketFacet {
+    /// The status key (the legacy `closed` counts as `done`).
+    Status,
+    /// What the status means (`open`, `in_progress`, `blocked`, `done`).
+    Category,
+    /// The ticket-type key.
+    Type,
+    /// The assignee's id, `none` for unassigned.
+    Assignee,
+    /// `low`, `medium`, `high`, `critical`.
+    Priority,
+}
+
+impl TicketFacet {
+    pub const ALL: [TicketFacet; 5] = [
+        TicketFacet::Status,
+        TicketFacet::Category,
+        TicketFacet::Type,
+        TicketFacet::Assignee,
+        TicketFacet::Priority,
+    ];
+
+    /// The facet's name on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TicketFacet::Status => "status",
+            TicketFacet::Category => "category",
+            TicketFacet::Type => "type",
+            TicketFacet::Assignee => "assignee",
+            TicketFacet::Priority => "priority",
+        }
+    }
+
+    pub fn parse(raw: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|f| f.as_str() == raw)
+    }
+}
+
+/// The counts of a list per facet (B6, W7-P), in the search's
+/// [`FacetCount`] (`value` `null`: unassigned). Each facet counts the
+/// tickets that match every filter of the query **except its own**, over
+/// all pages (the cursor plays no part), so a filter row can show what
+/// each of its choices would find. Largest counts first, then by key; at
+/// most [`TICKET_FACET_MAX_VALUES`] values each. A facet not asked for is
+/// absent.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export_to = "work/", optional_fields)]
+pub struct TicketFacets {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<Vec<FacetCount>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<Vec<FacetCount>>,
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+    pub ticket_type: Option<Vec<FacetCount>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<Vec<FacetCount>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub priority: Option<Vec<FacetCount>>,
+}
+
+impl TicketFacets {
+    /// The counts of `facet`, to fill in.
+    pub fn slot(&mut self, facet: TicketFacet) -> &mut Option<Vec<FacetCount>> {
+        match facet {
+            TicketFacet::Status => &mut self.status,
+            TicketFacet::Category => &mut self.category,
+            TicketFacet::Type => &mut self.ticket_type,
+            TicketFacet::Assignee => &mut self.assignee,
+            TicketFacet::Priority => &mut self.priority,
+        }
+    }
 }
 
 /// The order of a paged ticket list. Empty values (no due date, no
@@ -279,6 +369,7 @@ mod tests {
                 next_cursor: None,
                 limit: 50,
                 total: None,
+                facets: None,
             },
         };
         let json = serde_json::to_value(&page).unwrap();

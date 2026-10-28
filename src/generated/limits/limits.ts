@@ -49,6 +49,9 @@ export const TICKET_LIST_FIELD_FILTERS_MAX_CHARS = 4000;
 /** The most custom fields a list summary carries values of (`cf_keys`). */
 export const TICKET_LIST_MAX_FIELD_KEYS = 20;
 
+/** The most ticket ids one list filter takes (`ids`). */
+export const TICKET_LIST_MAX_IDS = 100;
+
 /** One attachment, in bytes. */
 export const ATTACHMENT_MAX_BYTES = 10485760;
 

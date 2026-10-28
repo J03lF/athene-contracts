@@ -53,6 +53,8 @@ import type {
 } from '../payloads/work';
 import type { TicketWriteResponse } from '../payloads/status-rules';
 import type { Page, TicketSummary, WorkspaceSprintsQuery } from '../payloads/ticket-list';
+import type { ProjectStatsQuery, ProjectStatsResponse } from '../payloads/project-stats';
+import type { TicketChangesResponse } from '../payloads/ticket-changes';
 import type { AtheneHttpClient, RequestOptions } from '../http';
 
 interface ApiEnvelope<T> {
@@ -87,6 +89,43 @@ export class WorkApiClient {
       : '';
     return this.http
       .get<ApiEnvelope<ProjectResponse[]>>(`/work/projects${qs}`)
+      .then(unwrap);
+  }
+  /**
+   * The projects at a glance (B2, W7-P): per project the tickets per status
+   * category, points, people with open work, overdue/due-soon and the last
+   * change. `workspace_id` for a workspace's projects, `project_id` for one.
+   */
+  projectStats(
+    query: ProjectStatsQuery = {},
+    init: RequestOptions = {},
+  ): Promise<ProjectStatsResponse> {
+    const params = new URLSearchParams();
+    if (query.workspace_id) params.set('workspace_id', query.workspace_id);
+    if (query.project_id) params.set('project_id', query.project_id);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return this.http
+      .get<ApiEnvelope<ProjectStatsResponse>>(`/work/projects/stats${qs}`, {
+        signal: init.signal,
+      })
+      .then(unwrap);
+  }
+  /**
+   * Which tickets of the workspace changed since `since` (B5, W7-P); without
+   * it, only the cursor of now. Browsers usually take the gateway's stream
+   * (`ticketStreamPath`) instead of asking this themselves.
+   */
+  ticketChanges(
+    workspaceId: string,
+    since?: string,
+    init: RequestOptions = {},
+  ): Promise<TicketChangesResponse> {
+    const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+    return this.http
+      .get<ApiEnvelope<TicketChangesResponse>>(
+        `/work/workspaces/${encodeURIComponent(workspaceId)}/ticket-changes${qs}`,
+        { signal: init.signal },
+      )
       .then(unwrap);
   }
   createProject(body: CreateProjectRequest): Promise<ProjectResponse> {

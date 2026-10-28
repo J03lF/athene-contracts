@@ -29,6 +29,16 @@ category?: string,
  */
 assignee?: string, 
 /**
+ * `me` or user ids: tickets these people reported (B1, W7-P).
+ */
+reporter?: string, 
+/**
+ * Ticket ids, at most [`crate::listing::TICKET_LIST_MAX_IDS`]: only
+ * these (B4, W7-P). An id the reader cannot see, or that is gone, is
+ * simply not in the answer.
+ */
+ids?: string, 
+/**
  * Priorities (`low,medium,high,critical`).
  */
 priority?: string, 
@@ -61,6 +71,12 @@ due_after?: string,
  */
 no_due?: boolean, 
 /**
+ * `true`: `due_before`, `due_after` and `no_due` read the ticket's
+ * **own** due date, not the one it inherits from its sprint (B3,
+ * W7-P; the calendar). The order `sort=due` stays effective.
+ */
+own_due?: boolean, 
+/**
  * Changed at or after this instant (RFC 3339).
  */
 updated_since?: string, 
@@ -85,6 +101,12 @@ cursor?: string,
  * `true`: `meta.total` counts every match (one more statement).
  */
 count?: boolean, 
+/**
+ * Facets to count (B6, W7-P), comma-separated
+ * [`crate::listing::TicketFacet`] names: `meta.facets` then holds
+ * the counts per value (one more statement for all of them).
+ */
+facets?: string, 
 /**
  * Custom-field conditions (CF5): a JSON array of
  * [`crate::listing::CustomFieldFilter`], at most 10, at most 4000
