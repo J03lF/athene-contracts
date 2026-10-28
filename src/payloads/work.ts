@@ -47,6 +47,7 @@ export type { MoveTicketProjectRequest } from '../generated/work/MoveTicketProje
 export type { MoveTicketProjectResponse } from '../generated/work/MoveTicketProjectResponse';
 export type { PerUserListQuery } from '../generated/work/PerUserListQuery';
 export type { ProjectHealth } from '../generated/work/ProjectHealth';
+export type { ProjectHealthMode } from '../generated/work/ProjectHealthMode';
 export type { ProjectReportQuery } from '../generated/work/ProjectReportQuery';
 export type { ProjectReportResponse } from '../generated/work/ProjectReportResponse';
 export type { ProjectResponse } from '../generated/work/ProjectResponse';

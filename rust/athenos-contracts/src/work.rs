@@ -27,6 +27,7 @@ use serde::de::{Deserializer, Error as _};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use ts_rs::TS;
+use utoipa::ToSchema;
 
 use crate::edit::{SetOps, TextHash};
 use crate::Patch;
@@ -63,13 +64,32 @@ pub enum TicketPriority {
     Critical,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+/// How a project stands: "Im Plan", "Gefährdet", "Blockiert". Since W9-H
+/// the tickets decide it (`ProjectStats::health`) unless someone set it by
+/// hand ([`ProjectHealthMode::Manual`]).
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, ToSchema, TS,
+)]
 #[serde(rename_all = "snake_case")]
 #[ts(export_to = "work/")]
 pub enum ProjectHealth {
     OnTrack,
     AtRisk,
     Blocked,
+}
+
+/// Whether a project's health follows its tickets (W9-H): `auto` (every
+/// project starts so) or `manual`, set by hand by someone who may edit the
+/// project, until someone switches it back.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, TS,
+)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "work/")]
+pub enum ProjectHealthMode {
+    #[default]
+    Auto,
+    Manual,
 }
 
 /// Whether a project takes work. An archived project (UX-020) is left out
@@ -357,7 +377,15 @@ pub struct ProjectResponse {
     /// Hex colour `#RRGGBB`. When `null` the frontend derives a stable
     /// colour from the key.
     pub color: Option<String>,
+    /// The health set by hand; it counts only while `health_mode` is
+    /// `manual`. What every view shows is `ProjectStats::health.status`.
     pub health: ProjectHealth,
+    /// `auto`: the tickets decide the health; `manual`: `health` does.
+    pub health_mode: ProjectHealthMode,
+    /// Who set the health by hand (`null` in `auto` mode, or when unknown).
+    pub health_set_by: Option<String>,
+    /// RFC 3339: when it was set by hand (`null` in `auto` mode).
+    pub health_set_at: Option<String>,
     /// 0..1: completion ratio, manually set or derived from tickets.
     pub progress: f32,
     pub lead_id: Option<String>,
@@ -419,9 +447,16 @@ pub struct UpdateProjectRequest {
     /// `#RRGGBB`, or `null` to fall back to the derived palette colour.
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub color: Patch<String>,
+    /// Sets the health by hand: the project's `health_mode` becomes
+    /// `manual`, with who and when (W9-H).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional, as = "Option<ProjectHealth>")]
     pub health: Option<String>,
+    /// `auto` hands the health back to the tickets ("Wieder automatisch");
+    /// not together with `health`. `manual` only together with `health`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, as = "Option<ProjectHealthMode>")]
+    pub health_mode: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional, as = "Option<ProjectStatus>")]
     pub status: Option<String>,
@@ -455,6 +490,11 @@ pub struct ProjectExpected {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional, as = "Option<ProjectHealth>")]
     pub health: Option<String>,
+    /// The mode seen. Setting the health by hand or switching back to
+    /// `auto` changes the mode, so its base goes with either.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, as = "Option<ProjectHealthMode>")]
+    pub health_mode: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional, as = "Option<ProjectStatus>")]
     pub status: Option<String>,

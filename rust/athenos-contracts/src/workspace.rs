@@ -11,6 +11,7 @@ use ts_rs::TS;
 use utoipa::ToSchema;
 
 use crate::athenos_ai::AiQualityEngine;
+use crate::project_stats::ProjectHealthRules;
 use crate::ticket_types::TicketTypeColor;
 use crate::work::TicketPriority;
 use crate::{DbEnum, Patch};
@@ -143,6 +144,10 @@ pub struct WorkspaceSettings {
     /// "Bereit zum Test" for `in_review`. `null` = the product's names.
     #[serde(default)]
     pub status_labels: Option<StatusLabels>,
+    /// The thresholds of the projects' automatic health (W9-H); `null` =
+    /// `PROJECT_HEALTH_DEFAULT_RULES`.
+    #[serde(default)]
+    pub project_health: Option<ProjectHealthRules>,
 }
 
 /// The longest status display name, in characters.
@@ -215,6 +220,11 @@ pub struct WorkspaceSettingsPatch {
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     #[schema(value_type = Option<StatusLabels>)]
     pub status_labels: Patch<StatusLabels>,
+    /// Replaces all thresholds at once (each in its bounds, 400 otherwise);
+    /// `null` = the defaults.
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    #[schema(value_type = Option<ProjectHealthRules>)]
+    pub project_health: Patch<ProjectHealthRules>,
 }
 
 /// `PATCH /workspaces/:id`: owners and admins (403 otherwise). An absent

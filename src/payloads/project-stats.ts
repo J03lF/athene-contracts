@@ -12,6 +12,15 @@ export type { ProjectPerson } from '../generated/work/ProjectPerson';
 export type { ProjectStats } from '../generated/work/ProjectStats';
 export type { ProjectStatsQuery } from '../generated/work/ProjectStatsQuery';
 export type { ProjectStatsResponse } from '../generated/work/ProjectStatsResponse';
+// The automatic health (W9-H).
+export type { ProjectHealthState } from '../generated/work/ProjectHealthState';
+export type { ProjectHealthReason } from '../generated/work/ProjectHealthReason';
+export type { ProjectHealthReasonCode } from '../generated/work/ProjectHealthReasonCode';
+export type { ProjectHealthRules } from '../generated/work/ProjectHealthRules';
+export {
+  PROJECT_HEALTH_DEFAULT_RULES,
+  PROJECT_HEALTH_BOUNDS,
+} from '../generated/work/project-health-constants';
 
 /** The most people one project's stats name. */
 export const PROJECT_STATS_MAX_PEOPLE = 8;

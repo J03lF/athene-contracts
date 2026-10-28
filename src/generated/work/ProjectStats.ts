@@ -2,6 +2,7 @@
 import type { CategoryCounts } from "./CategoryCounts";
 import type { DueCounts } from "./DueCounts";
 import type { PointCounts } from "./PointCounts";
+import type { ProjectHealthState } from "./ProjectHealthState";
 import type { ProjectPerson } from "./ProjectPerson";
 
 /**
@@ -38,4 +39,8 @@ done_recently: number,
  * RFC 3339: the last change to any of its tickets; `null` without
  * tickets.
  */
-last_activity_at: string | null, };
+last_activity_at: string | null, 
+/**
+ * Its health (W9-H).
+ */
+health: ProjectHealthState, };
