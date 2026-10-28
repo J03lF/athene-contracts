@@ -3,7 +3,7 @@ import type { AiModelError } from "./AiModelError";
 import type { AiModelState } from "./AiModelState";
 
 /**
- * Athene's own quality model: which package, its state and how fast it
+ * Athenos' own quality model: which package, its state and how fast it
  * answers on this machine.
  */
 export type AiQualityModelStatus = { 

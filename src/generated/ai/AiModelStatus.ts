@@ -12,11 +12,11 @@ import type { AiQualityModelStatus } from "./AiQualityModelStatus";
 export type AiModelStatus = { 
 /**
  * What answers the quality check now (where a workspace chose
- * "Regeln + Athene-Modell").
+ * "Regeln + Athenos-Modell").
  */
 engine: AiEngine, own_model: AiModelState, 
 /**
- * "Athene-Modell: an / aus", as stored.
+ * "Athenos-Modell: an / aus", as stored.
  */
 enabled: boolean, 
 /**

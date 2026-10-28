@@ -7,6 +7,6 @@ export type AskReporterItem = { ticket_id: string,
 /**
  * The text the person confirmed (Markdown, mentions as
  * `[@Name](mention:<id>)`). The server puts the label line
- * "Athene AI · Vorschlag" above it.
+ * "Athenos AI · Vorschlag" above it.
  */
 body: string, };

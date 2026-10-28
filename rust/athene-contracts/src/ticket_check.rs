@@ -575,7 +575,7 @@ pub struct Abstention {
 }
 
 wire_enum! {
-    /// A field Athene AI suggests a value for (triage).
+    /// A field Athenos AI suggests a value for (triage).
     TriageField {
         /// The ticket type's key (`bug`, `feature`, a workspace's own key).
         TicketType = "ticket_type",
@@ -759,7 +759,7 @@ wire_enum! {
 
 wire_enum! {
     /// A criterion's state in the model's own evaluation (the package's
-    /// `scoring.score`, before Athene combines it with the rules).
+    /// `scoring.score`, before Athenos combines it with the rules).
     ModelCriterionState {
         Pass = "pass",
         Fail = "fail",
@@ -1190,7 +1190,7 @@ pub struct AskReporterItem {
     pub ticket_id: String,
     /// The text the person confirmed (Markdown, mentions as
     /// `[@Name](mention:<id>)`). The server puts the label line
-    /// "Athene AI · Vorschlag" above it.
+    /// "Athenos AI · Vorschlag" above it.
     #[validate(length(min = 1, max = 4000))]
     pub body: String,
 }

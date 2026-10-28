@@ -13,7 +13,7 @@ export type AtheneAiWorkspaceResponse = { availability: AtheneAiAvailability,
  */
 enrollment: AiEnrollment | null, 
 /**
- * This week's numbers; `None` while Athene AI is not available here.
+ * This week's numbers; `None` while Athenos AI is not available here.
  */
 stats: AiWeekStats | null, 
 /**

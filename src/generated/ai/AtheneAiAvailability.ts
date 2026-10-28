@@ -3,7 +3,7 @@ import type { AiEnrollmentStatus } from "./AiEnrollmentStatus";
 import type { AiVisibility } from "./AiVisibility";
 
 /**
- * `athene_ai` of the capabilities: whether Athene AI is there for the
+ * `athene_ai` of the capabilities: whether Athenos AI is there for the
  * caller in this workspace, as far as the platform goes. The workspace's
  * and the person's own switches come on top (`ticket_check_*`).
  */

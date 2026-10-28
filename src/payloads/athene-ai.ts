@@ -1,5 +1,5 @@
 /**
- * Athene AI wire types: the platform's visibility (admin console), the
+ * Athenos AI wire types: the platform's visibility (admin console), the
  * beta enrollment of workspaces, and the availability the capabilities
  * carry (`athene_ai`).
  *

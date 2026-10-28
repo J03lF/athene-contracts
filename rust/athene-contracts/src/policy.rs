@@ -1614,7 +1614,7 @@ pub struct CapabilitiesResponse {
     /// The rules' revision (`POLICY_REVISION`); a client holding rules of
     /// another revision reloads them.
     pub policy_revision: u32,
-    /// Whether Athene AI is there for the caller here, as far as the
+    /// Whether Athenos AI is there for the caller here, as far as the
     /// platform goes (`athene_ai`). Not a policy rule: the core fills it in
     /// from the platform's visibility and the workspace's beta enrollment.
     pub athene_ai: AtheneAiAvailability,

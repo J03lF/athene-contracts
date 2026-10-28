@@ -14,14 +14,14 @@ interface ApiEnvelope<T> {
 const unwrap = <T>(envelope: ApiEnvelope<T>): T => envelope.data;
 
 /**
- * Athene AI: a workspace's page and beta enrollment, and the platform
+ * Athenos AI: a workspace's page and beta enrollment, and the platform
  * control in the admin console. Every admin call answers the whole
  * console state.
  */
 export class AtheneAiApiClient {
   constructor(private readonly http: AtheneHttpClient) {}
 
-  /** The workspace's Athene AI page (members). */
+  /** The workspace's Athenos AI page (members). */
   workspace(workspaceId: string): Promise<AtheneAiWorkspaceResponse> {
     return this.http
       .get<ApiEnvelope<AtheneAiWorkspaceResponse>>(`/work/workspaces/${workspaceId}/athene-ai`)

@@ -1,7 +1,7 @@
-//! Athene AI: one brand and one place to control every intelligence
+//! Athenos AI: one brand and one place to control every intelligence
 //! function of Athene. In R1 that is the ticket check (quality hints,
 //! secret protection, "Ähnliche Tickets", local algorithms); Q020 adds
-//! Athene's own local quality model ("Athene AI Beta 0.2.0").
+//! Athenos' own local quality model ("Athenos AI Beta 0.2.0").
 //!
 //! Three levels decide whether it runs, the first one here:
 //!
@@ -81,7 +81,7 @@ macro_rules! ai_enum {
 }
 
 ai_enum! {
-    /// Who sees Athene AI on this instance.
+    /// Who sees Athenos AI on this instance.
     ///
     /// There is no `dev_only`: modules do not learn the host's
     /// `FENRIR_ENV` (the host strips every `FENRIR_*` variable from a
@@ -120,13 +120,13 @@ ai_enum! {
     AiEngine {
         /// The R1 algorithms only.
         AlgorithmsR1 = "algorithms_r1",
-        /// The R1 algorithms plus Athene's own quality model (Q020).
+        /// The R1 algorithms plus Athenos' own quality model (Q020).
         AlgorithmsModel = "algorithms_model",
     }
 }
 
 ai_enum! {
-    /// Athene's own quality model, as the core found it.
+    /// Athenos' own quality model, as the core found it.
     AiModelState {
         /// No package at the configured place (or no place configured).
         NotInstalled = "not_installed",
@@ -142,7 +142,7 @@ ai_enum! {
 }
 
 ai_enum! {
-    /// How a workspace's quality score is decided (Settings → Athene AI,
+    /// How a workspace's quality score is decided (Settings → Athenos AI,
     /// "Qualitätsbewertung"; the workspace setting
     /// `ticket_check_quality_engine`, unset = `rules_model`).
     #[derive(Default)]
@@ -184,7 +184,7 @@ ai_enum! {
     /// Who decides which quality model runs.
     #[derive(Default)]
     AiModelControl {
-        /// The platform admin (Admin → Athene AI, "Athene-Modell").
+        /// The platform admin (Admin → Athenos AI, "Athenos-Modell").
         #[default]
         Admin = "admin",
         /// `ATHENE_QUALITY_MODEL=off`, the hard kill switch: never loaded,
@@ -193,7 +193,7 @@ ai_enum! {
     }
 }
 
-/// `athene_ai` of the capabilities: whether Athene AI is there for the
+/// `athene_ai` of the capabilities: whether Athenos AI is there for the
 /// caller in this workspace, as far as the platform goes. The workspace's
 /// and the person's own switches come on top (`ticket_check_*`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
@@ -223,7 +223,7 @@ impl AtheneAiAvailability {
     };
 }
 
-/// One number pair of this week's Athene AI on a workspace page.
+/// One number pair of this week's Athenos AI on a workspace page.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "ai/")]
 pub struct AiFeatureStat {
@@ -263,7 +263,7 @@ pub struct AtheneAiWorkspaceResponse {
     pub availability: AtheneAiAvailability,
     /// `None` until the workspace first applies or is added.
     pub enrollment: Option<AiEnrollment>,
-    /// This week's numbers; `None` while Athene AI is not available here.
+    /// This week's numbers; `None` while Athenos AI is not available here.
     pub stats: Option<AiWeekStats>,
     /// The platform's quality model, while one is active; `None`: the
     /// workspace's quality check runs on the rules alone.
@@ -292,7 +292,7 @@ pub struct AiWorkspaceRef {
     pub name: String,
 }
 
-/// Athene's own quality model: which package, its state and how fast it
+/// Athenos' own quality model: which package, its state and how fast it
 /// answers on this machine.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, TS)]
 #[ts(export_to = "ai/")]
@@ -396,10 +396,10 @@ pub struct AiModelSwap {
 #[ts(export_to = "ai/")]
 pub struct AiModelStatus {
     /// What answers the quality check now (where a workspace chose
-    /// "Regeln + Athene-Modell").
+    /// "Regeln + Athenos-Modell").
     pub engine: AiEngine,
     pub own_model: AiModelState,
-    /// "Athene-Modell: an / aus", as stored.
+    /// "Athenos-Modell: an / aus", as stored.
     pub enabled: bool,
     /// The admin decides, or the kill switch `ATHENE_QUALITY_MODEL=off`.
     pub control: AiModelControl,
@@ -482,7 +482,7 @@ pub struct UpdateAtheneAiRequest {
     pub visibility: Option<AiVisibility>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub beta_auto_approve: Option<bool>,
-    /// "Athene-Modell: an / aus". Off unloads the model.
+    /// "Athenos-Modell: an / aus". Off unloads the model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_enabled: Option<bool>,
     /// "Aktive Version": an installed version's folder name. A new one is

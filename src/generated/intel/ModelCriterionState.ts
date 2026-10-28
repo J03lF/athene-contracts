@@ -2,6 +2,6 @@
 
 /**
  * A criterion's state in the model's own evaluation (the package's
- * `scoring.score`, before Athene combines it with the rules).
+ * `scoring.score`, before Athenos combines it with the rules).
  */
 export type ModelCriterionState = "pass" | "fail" | "uncertain" | "not_applicable";

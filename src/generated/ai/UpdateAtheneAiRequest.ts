@@ -6,7 +6,7 @@ import type { AiVisibility } from "./AiVisibility";
  */
 export type UpdateAtheneAiRequest = { visibility?: AiVisibility | null, beta_auto_approve?: boolean | null, 
 /**
- * "Athene-Modell: an / aus". Off unloads the model.
+ * "Athenos-Modell: an / aus". Off unloads the model.
  */
 model_enabled?: boolean | null, 
 /**
