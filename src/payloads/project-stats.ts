@@ -3,7 +3,7 @@
  * `workspace_id` or `project_id`. Tickets per status category, points,
  * the people with open work, overdue and due-soon counts, the last change
  * — counted by the server, so an overview never reads the tickets.
- * Generated from `rust/athene-contracts/src/project_stats.rs`.
+ * Generated from `rust/athenos-contracts/src/project_stats.rs`.
  */
 export type { CategoryCounts } from '../generated/work/CategoryCounts';
 export type { DueCounts } from '../generated/work/DueCounts';

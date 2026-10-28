@@ -3,7 +3,7 @@
  * settings, members and invitations.
  *
  * Generated from the Rust contracts in
- * `rust/athene-contracts/src/workspace.rs` by ts-rs; do not add
+ * `rust/athenos-contracts/src/workspace.rs` by ts-rs; do not add
  * hand-written wire shapes here. Below the re-exports: value lists and
  * defaults the client needs at run time, and client helper types.
  */

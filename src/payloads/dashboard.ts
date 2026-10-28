@@ -1,6 +1,6 @@
 /**
  * Dashboard wire types (`/dashboard/*`), generated from
- * `rust/athene-contracts/src/dashboard.rs` by ts-rs. These routes answer
+ * `rust/athenos-contracts/src/dashboard.rs` by ts-rs. These routes answer
  * without the `{ data }` envelope.
  *
  * `FocusTicket.sequence` is the ticket's per-project number; the key

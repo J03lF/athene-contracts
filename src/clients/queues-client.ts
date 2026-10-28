@@ -1,4 +1,4 @@
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 import type {
   CreateQueueRequest,
   DeleteQueueResponse,
@@ -28,7 +28,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
  * workspace).
  */
 export class QueuesApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /** Every queue with its waiting count, `mine` and `can_take`. */
   list(workspaceId: string): Promise<WorkspaceQueuesResponse> {

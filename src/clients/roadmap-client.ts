@@ -1,5 +1,5 @@
 import type { RoadmapQuery, RoadmapResponse } from '../payloads/roadmap';
-import type { AtheneHttpClient, RequestOptions } from '../http';
+import type { AthenosHttpClient, RequestOptions } from '../http';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -15,7 +15,7 @@ interface ApiEnvelope<T> {
  * ticket edit of `WorkApiClient.updateTicket`.
  */
 export class RoadmapApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   roadmap(
     workspaceId: string,

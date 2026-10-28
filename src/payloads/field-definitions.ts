@@ -1,6 +1,6 @@
 /**
  * Custom field-definition wire types, generated from
- * `rust/athene-contracts/src/field_definitions.rs` by ts-rs.
+ * `rust/athenos-contracts/src/field_definitions.rs` by ts-rs.
  *
  * Definitions live per workspace and decorate either tickets or projects.
  * Each ticket carries a `custom_values` JSON object keyed by the

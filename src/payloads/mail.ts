@@ -3,7 +3,7 @@
  * can go out, how it went last) and `POST /admin/mail/test` (a test mail to
  * the signed-in admin).
  *
- * Generated from `rust/athene-contracts/src/mail.rs` by ts-rs.
+ * Generated from `rust/athenos-contracts/src/mail.rs` by ts-rs.
  */
 export type { MailLanguage } from '../generated/mail/MailLanguage';
 export type { MailLastError } from '../generated/mail/MailLastError';

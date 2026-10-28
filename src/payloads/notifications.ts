@@ -4,7 +4,7 @@
  * digests. Routes: `/user/notifications`, `/user/notifications/digests`,
  * `/work/workspaces/{id}/notification-defaults`.
  *
- * Generated from `rust/athene-contracts/src/notifications.rs` by ts-rs.
+ * Generated from `rust/athenos-contracts/src/notifications.rs` by ts-rs.
  */
 export type { AutoWatchDefaultResponse } from '../generated/notifications/AutoWatchDefaultResponse';
 export type { AutoWatchPatch } from '../generated/notifications/AutoWatchPatch';

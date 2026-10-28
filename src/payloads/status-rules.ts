@@ -8,7 +8,7 @@
  * counts `GET /work/workspaces/:id/wip?project_id=`); owners and admins
  * set them (`PUT /work/workspaces/:id/statuses/:status_id/rules`).
  *
- * Generated from `rust/athene-contracts/src/status_rules.rs` by ts-rs; the
+ * Generated from `rust/athenos-contracts/src/status_rules.rs` by ts-rs; the
  * constants below mirror the ones there.
  */
 export type { ApprovalMovers } from '../generated/workflow/ApprovalMovers';

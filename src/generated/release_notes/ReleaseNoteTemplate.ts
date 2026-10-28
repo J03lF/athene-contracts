@@ -34,7 +34,7 @@ other_heading: string | null,
 empty_text: string, internal_fields: ReleaseNoteFields, public_fields: ReleaseNoteFields, 
 /**
  * `https://…` with `{key}` and/or `{id}`, e.g. the app's ticket page
- * (`https://athene.example/app/tickets/{id}`). `null`: no links.
+ * (`https://athenos.example/app/tickets/{id}`). `null`: no links.
  */
 internal_link: string | null, 
 /**

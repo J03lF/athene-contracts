@@ -8,7 +8,7 @@ import type { AiModelState } from "./AiModelState";
  */
 export type AiQualityModelStatus = { 
 /**
- * `athene-quality`.
+ * `athenos-quality`.
  */
 id: string, 
 /**
@@ -17,7 +17,7 @@ id: string,
  */
 version: string, 
 /**
- * The package's contract once read (`athene-quality-onnx-v1`).
+ * The package's contract once read (`athenos-quality-onnx-v1`).
  */
 contract_version: string | null, state: AiModelState, 
 /**
@@ -47,7 +47,7 @@ check_ms: number | null,
 checked_at: string | null, 
 /**
  * `LICENSES.md` and `BASE_LICENSE.txt` ship with the package
- * (`GET /admin/athene-ai/model/licenses`).
+ * (`GET /admin/athenos-ai/model/licenses`).
  */
 licenses: boolean, 
 /**

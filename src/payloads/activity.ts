@@ -1,6 +1,6 @@
 /**
  * Activity feed wire types, generated from
- * `rust/athene-contracts/src/activity.rs` by ts-rs.
+ * `rust/athenos-contracts/src/activity.rs` by ts-rs.
  */
 import type { ActivityAction } from '../generated/activity/ActivityAction';
 import { ACTIVITY_ACTIONS } from '../generated/activity/activity-actions';

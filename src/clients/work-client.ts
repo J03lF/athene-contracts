@@ -55,7 +55,7 @@ import type { TicketWriteResponse } from '../payloads/status-rules';
 import type { Page, TicketSummary, WorkspaceSprintsQuery } from '../payloads/ticket-list';
 import type { ProjectStatsQuery, ProjectStatsResponse } from '../payloads/project-stats';
 import type { TicketChangesResponse } from '../payloads/ticket-changes';
-import type { AtheneHttpClient, RequestOptions } from '../http';
+import type { AthenosHttpClient, RequestOptions } from '../http';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -79,7 +79,7 @@ function perUserQs(q: PerUserListQuery): string {
 }
 
 export class WorkApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   // ---------- Projects ----------
   /** Without `workspace_id`: every workspace the caller belongs to. */

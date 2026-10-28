@@ -1,4 +1,4 @@
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 import type { CapabilitiesResponse } from '../payloads/policy';
 import type { PlaceQuery } from '../payloads/overrides';
 
@@ -21,7 +21,7 @@ export function placeQuery(place: PlaceQuery): string {
 
 /** The caller's permissions, as the server decides them. */
 export class PolicyApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /**
    * Every action's verdict in one workspace (`no-store`: ask again after a

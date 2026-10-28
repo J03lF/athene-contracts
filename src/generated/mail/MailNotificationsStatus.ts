@@ -5,20 +5,20 @@
  */
 export type MailNotificationsStatus = { 
 /**
- * `ATHENE_NOTIFY_EMAIL` is not `off` (the kill switch).
+ * `ATHENOS_NOTIFY_EMAIL` is not `off` (the kill switch).
  */
 email_enabled: boolean, 
 /**
- * The notification job runs (`ATHENE_NOTIFY_INTERVAL_SECONDS` > 0).
+ * The notification job runs (`ATHENOS_NOTIFY_INTERVAL_SECONDS` > 0).
  */
 job_running: boolean, 
 /**
- * What every link in a mail starts with (`ATHENE_APP_URL`).
+ * What every link in a mail starts with (`ATHENOS_APP_URL`).
  */
 app_url: string, 
 /**
  * One person gets at most one immediate mail per this many seconds;
  * what happens meanwhile comes in the next one
- * (`ATHENE_NOTIFY_MIN_GAP_SECONDS`, `0`: no pause).
+ * (`ATHENOS_NOTIFY_MIN_GAP_SECONDS`, `0`: no pause).
  */
 min_gap_seconds: number, };

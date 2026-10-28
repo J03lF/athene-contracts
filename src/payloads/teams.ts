@@ -1,6 +1,6 @@
 /**
  * Teams wire types: named groups of a workspace's members. Generated from
- * `rust/athene-contracts/src/teams.rs` by ts-rs; the limits below mirror
+ * `rust/athenos-contracts/src/teams.rs` by ts-rs; the limits below mirror
  * the constants there.
  *
  * Every response is wrapped as `{ data: … }`. Ids are UUID strings,

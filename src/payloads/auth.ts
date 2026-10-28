@@ -5,7 +5,7 @@ import type { StreamTicket } from '../generated/auth/StreamTicket';
 
 /**
  * Auth wire types. `RegistrationMode`, `FeatureFlagState` and `StreamTicket` are generated
- * from `rust/athene-contracts/src/auth.rs` (ts-rs); the rest is still
+ * from `rust/athenos-contracts/src/auth.rs` (ts-rs); the rest is still
  * hand-written and mirrors that file.
  */
 export type { FeatureFlagState } from '../generated/auth/FeatureFlagState';

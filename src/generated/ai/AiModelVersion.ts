@@ -3,7 +3,7 @@ import type { AiModelCheck } from "./AiModelCheck";
 import type { AiModelError } from "./AiModelError";
 
 /**
- * One installed version below `ATHENE_MODELS_DIR/athene-quality/`, as
+ * One installed version below `ATHENOS_MODELS_DIR/athenos-quality/`, as
  * its metadata says; the weights are never read for the list.
  */
 export type AiModelVersion = { 
@@ -12,11 +12,11 @@ export type AiModelVersion = {
  */
 version: string, 
 /**
- * `contract_version` of `athene_model.json`, once readable.
+ * `contract_version` of `athenos_model.json`, once readable.
  */
 contract_version: string | null, 
 /**
- * The contract is `athene-quality-onnx-v1` and the metadata reads:
+ * The contract is `athenos-quality-onnx-v1` and the metadata reads:
  * the version may be picked.
  */
 supported: boolean, 

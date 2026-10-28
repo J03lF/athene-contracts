@@ -1,4 +1,4 @@
-# Quality gates (Athene quality overhaul, step 1.1).
+# Quality gates (Athenos quality overhaul, step 1.1).
 # Same checks as scripts/ci-local.sh. Release packaging lives in release.yml.
 name: CI
 

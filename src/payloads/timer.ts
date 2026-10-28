@@ -3,7 +3,7 @@
  * the server. `GET /work/timer`, `POST /work/timer/{start,pause,resume,
  * switch,finish,discard}`.
  *
- * Generated from `rust/athene-contracts/src/timer.rs` by ts-rs. Time comes
+ * Generated from `rust/athenos-contracts/src/timer.rs` by ts-rs. Time comes
  * from the server's clock: `elapsed_seconds` is the time counted at the
  * answer's `server_now`; a client ticks from `started_at` and corrects for
  * its own clock with `server_now`.

@@ -2,7 +2,7 @@
  * Work wire types (`/work/*`): projects, tickets, comments, links,
  * watchers, the inbox, sprints, releases, labels, work logs and reports.
  *
- * Generated from the Rust contracts in `rust/athene-contracts/src/work.rs`
+ * Generated from the Rust contracts in `rust/athenos-contracts/src/work.rs`
  * by ts-rs; do not add hand-written wire shapes here. After changing a Rust
  * type, run `npm run generate` and commit `src/generated/`.
  *

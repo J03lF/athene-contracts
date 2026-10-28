@@ -1,23 +1,23 @@
-import { FetchAtheneClient, type AtheneHttpClient } from './http';
+import { FetchAthenosClient, type AthenosHttpClient } from './http';
 import { AuthApiClient } from './clients/auth-client';
 import { UserApiClient } from './clients/user-client';
 import { WorkApiClient } from './clients/work-client';
 import { DashboardApiClient } from './clients/dashboard-client';
 import { ActivityApiClient } from './clients/activity-client';
 
-export interface AtheneClientOptions {
+export interface AthenosClientOptions {
   baseUrl: string;
   token?: string;
 }
 
-export class AtheneClient {
+export class AthenosClient {
   readonly auth: AuthApiClient;
   readonly user: UserApiClient;
   readonly work: WorkApiClient;
   readonly dashboard: DashboardApiClient;
   readonly activity: ActivityApiClient;
 
-  constructor(http: AtheneHttpClient) {
+  constructor(http: AthenosHttpClient) {
     this.auth = new AuthApiClient(http);
     this.user = new UserApiClient(http);
     this.work = new WorkApiClient(http);
@@ -25,12 +25,12 @@ export class AtheneClient {
     this.activity = new ActivityApiClient(http);
   }
 
-  static create(options: AtheneClientOptions): AtheneClient {
+  static create(options: AthenosClientOptions): AthenosClient {
     const headers: Record<string, string> = {};
     if (options.token) {
       headers.Authorization = `Bearer ${options.token}`;
     }
-    const http = new FetchAtheneClient(options.baseUrl, headers);
-    return new AtheneClient(http);
+    const http = new FetchAthenosClient(options.baseUrl, headers);
+    return new AthenosClient(http);
   }
 }

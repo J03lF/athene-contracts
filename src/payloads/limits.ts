@@ -1,5 +1,5 @@
 /**
- * Length limits, generated from `rust/athene-contracts/src/limits.rs`
+ * Length limits, generated from `rust/athenos-contracts/src/limits.rs`
  * (BE-16, step 3.10): the numbers the core checks, for the forms that check
  * first.
  *

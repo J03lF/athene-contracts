@@ -1,7 +1,7 @@
 /**
  * Paged ticket lists (step 3.9): a page, its cursor vocabulary, the summary
  * projection and a ticket's effective due date. Generated from
- * `rust/athene-contracts/src/listing.rs`; see `WorkApiClient.listTicketPage`.
+ * `rust/athenos-contracts/src/listing.rs`; see `WorkApiClient.listTicketPage`.
  */
 export type { CustomFieldFilter } from '../generated/work/CustomFieldFilter';
 export type { CustomFieldOp } from '../generated/work/CustomFieldOp';

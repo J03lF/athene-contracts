@@ -1,4 +1,4 @@
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 import type {
   CreateWorkflowStatusRequest,
   DeleteWorkflowStatusRequest,
@@ -25,7 +25,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
  * `workspace.settings.edit` (owners and admins).
  */
 export class WorkflowApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /** Every status by position, archived ones included; `withUsage` adds `ticket_count`. */
   list(workspaceId: string, withUsage = false): Promise<WorkspaceWorkflowResponse> {

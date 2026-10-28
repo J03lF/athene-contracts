@@ -1,0 +1,94 @@
+[package]
+name = "athenos-service-kit"
+version = "0.1.0"
+edition = "2021"
+description = "Shared cross-cutting behaviour of the Athenos Rust services (layers, clients, config)"
+license = "MIT OR Apache-2.0"
+authors = ["Athenos Team"]
+
+# Roadmap step 3.6 (Q-056 / BE-14): what every Athenos service needs at its
+# edge lives here once — bind address and secret files, client IP, rate
+# limits, request ids, service-to-service auth, the signed principal, the
+# upstream client to the host gateway, the outbound (SSRF-guarded) client,
+# tracing and graceful shutdown, `body_fault`. Modules take it like
+# `athenos-contracts`: a git dependency on this repo, patched to the local
+# checkout (`[patch."https://github.com/J03lF/athenos-contracts.git"]`).
+#
+# The layers are plain tower layers over `http` types, so they work with
+# axum 0.7 (athenos) and 0.8 (everyone else) alike; only the `ClientIp`
+# extractor needs axum itself (features `axum` / `axum07`).
+
+[dependencies]
+bytes = "1"
+http = "1"
+# `SlotBody`: a response body that holds a stream's concurrency slot.
+http-body = "1"
+tower = { version = "0.5", default-features = false }
+tokio = { version = "1.41", features = ["time", "sync", "net", "signal", "rt", "macros"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["raw_value"] }
+uuid = { version = "1.11", features = ["v4"] }
+sha2 = "0.10"
+hmac = "0.12"
+subtle = "2.6"
+base64 = "0.22"
+thiserror = "2.0"
+url = "2.5"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "http2", "charset"] }
+
+# `ClientIp` as an extractor.
+axum = { version = "0.8", default-features = false, features = ["tokio"], optional = true }
+axum07 = { package = "axum", version = "0.7", default-features = false, features = ["tokio"], optional = true }
+async-trait = { version = "0.1.89", optional = true }
+
+# OpenTelemetry export from `observability::init` (the same stack the modules
+# used to set up themselves).
+opentelemetry = { version = "0.28", optional = true }
+opentelemetry_sdk = { version = "0.28", features = ["rt-tokio"], optional = true }
+opentelemetry-otlp = { version = "0.28", features = ["grpc-tonic"], optional = true }
+tracing-opentelemetry = { version = "0.29", optional = true }
+
+[features]
+default = []
+axum = ["dep:axum"]
+axum07 = ["dep:axum07", "dep:async-trait"]
+otel = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
+
+[dev-dependencies]
+tokio = { version = "1.41", features = ["full"] }
+tower = { version = "0.5", features = ["util"] }
+axum = { version = "0.8", features = ["macros"] }
+http-body-util = "0.1"
+
+# Lint policy (Athenos quality overhaul, step 1.1): the same block as in
+# every Athenos Rust crate.
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+unchecked_duration_subtraction = "warn"
+cast_possible_truncation = "warn"
+cast_possible_wrap = "warn"
+cast_sign_loss = "warn"
+checked_conversions = "warn"
+invalid_upcast_comparisons = "warn"
+ignored_unit_patterns = "warn"
+match_wildcard_for_single_variants = "warn"
+manual_assert = "warn"
+maybe_infinite_iter = "warn"
+same_functions_in_if_condition = "warn"
+large_futures = "warn"
+large_stack_arrays = "warn"
+implicit_clone = "warn"
+cloned_instead_of_copied = "warn"
+option_option = "deny"

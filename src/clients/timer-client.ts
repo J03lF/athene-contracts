@@ -6,7 +6,7 @@ import type {
   TimerStateResponse,
   TimerWriteRequest,
 } from '../payloads/timer';
-import type { AtheneHttpClient, RequestOptions } from '../http';
+import type { AthenosHttpClient, RequestOptions } from '../http';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -27,7 +27,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
  * time tracking off every route is `403 ATH-FEAT-001`.
  */
 export class TimerApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /** The caller's timer (or `null`) and the server's clock. */
   get(options: RequestOptions = {}): Promise<TimerStateResponse> {

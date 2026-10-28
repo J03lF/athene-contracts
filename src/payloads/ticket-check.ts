@@ -2,7 +2,7 @@
  * Ticket check wire types (intel layer R1): quality hints, the secret
  * scanner and "Ähnliche Tickets" while a ticket is written.
  *
- * Generated from `rust/athene-contracts/src/ticket_check.rs` by ts-rs.
+ * Generated from `rust/athenos-contracts/src/ticket_check.rs` by ts-rs.
  * The server sends no sentences (except the writing assistance, whose
  * questions are the model package's own texts): render `ticket_check.rule.<rule>.*`,
  * `ticket_check.reason.<code>` and `ticket_check.secret.<kind>`. A

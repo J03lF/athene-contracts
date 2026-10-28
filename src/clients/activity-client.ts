@@ -1,5 +1,5 @@
 import type { ActivityEventResponse } from '../payloads/activity';
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -10,7 +10,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
 }
 
 export class ActivityApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /** Workspace-wide feed, newest first. */
   listWorkspace(workspaceId: string, limit = 20): Promise<ActivityEventResponse[]> {

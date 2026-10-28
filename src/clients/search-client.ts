@@ -1,4 +1,4 @@
-import type { AtheneHttpClient, RequestOptions } from '../http';
+import type { AthenosHttpClient, RequestOptions } from '../http';
 import type { SearchTicketsQuery, TicketSearchResponse } from '../payloads/search';
 
 interface ApiEnvelope<T> {
@@ -7,7 +7,7 @@ interface ApiEnvelope<T> {
 
 /** Ticket and doc search in one workspace (3.9). */
 export class SearchApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /**
    * Tickets of the workspace matching `query.q` (full text, typo-tolerant

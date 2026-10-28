@@ -4,7 +4,7 @@ import type {
   TicketTypeResponse,
   UpdateTicketTypeRequest,
 } from '../payloads/ticket-types';
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -21,7 +21,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
  * the caller cannot see answers 403, whether or not it exists.
  */
 export class TicketTypesApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /** Ordered by `position`. Live types only unless `include_archived`. */
   list(workspaceId: string, query: ListTicketTypesQuery = {}): Promise<TicketTypeResponse[]> {

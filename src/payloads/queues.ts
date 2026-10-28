@@ -5,7 +5,7 @@
  * atomically (`409 ATH-RES-005` when someone was faster) or hands it back
  * to the person it came from, with a comment.
  *
- * Generated from `rust/athene-contracts/src/queues.rs` by ts-rs.
+ * Generated from `rust/athenos-contracts/src/queues.rs` by ts-rs.
  */
 export type { CreateQueueRequest } from '../generated/queues/CreateQueueRequest';
 export type { DeleteQueueResponse } from '../generated/queues/DeleteQueueResponse';

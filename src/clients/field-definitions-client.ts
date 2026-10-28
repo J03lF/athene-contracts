@@ -6,7 +6,7 @@ import type {
   ReorderFieldDefinitionsRequest,
   UpdateFieldDefinitionRequest,
 } from '../payloads/field-definitions';
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -26,7 +26,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
  * is deleted only from the archive.
  */
 export class FieldDefinitionsApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /**
    * All definitions for a workspace, ordered by (applies_to, position, key);

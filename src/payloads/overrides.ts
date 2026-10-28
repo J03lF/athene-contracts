@@ -3,7 +3,7 @@
  * docs area, or the workspace — a role or a team says allow, deny or
  * inherit per permission (`/workspaces/:workspace_id/overrides`).
  *
- * Generated types from `rust/athene-contracts/src/overrides.rs` by ts-rs,
+ * Generated types from `rust/athenos-contracts/src/overrides.rs` by ts-rs,
  * and the resolution itself as a TypeScript port of `overrides::resolve`
  * and `overrides::resolve_traced`, held to the same cases as the Rust one
  * (`OVERRIDE_CASES`, `src/generated/policy/override-cases.json`).

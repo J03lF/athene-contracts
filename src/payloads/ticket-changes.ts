@@ -4,7 +4,7 @@
  * the same as server-sent events at `ticketStreamPath(workspaceId)`
  * (open with a stream ticket). A change names the ticket and its version,
  * never its content; one may come twice. Generated from
- * `rust/athene-contracts/src/ticket_changes.rs`.
+ * `rust/athenos-contracts/src/ticket_changes.rs`.
  */
 export type { TicketChange } from '../generated/work/TicketChange';
 export type { TicketChangedEvent } from '../generated/work/TicketChangedEvent';

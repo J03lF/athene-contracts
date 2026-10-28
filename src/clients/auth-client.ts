@@ -17,10 +17,10 @@ import type {
   SessionListResponse,
   StreamTicketResponse,
 } from '../payloads/auth';
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 
 export class AuthApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   login(request: LoginRequest): Promise<AuthChallengeResponse> {
     return this.http.post('/auth/login/request', request);

@@ -8,7 +8,7 @@ import type {
   TeamRole,
   UpdateTeamRequest,
 } from '../payloads/teams';
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -26,7 +26,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
  * admins manage; anyone may leave a team (`removeMember` with their own id).
  */
 export class TeamsApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /** By name. Members are a preview (`TEAM_MEMBER_PREVIEW`); see `member_count`. */
   list(workspaceId: string, query: TeamListQuery = {}): Promise<TeamResponse[]> {

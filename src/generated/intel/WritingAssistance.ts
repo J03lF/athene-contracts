@@ -11,7 +11,7 @@ import type { QualityCriterion } from "./QualityCriterion";
  */
 export type WritingAssistance = { 
 /**
- * `athene-quality-assistance-v1`.
+ * `athenos-quality-assistance-v1`.
  */
 contract_version: string, 
 /**

@@ -3,7 +3,7 @@
  * order, intro/outro and an editable draft per variant (internal, public),
  * and a "Release-Notiz" per ticket. Markdown, and HTML by an allowlist.
  *
- * Generated from `rust/athene-contracts/src/release_notes.rs` by ts-rs.
+ * Generated from `rust/athenos-contracts/src/release_notes.rs` by ts-rs.
  */
 export type { ExclusionOps } from '../generated/release_notes/ExclusionOps';
 export type { ExclusionScope } from '../generated/release_notes/ExclusionScope';

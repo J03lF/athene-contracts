@@ -1,7 +1,7 @@
 /**
  * Admin wire types (`/admin/*`, `/maintenance/status`).
  *
- * Generated from the Rust contracts in `rust/athene-contracts/src/admin.rs`
+ * Generated from the Rust contracts in `rust/athenos-contracts/src/admin.rs`
  * by ts-rs; do not add hand-written shapes here. After changing a Rust type,
  * run `npm run generate` and commit `src/generated/`.
  *

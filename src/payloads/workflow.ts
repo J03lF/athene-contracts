@@ -9,7 +9,7 @@
  * (`workspace.settings.edit`). Per project a status can be hidden: not
  * offered there, but tickets already in it still show.
  *
- * Generated from `rust/athene-contracts/src/workflow.rs` by ts-rs; the
+ * Generated from `rust/athenos-contracts/src/workflow.rs` by ts-rs; the
  * constants below mirror the ones there.
  */
 import type { StatusCategory } from '../generated/workflow/StatusCategory';

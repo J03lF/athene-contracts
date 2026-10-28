@@ -2,7 +2,7 @@
  * Where a ticket field applies (custom fields wave 3, CF1): rules per
  * team, ticket type and project, fields of one ticket, suggestions, and
  * the resolution — generated types from
- * `rust/athene-contracts/src/field_assignments.rs` by ts-rs, and
+ * `rust/athenos-contracts/src/field_assignments.rs` by ts-rs, and
  * `resolveFields`, a TypeScript port of `field_assignments::resolve_fields`
  * held to the same cases as the Rust one (`FIELD_RESOLUTION_CASES`,
  * `src/generated/field_definitions/field-resolution.json`).

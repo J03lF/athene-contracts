@@ -3,7 +3,7 @@
  * authorises, the permissions roles are made of, the standing model and
  * the capabilities answer (`GET /work/workspaces/:workspace_id/capabilities`).
  *
- * Generated from `rust/athene-contracts/src/policy.rs` by ts-rs. The rules
+ * Generated from `rust/athenos-contracts/src/policy.rs` by ts-rs. The rules
  * themselves live there once (`allows`); their verdicts for a fixed set of
  * subjects are rendered to `src/generated/policy/policy-matrix.json`, which
  * the web tests its loading fallback against.

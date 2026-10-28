@@ -1,6 +1,6 @@
 /**
  * Attachments of tickets and comments (W4-B), generated from
- * `rust/athene-contracts/src/attachments.rs`. Upload: the raw file as the
+ * `rust/athenos-contracts/src/attachments.rs`. Upload: the raw file as the
  * body of `POST /api/v1/work/tickets/{id}/attachments` (or
  * `…/comments/{comment_id}/attachments`), its name in
  * {@link ATTACHMENT_NAME_HEADER}; download: `GET …/attachments/{attachment_id}/content`.

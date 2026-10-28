@@ -2,7 +2,7 @@
  * Conflict-aware edits (step 3.7, `CONFLICTS.md`): set operations, the
  * long-text hash and the `details` of a `409` `ATH-RES-003`.
  *
- * Generated from `rust/athene-contracts/src/edit.rs` by ts-rs; do not add
+ * Generated from `rust/athenos-contracts/src/edit.rs` by ts-rs; do not add
  * hand-written wire shapes here.
  */
 export type { ChangedBy } from '../generated/edit/ChangedBy';

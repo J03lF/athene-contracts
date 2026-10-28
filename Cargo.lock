@@ -60,7 +60,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "athene-contracts"
+name = "athenos-contracts"
 version = "0.1.0"
 dependencies = [
  "chrono",
@@ -73,7 +73,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "athene-service-kit"
+name = "athenos-service-kit"
 version = "0.1.0"
 dependencies = [
  "async-trait",

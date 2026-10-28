@@ -2,7 +2,7 @@
 import type { AttachmentKind } from "./AttachmentKind";
 
 /** The request header of an upload that carries the file name (UTF-8, percent-encoded). */
-export const ATTACHMENT_NAME_HEADER = 'x-athene-file-name';
+export const ATTACHMENT_NAME_HEADER = 'x-athenos-file-name';
 
 /** The types the server accepts (sniffed from the bytes), with their extensions. */
 export const ATTACHMENT_TYPES: ReadonlyArray<{ contentType: string; kind: AttachmentKind; extensions: readonly string[]; inline: boolean }> = [

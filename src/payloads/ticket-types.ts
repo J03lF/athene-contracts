@@ -1,6 +1,6 @@
 /**
  * Ticket-type wire types: the configurable kinds of ticket per workspace.
- * Generated from `rust/athene-contracts/src/ticket_types.rs` by ts-rs; the
+ * Generated from `rust/athenos-contracts/src/ticket_types.rs` by ts-rs; the
  * value lists below mirror the constants there.
  *
  * Every response is wrapped as `{ data: … }`. Ids are UUID strings,

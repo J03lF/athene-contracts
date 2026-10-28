@@ -1,6 +1,6 @@
 /**
  * Docs wire types: a workspace's markdown pages and the collections that
- * group them. Generated from `rust/athene-contracts/src/docs.rs` by ts-rs;
+ * group them. Generated from `rust/athenos-contracts/src/docs.rs` by ts-rs;
  * the limits below mirror the constants there.
  *
  * Every response is wrapped as `{ data: … }`; the page list adds

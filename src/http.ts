@@ -4,7 +4,7 @@
  */
 export type RequestOptions = Pick<RequestInit, 'signal'>;
 
-export interface AtheneHttpClient {
+export interface AthenosHttpClient {
   get<T>(path: string, config?: RequestInit): Promise<T>;
   post<T>(path: string, body?: unknown, config?: RequestInit): Promise<T>;
   patch<T>(path: string, body?: unknown, config?: RequestInit): Promise<T>;
@@ -12,7 +12,7 @@ export interface AtheneHttpClient {
   delete<T>(path: string, config?: RequestInit): Promise<T>;
 }
 
-export class FetchAtheneClient implements AtheneHttpClient {
+export class FetchAthenosClient implements AthenosHttpClient {
   constructor(private readonly baseUrl: string, private readonly defaultHeaders: HeadersInit = {}) {}
 
   get<T>(path: string, config: RequestInit = {}): Promise<T> {
@@ -49,7 +49,7 @@ export class FetchAtheneClient implements AtheneHttpClient {
       ...config,
     });
     if (!response.ok) {
-      throw await AtheneHttpError.fromResponse(response);
+      throw await AthenosHttpError.fromResponse(response);
     }
     if (response.status === 204) {
       return undefined as T;
@@ -58,18 +58,18 @@ export class FetchAtheneClient implements AtheneHttpClient {
   }
 }
 
-export class AtheneHttpError extends Error {
+export class AthenosHttpError extends Error {
   constructor(readonly status: number, message: string, readonly details?: unknown) {
     super(message);
   }
 
-  static async fromResponse(response: Response): Promise<AtheneHttpError> {
+  static async fromResponse(response: Response): Promise<AthenosHttpError> {
     try {
       const payload = await response.json();
       const message = payload?.error?.message || payload?.message || response.statusText;
-      return new AtheneHttpError(response.status, message, payload);
+      return new AthenosHttpError(response.status, message, payload);
     } catch {
-      return new AtheneHttpError(response.status, response.statusText);
+      return new AthenosHttpError(response.status, response.statusText);
     }
   }
 }

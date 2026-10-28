@@ -4,7 +4,7 @@ import type {
   FocusTicket,
   KpisResponse,
 } from '../payloads/dashboard';
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 
 export interface DashboardScopeQuery {
   /** Only this workspace (403 for a non-member). */
@@ -17,7 +17,7 @@ export interface FocusQuery extends DashboardScopeQuery {
 }
 
 export class DashboardApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   overview(workspaceId: string): Promise<DashboardOverviewResponse> {
     return this.http.get(`/dashboard/overview?workspace_id=${encodeURIComponent(workspaceId)}`);

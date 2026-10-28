@@ -9,7 +9,7 @@ import type {
   UpdateFieldAssignmentRequest,
 } from '../payloads/field-assignments';
 import type { TicketResponse } from '../payloads/work';
-import type { AtheneHttpClient, RequestOptions } from '../http';
+import type { AthenosHttpClient, RequestOptions } from '../http';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -30,7 +30,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
  * - Suggest: `field.suggest` on the ticket; accept/decline like a rule.
  */
 export class FieldAssignmentsApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   list(workspaceId: string, options: RequestOptions = {}): Promise<FieldAssignmentResponse[]> {
     return this.http

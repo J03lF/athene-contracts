@@ -3,4 +3,4 @@
 /**
  * What the secret scanner looks for (CONCEPT 2.4).
  */
-export type SecretKind = "secret.private_key" | "secret.cloud_key" | "secret.vcs_token" | "secret.service_token" | "secret.athene_api_key" | "secret.athene_invite" | "secret.jwt" | "secret.auth_header" | "secret.url_credentials" | "secret.password_assignment" | "secret.high_entropy" | "pii.iban" | "pii.card" | "pii.tax_id_de" | "pii.email" | "pii.phone";
+export type SecretKind = "secret.private_key" | "secret.cloud_key" | "secret.vcs_token" | "secret.service_token" | "secret.athenos_api_key" | "secret.athenos_invite" | "secret.jwt" | "secret.auth_header" | "secret.url_credentials" | "secret.password_assignment" | "secret.high_entropy" | "pii.iban" | "pii.card" | "pii.tax_id_de" | "pii.email" | "pii.phone";

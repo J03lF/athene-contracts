@@ -7,7 +7,7 @@ import type {
   OccurrenceDelete,
   OccurrenceEdit,
 } from '../payloads/calendar';
-import type { AtheneHttpClient, RequestOptions } from '../http';
+import type { AthenosHttpClient, RequestOptions } from '../http';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -32,7 +32,7 @@ function windowQuery(query: CalendarWindowQuery): string {
  * `ATH-RES-003` with the event as it is now in `details.current`.
  */
 export class CalendarApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /** Events overlapping the window (`from`/`to` are days, both included). */
   listEvents(

@@ -4,7 +4,7 @@
  * the sprint and release bands, `GET|POST /work/workspaces/:id/events`, `PATCH|DELETE
  * /work/events/:id`, `GET /work/workspaces/:id/calendar`.
  *
- * Generated from `rust/athene-contracts/src/calendar.rs` by ts-rs. An
+ * Generated from `rust/athenos-contracts/src/calendar.rs` by ts-rs. An
  * all-day event carries dates (`start_day`/`end_day`, both included), a
  * timed one instants (`starts_at`/`ends_at`).
  */

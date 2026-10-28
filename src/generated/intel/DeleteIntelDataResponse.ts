@@ -5,6 +5,6 @@
  */
 export type DeleteIntelDataResponse = { 
 /**
- * Rows removed over every `athene_intel_*` table.
+ * Rows removed over every `athenos_intel_*` table.
  */
 deleted: number, };

@@ -20,7 +20,7 @@ engine: AiEngine, own_model: AiModelState,
  */
 enabled: boolean, 
 /**
- * The admin decides, or the kill switch `ATHENE_QUALITY_MODEL=off`.
+ * The admin decides, or the kill switch `ATHENOS_QUALITY_MODEL=off`.
  */
 control: AiModelControl, 
 /**
@@ -33,8 +33,8 @@ selected_version: string,
  */
 version_picked: boolean, 
 /**
- * "Startwert aus Konfiguration": `ATHENE_QUALITY_MODEL` other than
- * `off` (`athene-quality/0.4.1-beta3`), used while nothing is picked;
+ * "Startwert aus Konfiguration": `ATHENOS_QUALITY_MODEL` other than
+ * `off` (`athenos-quality/0.4.1-beta3`), used while nothing is picked;
  * `None`: the built-in `0.2.0-beta1`.
  */
 env_default: string | null, 

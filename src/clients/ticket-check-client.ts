@@ -1,4 +1,4 @@
-import type { AtheneHttpClient, RequestOptions } from '../http';
+import type { AthenosHttpClient, RequestOptions } from '../http';
 import type {
   AskReporterRequest,
   AskReporterResponse,
@@ -23,7 +23,7 @@ const unwrap = <T>(envelope: ApiEnvelope<T>): T => envelope.data;
 
 /** The ticket check: check a draft, record decisions, forget what was learned. */
 export class TicketCheckApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /** Checks a draft; stores nothing. */
   check(workspaceId: string, body: TicketCheckRequest): Promise<TicketCheckResponse> {

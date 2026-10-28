@@ -1,4 +1,4 @@
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 import type {
   CreateInviteRequest,
   InvitationResponse,
@@ -19,7 +19,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
 
 /** Workspace and membership endpoints. */
 export class WorkspaceApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   listWorkspaces(): Promise<WorkspaceResponse[]> {
     return this.http.get<ApiEnvelope<WorkspaceResponse[]>>('/workspaces').then(unwrap);

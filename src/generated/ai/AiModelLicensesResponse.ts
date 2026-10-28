@@ -2,7 +2,7 @@
 import type { AiLicenseFile } from "./AiLicenseFile";
 
 /**
- * `GET /admin/athene-ai/model/licenses`: the licence files shipped next
+ * `GET /admin/athenos-ai/model/licenses`: the licence files shipped next
  * to the model, as they are on disk.
  */
 export type AiModelLicensesResponse = { version: string, files: Array<AiLicenseFile>, };

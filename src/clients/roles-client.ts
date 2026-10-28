@@ -1,4 +1,4 @@
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 import type {
   PlaceQuery,
   SetOverrideRequest,
@@ -36,7 +36,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
  * the workspace's `roles_epoch`, so capabilities held elsewhere reload.
  */
 export class RolesApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /** The roles by position, the templates, and an owner's one-time notice. */
   list(workspaceId: string): Promise<WorkspaceRolesResponse> {

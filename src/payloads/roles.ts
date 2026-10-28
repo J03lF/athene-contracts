@@ -6,7 +6,7 @@
  * can be edited but not deleted, a guest role holds at most
  * `GUEST_CEILING`.
  *
- * Generated from `rust/athene-contracts/src/roles.rs` by ts-rs.
+ * Generated from `rust/athenos-contracts/src/roles.rs` by ts-rs.
  */
 export type { AddMemberRoleRequest } from '../generated/roles/AddMemberRoleRequest';
 export type { AnswerRolesNoticeRequest } from '../generated/roles/AnswerRolesNoticeRequest';

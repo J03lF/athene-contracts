@@ -1,7 +1,7 @@
 /**
  * User wire types (`/user/settings`, `/user/profile`).
  *
- * Generated from the Rust contracts in `rust/athene-contracts/src/user.rs`
+ * Generated from the Rust contracts in `rust/athenos-contracts/src/user.rs`
  * by ts-rs; do not add hand-written wire shapes here. After changing a Rust
  * type, run `npm run generate` and commit `src/generated/`.
  *

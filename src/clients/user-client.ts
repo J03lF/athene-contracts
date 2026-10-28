@@ -4,7 +4,7 @@ import type {
   UserProfileResponse,
   UserSettingsResponse,
 } from '../payloads/user';
-import type { AtheneHttpClient, RequestOptions } from '../http';
+import type { AthenosHttpClient, RequestOptions } from '../http';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -16,7 +16,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
 
 /** The signed-in person's settings row and profile (`/user/*`). */
 export class UserApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   getSettings(init: RequestOptions = {}): Promise<UserSettingsResponse> {
     return this.http

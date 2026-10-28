@@ -1,4 +1,4 @@
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 import type {
   SetStatusRulesRequest,
   SetStatusRulesResponse,
@@ -20,7 +20,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
  * `workspace.settings.edit` (owners and admins).
  */
 export class StatusRulesApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   /** Every rule of the workspace: its own first, then the projects'. */
   list(workspaceId: string): Promise<WorkflowRulesResponse> {

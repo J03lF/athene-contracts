@@ -9,7 +9,7 @@ import type {
   UpdateDocCollectionRequest,
   UpdateDocRequest,
 } from '../payloads/docs';
-import type { AtheneHttpClient } from '../http';
+import type { AthenosHttpClient } from '../http';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -27,7 +27,7 @@ function unwrap<T>(envelope: ApiEnvelope<T>): T {
  * author's or a workspace owner's/admin's; everything else is any member's.
  */
 export class DocsApiClient {
-  constructor(private readonly http: AtheneHttpClient) {}
+  constructor(private readonly http: AthenosHttpClient) {}
 
   listCollections(workspaceId: string): Promise<DocCollectionResponse[]> {
     return this.http

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Local run of the CI quality gates (.github/workflows/ci.yml), step 1.1 of the
-# Athene quality overhaul. Works without any push: siblings are resolved from
+# Athenos quality overhaul. Works without any push: siblings are resolved from
 # the local tree through the same ../../ path patches CI recreates.
 #
 #   scripts/ci-local.sh            all gates
@@ -40,7 +40,7 @@ check_sibling() {
   fi
 }
 check_sibling MODULE_KIT_SHA ../../module-kit
-check_sibling CONTRACTS_SHA ../../athene-contracts
+check_sibling CONTRACTS_SHA ../../athenos-contracts
 
 for gate in "${gates[@]}"; do
   case $gate in

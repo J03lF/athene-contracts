@@ -19,7 +19,7 @@ engine: ReviewEngine,
  */
 unavailable: AssistanceUnavailable | null, 
 /**
- * `athene-quality-assistance-v1` with the model, else `None`.
+ * `athenos-quality-assistance-v1` with the model, else `None`.
  */
 contract_version: string | null, model_version: string | null, policy_version: string | null, 
 /**

@@ -1,4 +1,4 @@
-# Clippy configuration (Athene quality overhaul, step 1.1).
+# Clippy configuration (Athenos quality overhaul, step 1.1).
 # The lint levels live in Cargo.toml [lints]; this file only tunes them.
 # Tests may unwrap/expect/panic/print: a failing test should fail loudly,
 # and threading Result through every assertion adds noise, not safety.
