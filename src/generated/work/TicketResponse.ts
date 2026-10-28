@@ -46,7 +46,13 @@ adhoc_field_ids: Array<string>,
 /**
  * Planning estimate, 0..1000.
  */
-story_points: number | null, triage_category: string | null, triage_reason: string | null, triaged_at: string | null, first_response_at: string | null, resolved_at: string | null, due_date: string | null, sla_breached: boolean, 
+story_points: number | null, triage_category: string | null, triage_reason: string | null, triaged_at: string | null, first_response_at: string | null, resolved_at: string | null, due_date: string | null, 
+/**
+ * When work on the ticket is planned to begin (W7-R, the roadmap):
+ * RFC 3339, like `due_date`. `null` when it has none; absent from an
+ * older core.
+ */
+start_date?: string | null, sla_breached: boolean, 
 /**
  * Custom field values keyed by `FieldDefinition.key`. Validated against
  * the workspace's definitions before persistence; unknown keys are

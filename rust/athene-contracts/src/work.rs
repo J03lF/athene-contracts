@@ -523,6 +523,12 @@ pub struct TicketResponse {
     pub first_response_at: Option<String>,
     pub resolved_at: Option<String>,
     pub due_date: Option<String>,
+    /// When work on the ticket is planned to begin (W7-R, the roadmap):
+    /// RFC 3339, like `due_date`. `null` when it has none; absent from an
+    /// older core.
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub start_date: Option<String>,
     pub sla_breached: bool,
     /// Custom field values keyed by `FieldDefinition.key`. Validated against
     /// the workspace's definitions before persistence; unknown keys are
@@ -642,6 +648,10 @@ pub struct UpdateTicketRequest {
     /// RFC 3339 timestamp, or `null` to clear.
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub due_date: Patch<String>,
+    /// The planned start (W7-R), RFC 3339, or `null` to clear. Not after
+    /// the due date the ticket has with this patch applied (400).
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub start_date: Patch<String>,
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub story_points: Patch<i32>,
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
@@ -709,6 +719,8 @@ pub struct TicketExpected {
     pub assignee_id: Patch<String>,
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub due_date: Patch<String>,
+    #[serde(default, skip_serializing_if = "Patch::is_absent")]
+    pub start_date: Patch<String>,
     #[serde(default, skip_serializing_if = "Patch::is_absent")]
     pub story_points: Patch<i32>,
     #[serde(default, skip_serializing_if = "Patch::is_absent")]

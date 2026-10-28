@@ -19,7 +19,12 @@ export type UpdateTicketRequest = { title?: string, description?: string, ticket
 /**
  * RFC 3339 timestamp, or `null` to clear.
  */
-due_date?: string | null, story_points?: number | null, parent_ticket_id?: string | null, 
+due_date?: string | null, 
+/**
+ * The planned start (W7-R), RFC 3339, or `null` to clear. Not after
+ * the due date the ticket has with this patch applied (400).
+ */
+start_date?: string | null, story_points?: number | null, parent_ticket_id?: string | null, 
 /**
  * The release the ticket ships in; `null` takes it out of any.
  */

@@ -24,6 +24,7 @@ pub mod persistence;
 pub mod policy;
 pub mod queues;
 pub mod release_notes;
+pub mod roadmap;
 pub mod roles;
 pub mod search;
 pub mod status_rules;
