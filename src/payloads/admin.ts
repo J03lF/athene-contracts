@@ -25,3 +25,5 @@ export type { AuditEntryResponse } from '../generated/admin/AuditEntryResponse';
 export type { CacheRefreshResponse } from '../generated/admin/CacheRefreshResponse';
 export type { OverviewCounts } from '../generated/admin/OverviewCounts';
 export type { OverviewResponse } from '../generated/admin/OverviewResponse';
+export type { AnnouncementMailRequest } from '../generated/admin/AnnouncementMailRequest';
+export type { AnnouncementMailResponse } from '../generated/admin/AnnouncementMailResponse';

@@ -2,6 +2,7 @@
 //!
 //! Shared DTOs that backend services and clients agree on.
 
+pub mod account;
 pub mod activity;
 pub mod admin;
 pub mod athenos_ai;
@@ -14,6 +15,7 @@ pub mod docs;
 pub mod edit;
 pub mod field_assignments;
 pub mod field_definitions;
+pub mod legal;
 pub mod limits;
 pub mod listing;
 pub mod mail;

@@ -179,6 +179,40 @@ pub struct UpdateSettingsRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(as = "Option<String>")]
     pub maintenance_until: Option<DateTime<Utc>>,
+    /// Absolute session lifetime in days, `1..=90`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[validate(range(min = 1, max = 90))]
+    pub session_max_days: Option<u32>,
+    /// Days without use before a session ends, `1..=90` and at most
+    /// `session_max_days` (the stored one when that is absent): else `400`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[validate(range(min = 1, max = 90))]
+    pub session_idle_days: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub beta_banner_enabled: Option<bool>,
+    /// `^[A-Za-z0-9._-]{1,32}$`; a new value asks everyone to consent again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[validate(length(min = 1, max = 32))]
+    pub legal_version: Option<String>,
+    /// At most 200 characters; `""` clears it (the pages show
+    /// `[HOSTER, LAND]`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[validate(length(max = 200))]
+    pub legal_hoster: Option<String>,
+    /// `YYYY-MM-DD`; `""` clears it (the pages show `[DATUM]`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[validate(length(max = 10))]
+    pub legal_effective_date: Option<String>,
+    /// Workspaces a person may own; `0` = unlimited.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quota_workspaces_per_account: Option<u32>,
+    /// Attachment megabytes over all workspaces a person owns; `0` =
+    /// unlimited.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quota_storage_mb_per_account: Option<u32>,
+    /// Tickets a person creates per rolling 24 hours; `0` = unlimited.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quota_tickets_per_day: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, TS)]
@@ -197,6 +231,22 @@ pub struct SettingsResponse {
     pub updated_at: String,
     /// Id of the admin who last changed the settings.
     pub updated_by: Option<String>,
+    /// Absolute session lifetime in days (auth-service reads it).
+    pub session_max_days: u32,
+    /// Days without use before a session ends.
+    pub session_idle_days: u32,
+    pub beta_banner_enabled: bool,
+    /// The legal texts' version people consent to.
+    pub legal_version: String,
+    pub legal_hoster: Option<String>,
+    /// `YYYY-MM-DD`.
+    pub legal_effective_date: Option<String>,
+    /// `0` = unlimited.
+    pub quota_workspaces_per_account: u32,
+    /// `0` = unlimited.
+    pub quota_storage_mb_per_account: u32,
+    /// `0` = unlimited.
+    pub quota_tickets_per_day: u32,
 }
 
 /// Public maintenance status (`GET /maintenance/status` and its stream).
@@ -245,6 +295,40 @@ pub struct CacheRefreshResponse {
     pub settings_refreshed: bool,
     pub feature_flags_refreshed: bool,
     pub sla_updates: u64,
+}
+
+// ---------------------------------------------------------------------------
+// Service announcements
+// ---------------------------------------------------------------------------
+
+/// Real announcement sends allowed per rolling 24 hours (dry runs are free).
+pub const ANNOUNCEMENT_SENDS_PER_DAY: u32 = 3;
+/// The error code once they are used up (`429`).
+pub const ANNOUNCEMENT_RATE_CODE: &str = "ATH-RATE-ANNOUNCE";
+
+/// `POST /admin/announcements/mail`: a service mail (a planned reset, the
+/// end of the beta) to **every active user**, whatever their notification
+/// settings. `dry_run` only counts the recipients.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Validate, ToSchema, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export_to = "admin/")]
+pub struct AnnouncementMailRequest {
+    #[validate(length(min = 3, max = 150))]
+    pub subject: String,
+    /// Plain text; paragraphs separated by blank lines.
+    #[validate(length(min = 10, max = 5000))]
+    pub message: String,
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema, TS)]
+#[ts(export_to = "admin/")]
+pub struct AnnouncementMailResponse {
+    /// Active users the mail goes (or would go) to.
+    pub recipients: u32,
+    /// Mails handed to the mail service (`0` on a dry run).
+    pub queued: u32,
+    pub dry_run: bool,
 }
 
 // ---------------------------------------------------------------------------

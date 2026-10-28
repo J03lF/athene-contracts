@@ -6,7 +6,8 @@
 //! the list parameters of [`crate::work::ListTicketsQuery`] beyond
 //! `project_id` and `workspace_id`. Without them it answers the whole list
 //! as before, `{ "data": [...] }` (one release, for the readers that still
-//! hold it, QA-07).
+//! hold it, QA-07) — at most [`TICKET_UNPAGED_MAX`] tickets, else a `400`
+//! (W9A-07).
 //!
 //! The cursor is opaque: a client sends back what `meta.next_cursor` said,
 //! with the same filters and sort. A cursor of another query is a `400`.
@@ -22,6 +23,12 @@ use crate::work::TicketPriority;
 pub const TICKET_PAGE_DEFAULT_LIMIT: u32 = 50;
 /// The most tickets one page holds; a larger `limit` is clamped.
 pub const TICKET_PAGE_MAX_LIMIT: u32 = 200;
+/// The most tickets the unpaged list (`?workspace_id=` / `?project_id=`
+/// alone) answers (W9A-07). With more, it is a `400`
+/// [`TICKET_LIST_TOO_LARGE_CODE`] and the client pages (`limit`, `cursor`).
+pub const TICKET_UNPAGED_MAX: usize = 500;
+/// The unpaged list would hold more than [`TICKET_UNPAGED_MAX`] tickets.
+pub const TICKET_LIST_TOO_LARGE_CODE: &str = "ATH-VAL-005";
 /// The longest cursor the server hands out or reads. A title sort carries
 /// the title (up to 160 characters, 640 bytes in UTF-8) in base64url.
 pub const TICKET_CURSOR_MAX_CHARS: usize = 2048;

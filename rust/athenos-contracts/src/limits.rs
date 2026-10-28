@@ -99,3 +99,14 @@ pub const RELEASE_NOTES_DRAFT_MAX_BYTES: usize = 32 * 1024;
 /// name together: they travel in one connector request.
 pub const RELEASE_NOTES_EXCLUDED_MAX: usize = 200;
 pub const RELEASE_NOTES_ORDER_MAX: usize = 300;
+
+/// Over the platform's workspace quota (`quota_workspaces_per_account`):
+/// `409` on a workspace create (W9A-06).
+pub const QUOTA_WORKSPACES_CODE: &str = "ATH-QUOTA-001";
+/// Over the account's storage quota (`quota_storage_mb_per_account`, all
+/// the workspaces the owner owns): `409` on an upload. The workspace's own
+/// limit ([`ATTACHMENT_WORKSPACE_MAX_BYTES`]) stays.
+pub const QUOTA_STORAGE_CODE: &str = "ATH-QUOTA-002";
+/// Over the tickets a person may create per rolling 24 hours
+/// (`quota_tickets_per_day`): `429`.
+pub const QUOTA_TICKETS_PER_DAY_CODE: &str = "ATH-QUOTA-003";

@@ -33,6 +33,12 @@ pub struct RegisterRequest {
     pub password: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
+    /// The version of the legal texts the person accepted (the current
+    /// `legal.version` of `GET /public/site`); missing or outdated is a
+    /// `400 ATH-LEGAL-001` from the core.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[validate(length(min = 1, max = 32))]
+    pub accepted_legal_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Validate, ToSchema)]

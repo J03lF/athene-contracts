@@ -6,4 +6,39 @@ import type { RegistrationMode } from "../auth/RegistrationMode";
  * fields stay as they are. Maintenance mode itself is switched through
  * [`MaintenanceRequest`].
  */
-export type UpdateSettingsRequest = { registration_mode?: RegistrationMode | null, allowed_email_domains?: Array<string> | null, max_users?: number | null, max_teams?: number | null, maintenance_message?: string | null, maintenance_until?: string | null, };
+export type UpdateSettingsRequest = { registration_mode?: RegistrationMode | null, allowed_email_domains?: Array<string> | null, max_users?: number | null, max_teams?: number | null, maintenance_message?: string | null, maintenance_until?: string | null, 
+/**
+ * Absolute session lifetime in days, `1..=90`.
+ */
+session_max_days?: number | null, 
+/**
+ * Days without use before a session ends, `1..=90` and at most
+ * `session_max_days` (the stored one when that is absent): else `400`.
+ */
+session_idle_days?: number | null, beta_banner_enabled?: boolean | null, 
+/**
+ * `^[A-Za-z0-9._-]{1,32}$`; a new value asks everyone to consent again.
+ */
+legal_version?: string | null, 
+/**
+ * At most 200 characters; `""` clears it (the pages show
+ * `[HOSTER, LAND]`).
+ */
+legal_hoster?: string | null, 
+/**
+ * `YYYY-MM-DD`; `""` clears it (the pages show `[DATUM]`).
+ */
+legal_effective_date?: string | null, 
+/**
+ * Workspaces a person may own; `0` = unlimited.
+ */
+quota_workspaces_per_account?: number | null, 
+/**
+ * Attachment megabytes over all workspaces a person owns; `0` =
+ * unlimited.
+ */
+quota_storage_mb_per_account?: number | null, 
+/**
+ * Tickets a person creates per rolling 24 hours; `0` = unlimited.
+ */
+quota_tickets_per_day?: number | null, };

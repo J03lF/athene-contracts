@@ -27,6 +27,12 @@ export interface RegisterRequest {
   display_name: string;
   password: string;
   api_key?: string;
+  /**
+   * The version of the legal texts the person accepted: the current
+   * `legal.version` of `GET /public/site`. Missing or outdated is a
+   * `400 ATH-LEGAL-001`.
+   */
+  accepted_legal_version?: string;
 }
 
 export interface RegisterConfirmRequest {

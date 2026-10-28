@@ -5,4 +5,32 @@ export type SettingsResponse = { registration_mode: RegistrationMode, maintenanc
 /**
  * Id of the admin who last changed the settings.
  */
-updated_by: string | null, };
+updated_by: string | null, 
+/**
+ * Absolute session lifetime in days (auth-service reads it).
+ */
+session_max_days: number, 
+/**
+ * Days without use before a session ends.
+ */
+session_idle_days: number, beta_banner_enabled: boolean, 
+/**
+ * The legal texts' version people consent to.
+ */
+legal_version: string, legal_hoster: string | null, 
+/**
+ * `YYYY-MM-DD`.
+ */
+legal_effective_date: string | null, 
+/**
+ * `0` = unlimited.
+ */
+quota_workspaces_per_account: number, 
+/**
+ * `0` = unlimited.
+ */
+quota_storage_mb_per_account: number, 
+/**
+ * `0` = unlimited.
+ */
+quota_tickets_per_day: number, };
