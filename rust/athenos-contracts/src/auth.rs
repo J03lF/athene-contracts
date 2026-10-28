@@ -57,10 +57,19 @@ pub struct PasswordResetConfirmRequest {
     pub new_password: String,
 }
 
+/// A PIN step the client has to finish (`POST /auth/login/request`,
+/// `/auth/register/request`).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct AuthChallenge {
     pub challenge_id: String,
     pub expires_at: DateTime<Utc>,
+    /// Which confirm finishes it (W9-SPEC §7): `login` ⇒
+    /// `/auth/login/confirm`, `register` ⇒ `/auth/register/confirm`. A
+    /// sign-in with the right password of an account that was never
+    /// confirmed answers `register`: a fresh registration code went out.
+    /// Absent from older services; treat absent as the endpoint's own kind.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<ChallengePurpose>,
 }
 
 impl AuthChallenge {
@@ -68,8 +77,23 @@ impl AuthChallenge {
         Self {
             challenge_id: challenge_id.to_string(),
             expires_at,
+            purpose: None,
         }
     }
+
+    #[must_use]
+    pub fn with_purpose(mut self, purpose: ChallengePurpose) -> Self {
+        self.purpose = Some(purpose);
+        self
+    }
+}
+
+/// What an [`AuthChallenge`]'s PIN confirms.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ChallengePurpose {
+    Login,
+    Register,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]

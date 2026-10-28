@@ -43,9 +43,22 @@ export interface PasswordResetConfirmRequest {
   new_password: string;
 }
 
+/**
+ * Which confirm finishes a challenge: `login` ⇒ `/auth/login/confirm`,
+ * `register` ⇒ `/auth/register/confirm`.
+ */
+export type ChallengePurpose = 'login' | 'register';
+
+/**
+ * A PIN step the client has to finish. A sign-in with the right password of
+ * an account that was never confirmed answers `purpose: 'register'` (a fresh
+ * registration code went out). Absent from older services: then the
+ * endpoint's own kind.
+ */
 export interface AuthChallenge {
   challenge_id: string;
   expires_at: string;
+  purpose?: ChallengePurpose;
 }
 
 export interface AuthUser {
