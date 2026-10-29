@@ -547,6 +547,13 @@ pub struct WorkspaceIntegrationsResponse {
     pub configured: bool,
     /// This server takes `http` addresses too (a dev installation).
     pub allows_http: bool,
+    /// This server sends to loopback and private addresses too
+    /// (`ATHENOS_INTEGRATIONS_ALLOW_PRIVATE`, a dev installation; a
+    /// production core refuses to start with it). The web then leaves its
+    /// own check of local names and private addresses to the server.
+    /// Absent from an older core: `false`.
+    #[serde(default)]
+    pub allows_private: bool,
 }
 
 /// `POST /work/workspaces/:workspace_id/integrations`.

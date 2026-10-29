@@ -17,4 +17,12 @@ configured: boolean,
 /**
  * This server takes `http` addresses too (a dev installation).
  */
-allows_http: boolean, };
+allows_http: boolean, 
+/**
+ * This server sends to loopback and private addresses too
+ * (`ATHENOS_INTEGRATIONS_ALLOW_PRIVATE`, a dev installation; a
+ * production core refuses to start with it). The web then leaves its
+ * own check of local names and private addresses to the server.
+ * Absent from an older core: `false`.
+ */
+allows_private: boolean, };
