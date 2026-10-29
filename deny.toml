@@ -1,5 +1,5 @@
 # cargo-deny configuration (Athenos quality overhaul, step 1.1).
-# Run: cargo deny check            (CI: .github/workflows/ci.yml, local: scripts/ci-local.sh)
+# Run: cargo deny check            (release gates: .github/workflows/release.yml, local: scripts/ci-local.sh)
 # Docs: https://embarkstudios.github.io/cargo-deny/
 
 [graph]

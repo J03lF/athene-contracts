@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local run of the CI quality gates (.github/workflows/ci.yml), step 1.1 of the
+# Local run of the release gates (.github/workflows/release.yml), step 1.1 of the
 # Athenos quality overhaul. Works without any push: siblings are resolved from
 # the local tree through the same ../../ path patches CI recreates.
 #
@@ -24,19 +24,19 @@ run_gate() {
   if "$@"; then results+=("$name: ok"); else results+=("$name: FAILED"); failed=1; fi
 }
 
-# CI builds siblings at the SHAs pinned in ci.yml; warn when the local
-# checkout differs, because then "green here" is not "green in CI".
+# The release builds siblings at the SHAs pinned in release.yml; warn when the local
+# checkout differs, because then "green here" is not "green in the release".
 check_sibling() {
   local var=$1 dir=$2
   local pinned
-  pinned=$(sed -n "s/^  $var: \([0-9a-f]\{40\}\).*/\1/p" .github/workflows/ci.yml)
+  pinned=$(sed -n "s/^  $var: \([0-9a-f]\{40\}\).*/\1/p" .github/workflows/release.yml)
   [ -z "$pinned" ] && return 0
   if [ ! -d "$dir/.git" ]; then echo "warning: sibling $dir missing"; return 0; fi
   local head dirty=""
   head=$(git -C "$dir" rev-parse HEAD)
   [ -n "$(git -C "$dir" status --porcelain --untracked-files=no)" ] && dirty=" + uncommitted changes"
   if [ "$head" != "$pinned" ] || [ -n "$dirty" ]; then
-    echo "warning: $dir is at ${head:0:12}$dirty, CI pins ${pinned:0:12} ($var in ci.yml)"
+    echo "warning: $dir is at ${head:0:12}$dirty, the release pins ${pinned:0:12} ($var in release.yml)"
   fi
 }
 check_sibling MODULE_KIT_SHA ../../module-kit

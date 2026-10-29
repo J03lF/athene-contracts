@@ -1,0 +1,80 @@
+# The only pipeline of athenos-contracts: it runs on a tag v* (pushed by
+# fenrir infra/release/release.sh) or by hand, never on an ordinary push,
+# pull request or schedule (GitHub Actions minutes are scarce).
+#
+#   gates    fmt, clippy, tests (the TypeScript bindings check included) and
+#            cargo-deny (advisories, bans, licenses, sources).
+#   release  on a tag only: the GitHub release of the tag. The modules take
+#            the contracts by commit (CONTRACTS_SHA, the web's package.json
+#            pin), so there is no build artifact; the release marks which
+#            commit a module release was built against.
+#
+# The version of this repository lives in its tags only: the crates and the
+# npm package stay at 0.1.0, because every module's Cargo.lock records the
+# crate version and a bump would break their --locked builds.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  # Pinned so a new stable release cannot turn a release red via `-D warnings`.
+  RUST_TOOLCHAIN: "1.89.0"
+  CARGO_DENY_VERSION: "0.20.2"
+
+jobs:
+  gates:
+    name: fmt, clippy, test, cargo-deny
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust ${{ env.RUST_TOOLCHAIN }}
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt,clippy
+          rustup default "$RUST_TOOLCHAIN"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Format
+        run: cargo fmt --all --check
+      # --all-features: the service kit's axum/otel code is feature-gated.
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+      - name: Test
+        run: cargo test --all-targets --all-features --locked
+      - uses: taiki-e/install-action@37f7c5781271959fb65b6b35224e28652ff2b63d # v2.87.0
+        with:
+          tool: cargo-deny@${{ env.CARGO_DENY_VERSION }}
+      - name: cargo-deny (advisories, bans, licenses, sources)
+        run: cargo deny --locked check
+
+  release:
+    name: GitHub release
+    needs: gates
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # gh release create
+    steps:
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "athenos-contracts $TAG" \
+              --notes "Contracts at $GITHUB_SHA. Modules pin this commit as CONTRACTS_SHA." ||
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
