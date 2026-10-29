@@ -35,6 +35,7 @@ export * from './payloads/ticket-changes';
 export * from './payloads/legal';
 export * from './payloads/account';
 export * from './payloads/integrations';
+export * from './payloads/data-transfer';
 export * from './http';
 export * from './clients/auth-client';
 export * from './clients/user-client';

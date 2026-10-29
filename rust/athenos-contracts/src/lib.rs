@@ -11,6 +11,7 @@ pub mod auth;
 pub mod calendar;
 pub mod common;
 pub mod dashboard;
+pub mod data_transfer;
 pub mod docs;
 pub mod edit;
 pub mod field_assignments;
